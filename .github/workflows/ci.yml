@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          check-latest: true
+
+      - name: Lint
+        run: make lint
+
+      - name: Security Scan
+        run: make gosec
+
+      - name: Unit Tests
+        run: make test-unit
+
+      - name: Integration Tests
+        env:
+          PITCHSTACK_API_BASE_URL: https://api-gamma.pitchstack.com:8443
+          PITCHSTACK_API_TOKEN: TEST
+          PITCHSTACK_CARD_ID: sink-below-r
+          PITCHSTACK_CARD_SEARCH_TERM: sink
+          PITCHSTACK_PRINTING_ID: FTTgbMdc7HPFD8bfLrQNK
+          PITCHSTACK_PHYSICAL_CARD_ID: pc_FTTgbMdc7HPFD8bfLrQNK
+          PITCHSTACK_NONEXISTENT_CARD_ID: hahalol
+        run: make test-integration
