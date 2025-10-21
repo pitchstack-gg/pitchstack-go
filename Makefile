@@ -15,13 +15,7 @@ gosec:
 	gosec ./...
 
 test-unit:
-	@echo "==> running unit tests"
-	@set -o pipefail; packages="$$( go list ./... | grep -v 'tests/integration' || true )"; \
-	if [ -z "$$packages" ]; then \
-		echo "no unit packages to test"; \
-	else \
-		go test $$packages; \
-	fi
+	go test ./client/...
 
 test-integration:
 	@echo "==> running integration tests"

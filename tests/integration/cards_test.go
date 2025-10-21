@@ -3,7 +3,7 @@ package integration
 import (
 	"testing"
 
-	client "github.com/pitchstack-gg/pitchstack-go/client/client"
+	client "github.com/pitchstack-gg/pitchstack-go/client/v1"
 	"github.com/stretchr/testify/require"
 )
 
