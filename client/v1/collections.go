@@ -42,6 +42,15 @@ const (
 	CollectionTypeList        CollectionType = "LIST"
 )
 
+// CollectionPermission mirrors authzv1Permission.
+type CollectionPermission string
+
+const (
+	CollectionPermissionUnspecified CollectionPermission = "PERMISSION_UNSPECIFIED"
+	CollectionPermissionReader      CollectionPermission = "PERMISSION_READER"
+	CollectionPermissionWriter      CollectionPermission = "PERMISSION_WRITER"
+)
+
 // Collection mirrors v1Collection from the API definition.
 type Collection struct {
 	ID             string          `json:"id,omitempty"`
@@ -166,6 +175,38 @@ type BatchGetCollectionsResponse struct {
 }
 
 func (r *BatchGetCollectionsResponse) setMetadata(metadata ResponseMetadata) {
+	r.Metadata = metadata
+}
+
+// GrantCollectionAccessRequest assigns a permission for a collection.
+type GrantCollectionAccessRequest struct {
+	CollectionID string               `json:"resourceId,omitempty"`
+	SubjectID    string               `json:"subjectId,omitempty"`
+	Permission   CollectionPermission `json:"permission,omitempty"`
+}
+
+// GrantCollectionAccessResponse captures metadata for grant operations.
+type GrantCollectionAccessResponse struct {
+	Metadata ResponseMetadata `json:"-"`
+}
+
+func (r *GrantCollectionAccessResponse) setMetadata(metadata ResponseMetadata) {
+	r.Metadata = metadata
+}
+
+// RevokeCollectionAccessRequest removes a permission for a collection.
+type RevokeCollectionAccessRequest struct {
+	CollectionID string               `json:"resourceId,omitempty"`
+	SubjectID    string               `json:"subjectId,omitempty"`
+	Permission   CollectionPermission `json:"permission,omitempty"`
+}
+
+// RevokeCollectionAccessResponse captures metadata for revoke operations.
+type RevokeCollectionAccessResponse struct {
+	Metadata ResponseMetadata `json:"-"`
+}
+
+func (r *RevokeCollectionAccessResponse) setMetadata(metadata ResponseMetadata) {
 	r.Metadata = metadata
 }
 
@@ -389,6 +430,102 @@ func (c *Client) GetCollectionValuation(ctx context.Context, request *GetCollect
 	req.URL.RawQuery = query.Encode()
 
 	response := &GetCollectionValuationResponse{}
+	if err := c.do(req, response, opts...); err != nil {
+		return nil, err
+	}
+
+	return response, nil
+}
+
+// GrantCollectionAccess assigns a permission for a user to access a collection.
+func (c *Client) GrantCollectionAccess(ctx context.Context, request *GrantCollectionAccessRequest, opts ...RequestOpt) (*GrantCollectionAccessResponse, error) {
+	if request == nil {
+		return nil, errors.New("request must not be nil")
+	}
+
+	collectionID := strings.TrimSpace(request.CollectionID)
+	if collectionID == "" {
+		return nil, errors.New("collectionID must not be empty")
+	}
+	subjectID := strings.TrimSpace(request.SubjectID)
+	if subjectID == "" {
+		return nil, errors.New("subjectID must not be empty")
+	}
+	permission := CollectionPermission(strings.TrimSpace(string(request.Permission)))
+	if permission == "" || permission == CollectionPermissionUnspecified {
+		return nil, errors.New("permission must be specified")
+	}
+
+	body, err := jsonBody(struct {
+		CollectionID string               `json:"resourceId,omitempty"`
+		SubjectID    string               `json:"subjectId,omitempty"`
+		Permission   CollectionPermission `json:"permission,omitempty"`
+	}{
+		CollectionID: collectionID,
+		SubjectID:    subjectID,
+		Permission:   permission,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("encode body: %w", err)
+	}
+
+	req, err := c.newRequest(ctx, http.MethodPost, "/v1/collections/permissions:grant", body)
+	if err != nil {
+		return nil, err
+	}
+	if body != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
+
+	response := &GrantCollectionAccessResponse{}
+	if err := c.do(req, response, opts...); err != nil {
+		return nil, err
+	}
+
+	return response, nil
+}
+
+// RevokeCollectionAccess removes a permission previously granted to access a collection.
+func (c *Client) RevokeCollectionAccess(ctx context.Context, request *RevokeCollectionAccessRequest, opts ...RequestOpt) (*RevokeCollectionAccessResponse, error) {
+	if request == nil {
+		return nil, errors.New("request must not be nil")
+	}
+
+	collectionID := strings.TrimSpace(request.CollectionID)
+	if collectionID == "" {
+		return nil, errors.New("collectionID must not be empty")
+	}
+	subjectID := strings.TrimSpace(request.SubjectID)
+	if subjectID == "" {
+		return nil, errors.New("subjectID must not be empty")
+	}
+	permission := CollectionPermission(strings.TrimSpace(string(request.Permission)))
+	if permission == "" || permission == CollectionPermissionUnspecified {
+		return nil, errors.New("permission must be specified")
+	}
+
+	body, err := jsonBody(struct {
+		CollectionID string               `json:"resourceId,omitempty"`
+		SubjectID    string               `json:"subjectId,omitempty"`
+		Permission   CollectionPermission `json:"permission,omitempty"`
+	}{
+		CollectionID: collectionID,
+		SubjectID:    subjectID,
+		Permission:   permission,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("encode body: %w", err)
+	}
+
+	req, err := c.newRequest(ctx, http.MethodPost, "/v1/collections/permissions:revoke", body)
+	if err != nil {
+		return nil, err
+	}
+	if body != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
+
+	response := &RevokeCollectionAccessResponse{}
 	if err := c.do(req, response, opts...); err != nil {
 		return nil, err
 	}

@@ -309,3 +309,81 @@ func TestClientGetCollectionValuation(t *testing.T) {
 		require.Nil(t, resp)
 	})
 }
+
+func TestClientGrantCollectionAccess(t *testing.T) {
+	t.Run("when payload valid, then permission is granted", func(t *testing.T) {
+		handler := func(w http.ResponseWriter, r *http.Request) {
+			require.Equal(t, http.MethodPost, r.Method)
+			require.Equal(t, "/v1/collections/permissions:grant", r.URL.Path)
+			require.Equal(t, "application/json", r.Header.Get("Content-Type"))
+
+			var payload map[string]any
+			require.NoError(t, json.NewDecoder(r.Body).Decode(&payload))
+			require.Equal(t, "col-1", payload["resourceId"])
+			require.Equal(t, "user-42", payload["subjectId"])
+			require.Equal(t, string(CollectionPermissionReader), payload["permission"])
+
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{}`))
+		}
+
+		server := httptest.NewServer(http.HandlerFunc(handler))
+		t.Cleanup(server.Close)
+
+		client := newTestClient(t, WithBaseURL(server.URL), WithHTTPClient(server.Client()))
+		resp, err := client.GrantCollectionAccess(context.Background(), &GrantCollectionAccessRequest{
+			CollectionID: "col-1",
+			SubjectID:    "user-42",
+			Permission:   CollectionPermissionReader,
+		})
+		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, resp.Metadata.StatusCode)
+	})
+
+	t.Run("when required fields missing, then returns error", func(t *testing.T) {
+		client := newTestClient(t)
+		resp, err := client.GrantCollectionAccess(context.Background(), &GrantCollectionAccessRequest{})
+		require.Error(t, err)
+		require.Nil(t, resp)
+	})
+}
+
+func TestClientRevokeCollectionAccess(t *testing.T) {
+	t.Run("when payload valid, then permission is revoked", func(t *testing.T) {
+		handler := func(w http.ResponseWriter, r *http.Request) {
+			require.Equal(t, http.MethodPost, r.Method)
+			require.Equal(t, "/v1/collections/permissions:revoke", r.URL.Path)
+			require.Equal(t, "application/json", r.Header.Get("Content-Type"))
+
+			var payload map[string]any
+			require.NoError(t, json.NewDecoder(r.Body).Decode(&payload))
+			require.Equal(t, "col-1", payload["resourceId"])
+			require.Equal(t, "user-42", payload["subjectId"])
+			require.Equal(t, string(CollectionPermissionWriter), payload["permission"])
+
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{}`))
+		}
+
+		server := httptest.NewServer(http.HandlerFunc(handler))
+		t.Cleanup(server.Close)
+
+		client := newTestClient(t, WithBaseURL(server.URL), WithHTTPClient(server.Client()))
+		resp, err := client.RevokeCollectionAccess(context.Background(), &RevokeCollectionAccessRequest{
+			CollectionID: "col-1",
+			SubjectID:    "user-42",
+			Permission:   CollectionPermissionWriter,
+		})
+		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, resp.Metadata.StatusCode)
+	})
+
+	t.Run("when required fields missing, then returns error", func(t *testing.T) {
+		client := newTestClient(t)
+		resp, err := client.RevokeCollectionAccess(context.Background(), &RevokeCollectionAccessRequest{})
+		require.Error(t, err)
+		require.Nil(t, resp)
+	})
+}
