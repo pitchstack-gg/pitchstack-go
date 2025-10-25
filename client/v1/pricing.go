@@ -109,7 +109,7 @@ func (c *Client) GetPhysicalCardPrice(ctx context.Context, request *GetPhysicalC
 		return nil, errors.New("physicalCardID must not be empty")
 	}
 
-	path := fmt.Sprintf("/api/v1/physical_cards/%s/price", url.PathEscape(request.PhysicalCardID))
+	path := fmt.Sprintf("/v1/prices/%s", url.PathEscape(request.PhysicalCardID))
 	req, err := c.newRequest(ctx, http.MethodGet, path, nil)
 	if err != nil {
 		return nil, err
@@ -137,7 +137,7 @@ func (c *Client) GetPhysicalCardPriceHistory(ctx context.Context, request *GetPh
 		return nil, errors.New("physicalCardID must not be empty")
 	}
 
-	path := fmt.Sprintf("/api/v1/physical_cards/%s/price/history", url.PathEscape(request.PhysicalCardID))
+	path := fmt.Sprintf("/v1/prices/%s/history", url.PathEscape(request.PhysicalCardID))
 	req, err := c.newRequest(ctx, http.MethodGet, path, nil)
 	if err != nil {
 		return nil, err
@@ -174,7 +174,7 @@ func (c *Client) GetBulkPhysicalCardPrices(ctx context.Context, request *GetBulk
 		return nil, fmt.Errorf("encode body: %w", err)
 	}
 
-	req, err := c.newRequest(ctx, http.MethodPost, "/api/v1/prices:batchGet", body)
+	req, err := c.newRequest(ctx, http.MethodPost, "/v1/prices:batchGet", body)
 	if err != nil {
 		return nil, err
 	}
@@ -183,21 +183,6 @@ func (c *Client) GetBulkPhysicalCardPrices(ctx context.Context, request *GetBulk
 	}
 
 	response := &GetBulkPhysicalCardPricesResponse{}
-	if err := c.do(req, response, opts...); err != nil {
-		return nil, err
-	}
-
-	return response, nil
-}
-
-// GetPricingStats retrieves aggregate pricing statistics.
-func (c *Client) GetPricingStats(ctx context.Context, opts ...RequestOpt) (*GetPricingStatsResponse, error) {
-	req, err := c.newRequest(ctx, http.MethodGet, "/api/v1/prices:stats", nil)
-	if err != nil {
-		return nil, err
-	}
-
-	response := &GetPricingStatsResponse{}
 	if err := c.do(req, response, opts...); err != nil {
 		return nil, err
 	}

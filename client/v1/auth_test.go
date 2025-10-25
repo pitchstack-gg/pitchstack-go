@@ -17,7 +17,7 @@ func TestClientLogin(t *testing.T) {
 
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			require.Equal(t, http.MethodPost, r.Method)
-			require.Equal(t, "/api/v1/auth/login", r.URL.Path)
+			require.Equal(t, "/v1/auth/login", r.URL.Path)
 			require.Equal(t, "application/json", r.Header.Get("Content-Type"))
 
 			var payload LoginRequest
@@ -67,7 +67,7 @@ func TestClientRefreshToken(t *testing.T) {
 		expectedExpiry := time.Now().UTC().Truncate(time.Second)
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			require.Equal(t, http.MethodPost, r.Method)
-			require.Equal(t, "/api/v1/auth/token/refresh", r.URL.Path)
+			require.Equal(t, "/v1/auth/token/refresh", r.URL.Path)
 
 			var payload RefreshTokenRequest
 			require.NoError(t, json.NewDecoder(r.Body).Decode(&payload))
@@ -101,7 +101,7 @@ func TestClientRefreshToken(t *testing.T) {
 func TestClientLogout(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		require.Equal(t, http.MethodPost, r.Method)
-		require.Equal(t, "/api/v1/auth/logout", r.URL.Path)
+		require.Equal(t, "/v1/auth/logout", r.URL.Path)
 		require.Equal(t, "application/json", r.Header.Get("Content-Type"))
 		require.NoError(t, json.NewDecoder(r.Body).Decode(&LogoutRequest{}))
 		w.Header().Set("X-Request-Id", "req-logout")
@@ -119,7 +119,7 @@ func TestClientLogout(t *testing.T) {
 func TestClientMe(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		require.Equal(t, http.MethodGet, r.Method)
-		require.Equal(t, "/api/v1/me", r.URL.Path)
+		require.Equal(t, "/v1/me", r.URL.Path)
 		require.NoError(t, json.NewEncoder(w).Encode(MeResponse{
 			User: &User{
 				UserID:   "user-1",
@@ -138,7 +138,7 @@ func TestClientMe(t *testing.T) {
 func TestClientGetUser(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		require.Equal(t, http.MethodGet, r.Method)
-		require.Equal(t, "/api/v1/users/user-1", r.URL.Path)
+		require.Equal(t, "/v1/users/user-1", r.URL.Path)
 		require.NoError(t, json.NewEncoder(w).Encode(GetUserResponse{
 			User: &User{UserID: "user-1"},
 		}))
@@ -159,7 +159,7 @@ func TestClientGetUser(t *testing.T) {
 func TestClientUpdateUser(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		require.Equal(t, http.MethodPut, r.Method)
-		require.Equal(t, "/api/v1/users/user-1", r.URL.Path)
+		require.Equal(t, "/v1/users/user-1", r.URL.Path)
 
 		var payload struct {
 			Email string   `json:"email"`

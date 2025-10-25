@@ -19,7 +19,7 @@ func TestClientListCollectionItems(t *testing.T) {
 			require.Equal(t, "col-1", values.Get("collectionId"))
 			require.Equal(t, "card-1", values.Get("cardId"))
 			require.Equal(t, "printing-1", values.Get("printingId"))
-			require.Equal(t, "phys-1", values.Get("physicalCardId"))
+			require.Equal(t, "product-1", values.Get("productId"))
 			require.Equal(t, "25", values.Get("pageSize"))
 			require.Equal(t, "token", values.Get("nextToken"))
 
@@ -35,12 +35,12 @@ func TestClientListCollectionItems(t *testing.T) {
 
 		client := newTestClient(t, WithBaseURL(server.URL), WithHTTPClient(server.Client()))
 		resp, err := client.ListCollectionItems(context.Background(), &ListCollectionItemsRequest{
-			CollectionID:   "col-1",
-			CardID:         "card-1",
-			PrintingID:     "printing-1",
-			PhysicalCardID: "phys-1",
-			PageSize:       &pageSize,
-			NextToken:      "token",
+			CollectionID: "col-1",
+			CardID:       "card-1",
+			PrintingID:   "printing-1",
+			ProductID:    "product-1",
+			PageSize:     &pageSize,
+			NextToken:    "token",
 		})
 		require.NoError(t, err)
 		require.Len(t, resp.Items, 1)
@@ -50,7 +50,7 @@ func TestClientListCollectionItems(t *testing.T) {
 func TestClientGetCollectionItem(t *testing.T) {
 	t.Run("when id provided, then item fetched", func(t *testing.T) {
 		handler := func(w http.ResponseWriter, r *http.Request) {
-			require.Equal(t, "/api/v1/collection_items/item-1", r.URL.Path)
+			require.Equal(t, "/v1/collection_items/item-1", r.URL.Path)
 			resp := GetCollectionItemResponse{Item: &CollectionItem{ID: "item-1"}}
 			w.Header().Set("Content-Type", "application/json")
 			_ = json.NewEncoder(w).Encode(resp)
@@ -82,9 +82,11 @@ func TestClientCreateCollectionItem(t *testing.T) {
 			var body CreateCollectionItemRequest
 			require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
 			require.Equal(t, "col-1", body.CollectionID)
-			require.Equal(t, "phys-1", body.PhysicalCardID)
+			require.Equal(t, "product-1", body.ProductID)
 			require.Equal(t, int32(3), body.Quantity)
 			require.Equal(t, ConditionNearMint, body.Condition)
+			require.NotNil(t, body.Value)
+			require.InEpsilon(t, 9.99, *body.Value, 1e-9)
 
 			resp := CreateCollectionItemResponse{Item: &CollectionItem{ID: "item-1"}}
 			w.Header().Set("Content-Type", "application/json")
@@ -95,11 +97,13 @@ func TestClientCreateCollectionItem(t *testing.T) {
 		t.Cleanup(server.Close)
 
 		client := newTestClient(t, WithBaseURL(server.URL), WithHTTPClient(server.Client()))
+		value := 9.99
 		resp, err := client.CreateCollectionItem(context.Background(), &CreateCollectionItemRequest{
-			CollectionID:   "col-1",
-			PhysicalCardID: "phys-1",
-			Quantity:       3,
-			Condition:      ConditionNearMint,
+			CollectionID: "col-1",
+			ProductID:    "product-1",
+			Quantity:     3,
+			Condition:    ConditionNearMint,
+			Value:        &value,
 		})
 		require.NoError(t, err)
 		require.Equal(t, "item-1", resp.Item.ID)
@@ -117,14 +121,15 @@ func TestClientUpdateCollectionItem(t *testing.T) {
 	t.Run("when fields provided, then update request sent", func(t *testing.T) {
 		handler := func(w http.ResponseWriter, r *http.Request) {
 			require.Equal(t, http.MethodPut, r.Method)
-			require.Equal(t, "/api/v1/collection_items/item-1", r.URL.Path)
+			require.Equal(t, "/v1/collection_items/item-1", r.URL.Path)
 
 			var body map[string]interface{}
 			require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
 			require.EqualValues(t, 5, body["quantity"])
 			require.Equal(t, string(ConditionLightlyPlayed), body["condition"])
+			require.EqualValues(t, 12.5, body["value"])
 
-			resp := UpdateCollectionItemResponse{Item: &CollectionItem{ID: "item-1", Quantity: 5}}
+			resp := UpdateCollectionItemResponse{Item: &CollectionItem{ID: "item-1", Quantity: 5, Value: 12.5}}
 			w.Header().Set("Content-Type", "application/json")
 			_ = json.NewEncoder(w).Encode(resp)
 		}
@@ -134,15 +139,18 @@ func TestClientUpdateCollectionItem(t *testing.T) {
 
 		quantity := int32(5)
 		condition := ConditionLightlyPlayed
+		value := 12.5
 
 		client := newTestClient(t, WithBaseURL(server.URL), WithHTTPClient(server.Client()))
 		resp, err := client.UpdateCollectionItem(context.Background(), &UpdateCollectionItemRequest{
 			ItemID:    "item-1",
 			Quantity:  &quantity,
 			Condition: &condition,
+			Value:     &value,
 		})
 		require.NoError(t, err)
 		require.Equal(t, int32(5), resp.Item.Quantity)
+		require.InEpsilon(t, 12.5, resp.Item.Value, 1e-9)
 	})
 
 	t.Run("when id missing, then returns error", func(t *testing.T) {
@@ -157,7 +165,7 @@ func TestClientDeleteCollectionItem(t *testing.T) {
 	t.Run("when id provided, then delete succeeds", func(t *testing.T) {
 		handler := func(w http.ResponseWriter, r *http.Request) {
 			require.Equal(t, http.MethodDelete, r.Method)
-			require.Equal(t, "/api/v1/collection_items/item-1", r.URL.Path)
+			require.Equal(t, "/v1/collection_items/item-1", r.URL.Path)
 			_, _ = w.Write([]byte(`{}`))
 		}
 
@@ -181,7 +189,7 @@ func TestClientDeleteCollectionItem(t *testing.T) {
 func TestClientBatchGetCollectionItems(t *testing.T) {
 	t.Run("when ids provided, then items fetched", func(t *testing.T) {
 		handler := func(w http.ResponseWriter, r *http.Request) {
-			require.Equal(t, "/api/v1/collection_items:batchGet", r.URL.Path)
+			require.Equal(t, "/v1/collection_items:batchGet", r.URL.Path)
 
 			var body BatchGetCollectionItemsRequest
 			require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
@@ -212,45 +220,6 @@ func TestClientBatchGetCollectionItems(t *testing.T) {
 	t.Run("when request is nil, then returns error", func(t *testing.T) {
 		client := newTestClient(t)
 		resp, err := client.BatchGetCollectionItems(context.Background(), nil)
-		require.Error(t, err)
-		require.Nil(t, resp)
-	})
-}
-
-func TestClientCollectionItemsSync(t *testing.T) {
-	t.Run("when ops provided, then sync request succeeds", func(t *testing.T) {
-		handler := func(w http.ResponseWriter, r *http.Request) {
-			require.Equal(t, "/api/v1/collection_items:sync", r.URL.Path)
-
-			var body CollectionItemsSyncRequest
-			require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
-			require.Len(t, body.Ops, 1)
-			require.Equal(t, SyncActionDelete, body.Ops[0].Action)
-
-			resp := CollectionItemsSyncResponse{
-				Results: []CollectionItemSyncResult{{OpID: "1", Status: SyncStatusOK}},
-			}
-			w.Header().Set("Content-Type", "application/json")
-			_ = json.NewEncoder(w).Encode(resp)
-		}
-
-		server := httptest.NewServer(http.HandlerFunc(handler))
-		t.Cleanup(server.Close)
-
-		client := newTestClient(t, WithBaseURL(server.URL), WithHTTPClient(server.Client()))
-		resp, err := client.CollectionItemsSync(context.Background(), &CollectionItemsSyncRequest{
-			Ops: []CollectionItemSyncOp{
-				{OpID: "1", Action: SyncActionDelete},
-			},
-		})
-		require.NoError(t, err)
-		require.Len(t, resp.Results, 1)
-		require.Equal(t, SyncStatusOK, resp.Results[0].Status)
-	})
-
-	t.Run("when request is nil, then returns error", func(t *testing.T) {
-		client := newTestClient(t)
-		resp, err := client.CollectionItemsSync(context.Background(), nil)
 		require.Error(t, err)
 		require.Nil(t, resp)
 	})

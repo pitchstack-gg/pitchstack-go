@@ -26,10 +26,11 @@ const (
 type CollectionItem struct {
 	ID             string     `json:"id,omitempty"`
 	CollectionID   string     `json:"collectionId,omitempty"`
-	UserID         string     `json:"userId,omitempty"`
-	PhysicalCardID string     `json:"physicalCardId,omitempty"`
+	OwnerID        string     `json:"ownerId,omitempty"`
+	ProductID      string     `json:"productId,omitempty"`
 	Quantity       int32      `json:"quantity,omitempty"`
 	Condition      Condition  `json:"condition,omitempty"`
+	Value          float64    `json:"value,omitempty"`
 	CreatedAt      *time.Time `json:"createdAt,omitempty"`
 	UpdatedAt      *time.Time `json:"updatedAt,omitempty"`
 	CardID         string     `json:"cardId,omitempty"`
@@ -40,12 +41,12 @@ type CollectionItem struct {
 
 // ListCollectionItemsRequest captures filters for listing items.
 type ListCollectionItemsRequest struct {
-	CollectionID   string
-	CardID         string
-	PrintingID     string
-	PhysicalCardID string
-	PageSize       *int32
-	NextToken      string
+	CollectionID string
+	CardID       string
+	PrintingID   string
+	ProductID    string
+	PageSize     *int32
+	NextToken    string
 }
 
 // ListCollectionItemsResponse returns paginated items.
@@ -76,10 +77,11 @@ func (r *GetCollectionItemResponse) setMetadata(metadata ResponseMetadata) {
 
 // CreateCollectionItemRequest creates an item within a collection.
 type CreateCollectionItemRequest struct {
-	CollectionID   string    `json:"collectionId,omitempty"`
-	PhysicalCardID string    `json:"physicalCardId,omitempty"`
-	Quantity       int32     `json:"quantity,omitempty"`
-	Condition      Condition `json:"condition,omitempty"`
+	CollectionID string    `json:"collectionId,omitempty"`
+	ProductID    string    `json:"productId,omitempty"`
+	Quantity     int32     `json:"quantity,omitempty"`
+	Condition    Condition `json:"condition,omitempty"`
+	Value        *float64  `json:"value,omitempty"`
 }
 
 // CreateCollectionItemResponse returns the created item.
@@ -97,6 +99,7 @@ type UpdateCollectionItemRequest struct {
 	ItemID    string     `json:"-"`
 	Quantity  *int32     `json:"quantity,omitempty"`
 	Condition *Condition `json:"condition,omitempty"`
+	Value     *float64   `json:"value,omitempty"`
 }
 
 // UpdateCollectionItemResponse returns the updated item.
@@ -140,49 +143,13 @@ func (r *BatchGetCollectionItemsResponse) setMetadata(metadata ResponseMetadata)
 	r.Metadata = metadata
 }
 
-// CollectionItemSyncOp describes a sync operation for collection items.
-type CollectionItemSyncOp struct {
-	OpID            string     `json:"opId,omitempty"`
-	Action          SyncAction `json:"action,omitempty"`
-	ID              string     `json:"id,omitempty"`
-	ClientUpdatedAt *time.Time `json:"clientUpdatedAt,omitempty"`
-	PhysicalCardID  string     `json:"physicalCardId,omitempty"`
-	CollectionID    string     `json:"collectionId,omitempty"`
-	Condition       Condition  `json:"condition,omitempty"`
-	Quantity        int32      `json:"quantity,omitempty"`
-}
-
-// CollectionItemsSyncRequest carries item sync operations.
-type CollectionItemsSyncRequest struct {
-	Ops []CollectionItemSyncOp `json:"ops,omitempty"`
-}
-
-// CollectionItemSyncResult reports outcome for an item operation.
-type CollectionItemSyncResult struct {
-	OpID     string          `json:"opId,omitempty"`
-	Status   SyncStatus      `json:"status,omitempty"`
-	Entity   *CollectionItem `json:"entity,omitempty"`
-	ServerID string          `json:"serverId,omitempty"`
-	Message  string          `json:"message,omitempty"`
-}
-
-// CollectionItemsSyncResponse aggregates item sync results.
-type CollectionItemsSyncResponse struct {
-	Results  []CollectionItemSyncResult `json:"results,omitempty"`
-	Metadata ResponseMetadata           `json:"-"`
-}
-
-func (r *CollectionItemsSyncResponse) setMetadata(metadata ResponseMetadata) {
-	r.Metadata = metadata
-}
-
 // ListCollectionItems enumerates collection items with optional filters.
 func (c *Client) ListCollectionItems(ctx context.Context, request *ListCollectionItemsRequest, opts ...RequestOpt) (*ListCollectionItemsResponse, error) {
 	if request == nil {
 		request = &ListCollectionItemsRequest{}
 	}
 
-	req, err := c.newRequest(ctx, http.MethodGet, "/api/v1/collection_items", nil)
+	req, err := c.newRequest(ctx, http.MethodGet, "/v1/collection_items", nil)
 	if err != nil {
 		return nil, err
 	}
@@ -197,8 +164,8 @@ func (c *Client) ListCollectionItems(ctx context.Context, request *ListCollectio
 	if printingID := strings.TrimSpace(request.PrintingID); printingID != "" {
 		query.Set("printingId", printingID)
 	}
-	if physicalCardID := strings.TrimSpace(request.PhysicalCardID); physicalCardID != "" {
-		query.Set("physicalCardId", physicalCardID)
+	if productID := strings.TrimSpace(request.ProductID); productID != "" {
+		query.Set("productId", productID)
 	}
 	if request.PageSize != nil && *request.PageSize > 0 {
 		query.Set("pageSize", strconv.Itoa(int(*request.PageSize)))
@@ -225,7 +192,7 @@ func (c *Client) GetCollectionItem(ctx context.Context, request *GetCollectionIt
 		return nil, errors.New("itemID must not be empty")
 	}
 
-	path := fmt.Sprintf("/api/v1/collection_items/%s", url.PathEscape(request.ItemID))
+	path := fmt.Sprintf("/v1/collection_items/%s", url.PathEscape(request.ItemID))
 	req, err := c.newRequest(ctx, http.MethodGet, path, nil)
 	if err != nil {
 		return nil, err
@@ -250,7 +217,7 @@ func (c *Client) CreateCollectionItem(ctx context.Context, request *CreateCollec
 		return nil, fmt.Errorf("encode body: %w", err)
 	}
 
-	req, err := c.newRequest(ctx, http.MethodPost, "/api/v1/collection_items", body)
+	req, err := c.newRequest(ctx, http.MethodPost, "/v1/collection_items", body)
 	if err != nil {
 		return nil, err
 	}
@@ -278,15 +245,17 @@ func (c *Client) UpdateCollectionItem(ctx context.Context, request *UpdateCollec
 	body, err := jsonBody(struct {
 		Quantity  *int32     `json:"quantity,omitempty"`
 		Condition *Condition `json:"condition,omitempty"`
+		Value     *float64   `json:"value,omitempty"`
 	}{
 		Quantity:  request.Quantity,
 		Condition: request.Condition,
+		Value:     request.Value,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("encode body: %w", err)
 	}
 
-	path := fmt.Sprintf("/api/v1/collection_items/%s", url.PathEscape(request.ItemID))
+	path := fmt.Sprintf("/v1/collection_items/%s", url.PathEscape(request.ItemID))
 	req, err := c.newRequest(ctx, http.MethodPut, path, body)
 	if err != nil {
 		return nil, err
@@ -312,7 +281,7 @@ func (c *Client) DeleteCollectionItem(ctx context.Context, request *DeleteCollec
 		return nil, errors.New("itemID must not be empty")
 	}
 
-	path := fmt.Sprintf("/api/v1/collection_items/%s", url.PathEscape(request.ItemID))
+	path := fmt.Sprintf("/v1/collection_items/%s", url.PathEscape(request.ItemID))
 	req, err := c.newRequest(ctx, http.MethodDelete, path, nil)
 	if err != nil {
 		return nil, err
@@ -337,7 +306,7 @@ func (c *Client) BatchGetCollectionItems(ctx context.Context, request *BatchGetC
 		return nil, fmt.Errorf("encode body: %w", err)
 	}
 
-	req, err := c.newRequest(ctx, http.MethodPost, "/api/v1/collection_items:batchGet", body)
+	req, err := c.newRequest(ctx, http.MethodPost, "/v1/collection_items:batchGet", body)
 	if err != nil {
 		return nil, err
 	}
@@ -346,33 +315,6 @@ func (c *Client) BatchGetCollectionItems(ctx context.Context, request *BatchGetC
 	}
 
 	response := &BatchGetCollectionItemsResponse{}
-	if err := c.do(req, response, opts...); err != nil {
-		return nil, err
-	}
-
-	return response, nil
-}
-
-// CollectionItemsSync synchronizes collection items in bulk.
-func (c *Client) CollectionItemsSync(ctx context.Context, request *CollectionItemsSyncRequest, opts ...RequestOpt) (*CollectionItemsSyncResponse, error) {
-	if request == nil {
-		return nil, errors.New("request must not be nil")
-	}
-
-	body, err := jsonBody(request)
-	if err != nil {
-		return nil, fmt.Errorf("encode body: %w", err)
-	}
-
-	req, err := c.newRequest(ctx, http.MethodPost, "/api/v1/collection_items:sync", body)
-	if err != nil {
-		return nil, err
-	}
-	if body != nil {
-		req.Header.Set("Content-Type", "application/json")
-	}
-
-	response := &CollectionItemsSyncResponse{}
 	if err := c.do(req, response, opts...); err != nil {
 		return nil, err
 	}

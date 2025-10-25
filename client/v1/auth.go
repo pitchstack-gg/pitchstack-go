@@ -272,7 +272,7 @@ func (c *Client) Login(ctx context.Context, request *LoginRequest, opts ...Reque
 		return nil, fmt.Errorf("encode body: %w", err)
 	}
 
-	req, err := c.newRequest(ctx, http.MethodPost, "/api/v1/auth/login", body)
+	req, err := c.newRequest(ctx, http.MethodPost, "/v1/auth/login", body)
 	if err != nil {
 		return nil, err
 	}
@@ -302,7 +302,7 @@ func (c *Client) RefreshToken(ctx context.Context, request *RefreshTokenRequest,
 		return nil, fmt.Errorf("encode body: %w", err)
 	}
 
-	req, err := c.newRequest(ctx, http.MethodPost, "/api/v1/auth/token/refresh", body)
+	req, err := c.newRequest(ctx, http.MethodPost, "/v1/auth/token/refresh", body)
 	if err != nil {
 		return nil, err
 	}
@@ -329,7 +329,7 @@ func (c *Client) Logout(ctx context.Context, request *LogoutRequest, opts ...Req
 		return nil, fmt.Errorf("encode body: %w", err)
 	}
 
-	req, err := c.newRequest(ctx, http.MethodPost, "/api/v1/auth/logout", body)
+	req, err := c.newRequest(ctx, http.MethodPost, "/v1/auth/logout", body)
 	if err != nil {
 		return nil, err
 	}
@@ -347,7 +347,7 @@ func (c *Client) Logout(ctx context.Context, request *LogoutRequest, opts ...Req
 
 // Me retrieves the current authenticated user.
 func (c *Client) Me(ctx context.Context, opts ...RequestOpt) (*MeResponse, error) {
-	req, err := c.newRequest(ctx, http.MethodGet, "/api/v1/me", nil)
+	req, err := c.newRequest(ctx, http.MethodGet, "/v1/me", nil)
 	if err != nil {
 		return nil, err
 	}
@@ -371,7 +371,7 @@ func (c *Client) GetUser(ctx context.Context, request *GetUserRequest, opts ...R
 		return nil, errors.New("userID must not be empty")
 	}
 
-	path := fmt.Sprintf("/api/v1/users/%s", url.PathEscape(userID))
+	path := fmt.Sprintf("/v1/users/%s", url.PathEscape(userID))
 	req, err := c.newRequest(ctx, http.MethodGet, path, nil)
 	if err != nil {
 		return nil, err
@@ -409,7 +409,7 @@ func (c *Client) UpdateUser(ctx context.Context, request *UpdateUserRequest, opt
 		return nil, fmt.Errorf("encode body: %w", err)
 	}
 
-	path := fmt.Sprintf("/api/v1/users/%s", url.PathEscape(userID))
+	path := fmt.Sprintf("/v1/users/%s", url.PathEscape(userID))
 	req, err := c.newRequest(ctx, http.MethodPut, path, body)
 	if err != nil {
 		return nil, err

@@ -14,7 +14,7 @@ import (
 func TestClientGetPhysicalCardPrice(t *testing.T) {
 	t.Run("when card id provided, then price entry returned", func(t *testing.T) {
 		handler := func(w http.ResponseWriter, r *http.Request) {
-			require.Equal(t, "/api/v1/physical_cards/phys-1/price", r.URL.Path)
+			require.Equal(t, "/v1/prices/phys-1", r.URL.Path)
 			require.Equal(t, "TCGPlayer", r.URL.Query().Get("source"))
 			require.Equal(t, "USD", r.URL.Query().Get("currency"))
 
@@ -56,7 +56,7 @@ func TestClientGetPhysicalCardPriceHistory(t *testing.T) {
 		now := time.Now().UTC().Round(time.Second)
 
 		handler := func(w http.ResponseWriter, r *http.Request) {
-			require.Equal(t, "/api/v1/physical_cards/phys-1/price/history", r.URL.Path)
+			require.Equal(t, "/v1/prices/phys-1/history", r.URL.Path)
 			require.Equal(t, "2024-01-01", r.URL.Query().Get("startDate"))
 			require.Equal(t, "2024-02-01", r.URL.Query().Get("endDate"))
 			require.Equal(t, "50", r.URL.Query().Get("limit"))
@@ -141,32 +141,5 @@ func TestClientGetBulkPhysicalCardPrices(t *testing.T) {
 		resp, err := client.GetBulkPhysicalCardPrices(context.Background(), nil)
 		require.Error(t, err)
 		require.Nil(t, resp)
-	})
-}
-
-func TestClientGetPricingStats(t *testing.T) {
-	t.Run("when endpoint returns stats, then response decoded", func(t *testing.T) {
-		now := time.Now().UTC().Round(time.Second)
-		handler := func(w http.ResponseWriter, r *http.Request) {
-			require.Equal(t, "/api/v1/prices:stats", r.URL.Path)
-
-			resp := GetPricingStatsResponse{
-				TotalCards:     100,
-				UpdatedLast24h: 25,
-				AveragePrice:   5.55,
-				LastUpdateTime: &now,
-			}
-			w.Header().Set("Content-Type", "application/json")
-			_ = json.NewEncoder(w).Encode(resp)
-		}
-
-		server := httptest.NewServer(http.HandlerFunc(handler))
-		t.Cleanup(server.Close)
-
-		client := newTestClient(t, WithBaseURL(server.URL), WithHTTPClient(server.Client()))
-		resp, err := client.GetPricingStats(context.Background())
-		require.NoError(t, err)
-		require.Equal(t, int32(100), resp.TotalCards)
-		require.NotNil(t, resp.LastUpdateTime)
 	})
 }

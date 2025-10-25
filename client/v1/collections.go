@@ -31,37 +31,40 @@ const (
 	VisibilityLevelPublic      VisibilityLevel = "VISIBILITY_LEVEL_PUBLIC"
 )
 
-// SyncAction represents v1SyncAction.
-type SyncAction string
+// CollectionType matches the API's v1CollectionType enum.
+type CollectionType string
 
 const (
-	SyncActionUnspecified SyncAction = "SYNC_ACTION_UNSPECIFIED"
-	SyncActionUpsert      SyncAction = "UPSERT"
-	SyncActionDelete      SyncAction = "DELETE"
-)
-
-// SyncStatus represents v1SyncStatus.
-type SyncStatus string
-
-const (
-	SyncStatusUnspecified SyncStatus = "SYNC_STATUS_UNSPECIFIED"
-	SyncStatusOK          SyncStatus = "OK"
-	SyncStatusConflict    SyncStatus = "CONFLICT"
-	SyncStatusError       SyncStatus = "ERROR"
+	CollectionTypeUnspecified CollectionType = "COLLECTION_TYPE_UNSPECIFIED"
+	CollectionTypeBinder      CollectionType = "BINDER"
+	CollectionTypeWantlist    CollectionType = "WANTLIST"
+	CollectionTypeTradelist   CollectionType = "TRADELIST"
+	CollectionTypeList        CollectionType = "LIST"
 )
 
 // Collection mirrors v1Collection from the API definition.
 type Collection struct {
-	ID              string          `json:"id,omitempty"`
-	Name            string          `json:"name,omitempty"`
-	Description     string          `json:"description,omitempty"`
-	UserID          string          `json:"userId,omitempty"`
-	Visibility      VisibilityLevel `json:"visibility,omitempty"`
-	CreatedAt       *time.Time      `json:"createdAt,omitempty"`
-	UpdatedAt       *time.Time      `json:"updatedAt,omitempty"`
-	ItemsCount      int32           `json:"itemsCount,omitempty"`
-	QuantityCount   int32           `json:"quantityCount,omitempty"`
-	UniqueCardCount int32           `json:"uniqueCardCount,omitempty"`
+	ID             string          `json:"id,omitempty"`
+	Name           string          `json:"name,omitempty"`
+	Description    string          `json:"description,omitempty"`
+	OwnerID        string          `json:"ownerId,omitempty"`
+	CollectionType CollectionType  `json:"collectionType,omitempty"`
+	Visibility     VisibilityLevel `json:"visibility,omitempty"`
+	CreatedAt      *time.Time      `json:"createdAt,omitempty"`
+	UpdatedAt      *time.Time      `json:"updatedAt,omitempty"`
+}
+
+// CollectionStats captures aggregate metrics for a collection.
+type CollectionStats struct {
+	ItemsCount      int32 `json:"itemsCount,omitempty"`
+	QuantityCount   int32 `json:"quantityCount,omitempty"`
+	UniqueCardCount int32 `json:"uniqueCardCount,omitempty"`
+}
+
+// CollectionWithStats bundles a collection and its stats.
+type CollectionWithStats struct {
+	Collection *Collection      `json:"collection,omitempty"`
+	Stats      *CollectionStats `json:"stats,omitempty"`
 }
 
 // ListCollectionsRequest captures query parameters for ListCollections.
@@ -85,9 +88,10 @@ func (r *ListCollectionsResponse) setMetadata(metadata ResponseMetadata) {
 
 // CreateCollectionRequest captures payload fields for collection creation.
 type CreateCollectionRequest struct {
-	Name        string          `json:"name,omitempty"`
-	Description string          `json:"description,omitempty"`
-	Visibility  VisibilityLevel `json:"visibility,omitempty"`
+	Name           string          `json:"name,omitempty"`
+	CollectionType CollectionType  `json:"collectionType,omitempty"`
+	Description    string          `json:"description,omitempty"`
+	Visibility     VisibilityLevel `json:"visibility,omitempty"`
 }
 
 // CreateCollectionResponse contains the created collection.
@@ -108,6 +112,7 @@ type GetCollectionRequest struct {
 // GetCollectionResponse returns a single collection.
 type GetCollectionResponse struct {
 	Collection *Collection      `json:"collection,omitempty"`
+	Stats      *CollectionStats `json:"stats,omitempty"`
 	Metadata   ResponseMetadata `json:"-"`
 }
 
@@ -155,47 +160,12 @@ type BatchGetCollectionsRequest struct {
 
 // BatchGetCollectionsResponse returns collections fetched in bulk.
 type BatchGetCollectionsResponse struct {
-	Collections []Collection     `json:"collections,omitempty"`
-	NotFoundIDs []string         `json:"notFoundIds,omitempty"`
-	Metadata    ResponseMetadata `json:"-"`
+	Collections []CollectionWithStats `json:"collections,omitempty"`
+	NotFoundIDs []string              `json:"notFoundIds,omitempty"`
+	Metadata    ResponseMetadata      `json:"-"`
 }
 
 func (r *BatchGetCollectionsResponse) setMetadata(metadata ResponseMetadata) {
-	r.Metadata = metadata
-}
-
-// CollectionSyncOp describes a collections sync operation.
-type CollectionSyncOp struct {
-	OpID            string          `json:"opId,omitempty"`
-	Action          SyncAction      `json:"action,omitempty"`
-	ID              string          `json:"id,omitempty"`
-	ClientUpdatedAt *time.Time      `json:"clientUpdatedAt,omitempty"`
-	Name            string          `json:"name,omitempty"`
-	Description     string          `json:"description,omitempty"`
-	Visibility      VisibilityLevel `json:"visibility,omitempty"`
-}
-
-// CollectionsSyncRequest carries a batch of sync operations.
-type CollectionsSyncRequest struct {
-	Ops []CollectionSyncOp `json:"ops,omitempty"`
-}
-
-// CollectionSyncResult provides per-operation outcomes.
-type CollectionSyncResult struct {
-	OpID     string      `json:"opId,omitempty"`
-	Status   SyncStatus  `json:"status,omitempty"`
-	Entity   *Collection `json:"entity,omitempty"`
-	ServerID string      `json:"serverId,omitempty"`
-	Message  string      `json:"message,omitempty"`
-}
-
-// CollectionsSyncResponse aggregates sync results.
-type CollectionsSyncResponse struct {
-	Results  []CollectionSyncResult `json:"results,omitempty"`
-	Metadata ResponseMetadata       `json:"-"`
-}
-
-func (r *CollectionsSyncResponse) setMetadata(metadata ResponseMetadata) {
 	r.Metadata = metadata
 }
 
@@ -222,59 +192,13 @@ func (r *GetCollectionValuationResponse) setMetadata(metadata ResponseMetadata) 
 	r.Metadata = metadata
 }
 
-// ListStarredCollectionsRequest enumerates starred collections for a user.
-type ListStarredCollectionsRequest struct {
-	UserID string `json:"-"`
-	Limit  *int32
-	Offset *int32
-}
-
-// ListStarredCollectionsResponse includes collections and totals.
-type ListStarredCollectionsResponse struct {
-	Collections []Collection     `json:"collections,omitempty"`
-	Total       int32            `json:"total,omitempty"`
-	Metadata    ResponseMetadata `json:"-"`
-}
-
-func (r *ListStarredCollectionsResponse) setMetadata(metadata ResponseMetadata) {
-	r.Metadata = metadata
-}
-
-// StarCollectionRequest toggles starring for a collection.
-type StarCollectionRequest struct {
-	CollectionID string `json:"-"`
-}
-
-// StarCollectionResponse carries response metadata.
-type StarCollectionResponse struct {
-	Metadata ResponseMetadata `json:"-"`
-}
-
-func (r *StarCollectionResponse) setMetadata(metadata ResponseMetadata) {
-	r.Metadata = metadata
-}
-
-// UnstarCollectionRequest removes a star from a collection.
-type UnstarCollectionRequest struct {
-	CollectionID string `json:"-"`
-}
-
-// UnstarCollectionResponse carries response metadata.
-type UnstarCollectionResponse struct {
-	Metadata ResponseMetadata `json:"-"`
-}
-
-func (r *UnstarCollectionResponse) setMetadata(metadata ResponseMetadata) {
-	r.Metadata = metadata
-}
-
 // ListCollections enumerates collections visible to the caller.
 func (c *Client) ListCollections(ctx context.Context, request *ListCollectionsRequest, opts ...RequestOpt) (*ListCollectionsResponse, error) {
 	if request == nil {
 		request = &ListCollectionsRequest{}
 	}
 
-	req, err := c.newRequest(ctx, http.MethodGet, "/api/v1/collections", nil)
+	req, err := c.newRequest(ctx, http.MethodGet, "/v1/collections", nil)
 	if err != nil {
 		return nil, err
 	}
@@ -315,7 +239,7 @@ func (c *Client) CreateCollection(ctx context.Context, request *CreateCollection
 		return nil, fmt.Errorf("encode body: %w", err)
 	}
 
-	req, err := c.newRequest(ctx, http.MethodPost, "/api/v1/collections", body)
+	req, err := c.newRequest(ctx, http.MethodPost, "/v1/collections", body)
 	if err != nil {
 		return nil, err
 	}
@@ -340,7 +264,7 @@ func (c *Client) GetCollection(ctx context.Context, request *GetCollectionReques
 		return nil, errors.New("collectionID must not be empty")
 	}
 
-	path := fmt.Sprintf("/api/v1/collections/%s", url.PathEscape(request.CollectionID))
+	path := fmt.Sprintf("/v1/collections/%s", url.PathEscape(request.CollectionID))
 	req, err := c.newRequest(ctx, http.MethodGet, path, nil)
 	if err != nil {
 		return nil, err
@@ -376,7 +300,7 @@ func (c *Client) UpdateCollection(ctx context.Context, request *UpdateCollection
 		return nil, fmt.Errorf("encode body: %w", err)
 	}
 
-	path := fmt.Sprintf("/api/v1/collections/%s", url.PathEscape(request.CollectionID))
+	path := fmt.Sprintf("/v1/collections/%s", url.PathEscape(request.CollectionID))
 	req, err := c.newRequest(ctx, http.MethodPut, path, body)
 	if err != nil {
 		return nil, err
@@ -402,7 +326,7 @@ func (c *Client) DeleteCollection(ctx context.Context, request *DeleteCollection
 		return nil, errors.New("collectionID must not be empty")
 	}
 
-	path := fmt.Sprintf("/api/v1/collections/%s", url.PathEscape(request.CollectionID))
+	path := fmt.Sprintf("/v1/collections/%s", url.PathEscape(request.CollectionID))
 	req, err := c.newRequest(ctx, http.MethodDelete, path, nil)
 	if err != nil {
 		return nil, err
@@ -427,7 +351,7 @@ func (c *Client) BatchGetCollections(ctx context.Context, request *BatchGetColle
 		return nil, fmt.Errorf("encode body: %w", err)
 	}
 
-	req, err := c.newRequest(ctx, http.MethodPost, "/api/v1/collections:batchGet", body)
+	req, err := c.newRequest(ctx, http.MethodPost, "/v1/collections:batchGet", body)
 	if err != nil {
 		return nil, err
 	}
@@ -436,33 +360,6 @@ func (c *Client) BatchGetCollections(ctx context.Context, request *BatchGetColle
 	}
 
 	response := &BatchGetCollectionsResponse{}
-	if err := c.do(req, response, opts...); err != nil {
-		return nil, err
-	}
-
-	return response, nil
-}
-
-// CollectionsSync synchronizes collections in bulk.
-func (c *Client) CollectionsSync(ctx context.Context, request *CollectionsSyncRequest, opts ...RequestOpt) (*CollectionsSyncResponse, error) {
-	if request == nil {
-		return nil, errors.New("request must not be nil")
-	}
-
-	body, err := jsonBody(request)
-	if err != nil {
-		return nil, fmt.Errorf("encode body: %w", err)
-	}
-
-	req, err := c.newRequest(ctx, http.MethodPost, "/api/v1/collections:sync", body)
-	if err != nil {
-		return nil, err
-	}
-	if body != nil {
-		req.Header.Set("Content-Type", "application/json")
-	}
-
-	response := &CollectionsSyncResponse{}
 	if err := c.do(req, response, opts...); err != nil {
 		return nil, err
 	}
@@ -479,7 +376,7 @@ func (c *Client) GetCollectionValuation(ctx context.Context, request *GetCollect
 		return nil, errors.New("collectionID must not be empty")
 	}
 
-	path := fmt.Sprintf("/api/v1/collections/%s/valuation", url.PathEscape(request.CollectionID))
+	path := fmt.Sprintf("/v1/collections/%s/valuation", url.PathEscape(request.CollectionID))
 	req, err := c.newRequest(ctx, http.MethodGet, path, nil)
 	if err != nil {
 		return nil, err
@@ -492,84 +389,6 @@ func (c *Client) GetCollectionValuation(ctx context.Context, request *GetCollect
 	req.URL.RawQuery = query.Encode()
 
 	response := &GetCollectionValuationResponse{}
-	if err := c.do(req, response, opts...); err != nil {
-		return nil, err
-	}
-
-	return response, nil
-}
-
-// ListStarredCollections returns starred collections for a user.
-func (c *Client) ListStarredCollections(ctx context.Context, request *ListStarredCollectionsRequest, opts ...RequestOpt) (*ListStarredCollectionsResponse, error) {
-	if request == nil {
-		return nil, errors.New("request must not be nil")
-	}
-	if strings.TrimSpace(request.UserID) == "" {
-		return nil, errors.New("userID must not be empty")
-	}
-
-	path := fmt.Sprintf("/api/v1/users/%s/stars/collections", url.PathEscape(request.UserID))
-	req, err := c.newRequest(ctx, http.MethodGet, path, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	query := req.URL.Query()
-	if request.Limit != nil && *request.Limit >= 0 {
-		query.Set("limit", strconv.Itoa(int(*request.Limit)))
-	}
-	if request.Offset != nil && *request.Offset >= 0 {
-		query.Set("offset", strconv.Itoa(int(*request.Offset)))
-	}
-	req.URL.RawQuery = query.Encode()
-
-	response := &ListStarredCollectionsResponse{}
-	if err := c.do(req, response, opts...); err != nil {
-		return nil, err
-	}
-
-	return response, nil
-}
-
-// StarCollection marks a collection as starred.
-func (c *Client) StarCollection(ctx context.Context, request *StarCollectionRequest, opts ...RequestOpt) (*StarCollectionResponse, error) {
-	if request == nil {
-		return nil, errors.New("request must not be nil")
-	}
-	if strings.TrimSpace(request.CollectionID) == "" {
-		return nil, errors.New("collectionID must not be empty")
-	}
-
-	path := fmt.Sprintf("/api/v1/collections/%s/stars", url.PathEscape(request.CollectionID))
-	req, err := c.newRequest(ctx, http.MethodPost, path, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	response := &StarCollectionResponse{}
-	if err := c.do(req, response, opts...); err != nil {
-		return nil, err
-	}
-
-	return response, nil
-}
-
-// UnstarCollection removes the starred state from a collection.
-func (c *Client) UnstarCollection(ctx context.Context, request *UnstarCollectionRequest, opts ...RequestOpt) (*UnstarCollectionResponse, error) {
-	if request == nil {
-		return nil, errors.New("request must not be nil")
-	}
-	if strings.TrimSpace(request.CollectionID) == "" {
-		return nil, errors.New("collectionID must not be empty")
-	}
-
-	path := fmt.Sprintf("/api/v1/collections/%s/stars", url.PathEscape(request.CollectionID))
-	req, err := c.newRequest(ctx, http.MethodDelete, path, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	response := &UnstarCollectionResponse{}
 	if err := c.do(req, response, opts...); err != nil {
 		return nil, err
 	}
