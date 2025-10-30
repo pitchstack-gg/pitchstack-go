@@ -19,7 +19,7 @@ const (
 	envCardID            = "PITCHSTACK_CARD_ID"
 	envCardSearchTerm    = "PITCHSTACK_CARD_SEARCH_TERM"
 	envPrintingID        = "PITCHSTACK_PRINTING_ID"
-	envPhysicalCardID    = "PITCHSTACK_PHYSICAL_CARD_ID"
+	envProductID         = "PITCHSTACK_PRODUCT_ID"
 	envCollectionItemID  = "PITCHSTACK_COLLECTION_ITEM_ID"
 	envNonexistentCardID = "PITCHSTACK_NONEXISTENT_CARD_ID"
 
@@ -36,7 +36,7 @@ type testConfig struct {
 	CardID            string
 	CardSearchTerm    string
 	PrintingID        string
-	PhysicalCardID    string
+	ProductID         string
 	CollectionItemID  string
 	TagResourceID     string
 	TagResourceType   client.ResourceType
@@ -77,7 +77,7 @@ func loadTestConfig() testConfig {
 		CardID:            getEnvOrDefault(envCardID, "sink-below-r"),
 		CardSearchTerm:    getEnvOrDefault(envCardSearchTerm, "sink"),
 		PrintingID:        getEnvOrDefault(envPrintingID, "FTTgbMdc7HPFD8bfLrQNK"),
-		PhysicalCardID:    getEnvOrDefault(envPhysicalCardID, "pc_FTTgbMdc7HPFD8bfLrQNK"),
+		ProductID:         getEnvOrDefault(envProductID, "prod_FTTgbMdc7HPFD8bfLrQNK"),
 		NonexistentCardID: getEnvOrDefault(envNonexistentCardID, "hahalol"),
 	}
 }

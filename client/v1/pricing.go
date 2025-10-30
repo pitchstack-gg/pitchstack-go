@@ -13,72 +13,71 @@ import (
 
 // PriceEntry mirrors v1PriceEntry.
 type PriceEntry struct {
-	EntryID        string     `json:"entryId,omitempty"`
-	PhysicalCardID string     `json:"physicalCardId,omitempty"`
-	Currency       string     `json:"currency,omitempty"`
-	Price          float64    `json:"price,omitempty"`
-	LowPrice       float64    `json:"lowPrice,omitempty"`
-	HighPrice      float64    `json:"highPrice,omitempty"`
-	RecordAt       *time.Time `json:"recordAt,omitempty"`
-	Source         string     `json:"source,omitempty"`
-	SourceURL      string     `json:"sourceUrl,omitempty"`
+	EntryID   string     `json:"entryId,omitempty"`
+	ProductID string     `json:"productId,omitempty"`
+	Currency  string     `json:"currency,omitempty"`
+	Price     float64    `json:"price,omitempty"`
+	Price2    float64    `json:"price2,omitempty"`
+	Price3    float64    `json:"price3,omitempty"`
+	RecordAt  *time.Time `json:"recordAt,omitempty"`
+	Source    string     `json:"source,omitempty"`
+	SourceURL string     `json:"sourceUrl,omitempty"`
 }
 
-// GetPhysicalCardPriceRequest identifies which card price to fetch.
-type GetPhysicalCardPriceRequest struct {
-	PhysicalCardID string `json:"-"`
-	Source         string
-	Currency       string
+// GetProductPriceRequest identifies which product price to fetch.
+type GetProductPriceRequest struct {
+	ProductID string `json:"-"`
+	Source    string
 }
 
-// GetPhysicalCardPriceResponse contains the current price.
-type GetPhysicalCardPriceResponse struct {
+// GetProductPriceResponse contains the current price.
+type GetProductPriceResponse struct {
 	Entry    *PriceEntry      `json:"entry,omitempty"`
 	Metadata ResponseMetadata `json:"-"`
 }
 
-func (r *GetPhysicalCardPriceResponse) setMetadata(metadata ResponseMetadata) {
+func (r *GetProductPriceResponse) setMetadata(metadata ResponseMetadata) {
 	r.Metadata = metadata
 }
 
-// GetPhysicalCardPriceHistoryRequest fetches historical pricing.
-type GetPhysicalCardPriceHistoryRequest struct {
-	PhysicalCardID string `json:"-"`
-	StartDate      string
-	EndDate        string
-	Limit          *int32
-	Source         string
+// GetProductPriceHistoryRequest fetches historical pricing.
+type GetProductPriceHistoryRequest struct {
+	ProductID string `json:"-"`
+	StartDate string
+	EndDate   string
+	Limit     *int32
+	Source    string
 }
 
-// GetPhysicalCardPriceHistoryResponse mirrors v1GetPhysicalCardPriceHistoryResponse.
-type GetPhysicalCardPriceHistoryResponse struct {
-	PhysicalCardID string           `json:"physicalCardId,omitempty"`
-	Source         string           `json:"source,omitempty"`
-	SourceURL      string           `json:"sourceUrl,omitempty"`
-	StartTime      *time.Time       `json:"startTime,omitempty"`
-	EndTime        *time.Time       `json:"endTime,omitempty"`
-	Entries        []PriceEntry     `json:"entries,omitempty"`
-	Metadata       ResponseMetadata `json:"-"`
+// GetProductPriceHistoryResponse mirrors v1GetProductPriceHistoryResponse.
+type GetProductPriceHistoryResponse struct {
+	ProductID string           `json:"productId,omitempty"`
+	Source    string           `json:"source,omitempty"`
+	SourceURL string           `json:"sourceUrl,omitempty"`
+	StartTime *time.Time       `json:"startTime,omitempty"`
+	EndTime   *time.Time       `json:"endTime,omitempty"`
+	Entries   []PriceEntry     `json:"entries,omitempty"`
+	Metadata  ResponseMetadata `json:"-"`
 }
 
-func (r *GetPhysicalCardPriceHistoryResponse) setMetadata(metadata ResponseMetadata) {
+func (r *GetProductPriceHistoryResponse) setMetadata(metadata ResponseMetadata) {
 	r.Metadata = metadata
 }
 
-// GetBulkPhysicalCardPricesRequest fetches prices for multiple cards.
-type GetBulkPhysicalCardPricesRequest struct {
-	PhysicalCardIDs []string `json:"physicalCardIds,omitempty"`
-	Source          string   `json:"source,omitempty"`
+// BatchGetProductPricesRequest fetches prices for multiple products.
+type BatchGetProductPricesRequest struct {
+	ProductIDs []string `json:"productIds,omitempty"`
+	Source     string   `json:"source,omitempty"`
 }
 
-// GetBulkPhysicalCardPricesResponse mirrors v1GetBulkPhysicalCardPricesResponse.
-type GetBulkPhysicalCardPricesResponse struct {
+// BatchGetProductPricesResponse mirrors v1BatchGetProductPricesResponse.
+type BatchGetProductPricesResponse struct {
 	Prices   []PriceEntry     `json:"prices,omitempty"`
 	NotFound []string         `json:"notFound,omitempty"`
 	Metadata ResponseMetadata `json:"-"`
 }
 
-func (r *GetBulkPhysicalCardPricesResponse) setMetadata(metadata ResponseMetadata) {
+func (r *BatchGetProductPricesResponse) setMetadata(metadata ResponseMetadata) {
 	r.Metadata = metadata
 }
 
@@ -100,16 +99,16 @@ func (r *GetPricingStatsResponse) setMetadata(metadata ResponseMetadata) {
 	r.Metadata = metadata
 }
 
-// GetPhysicalCardPrice retrieves the current price entry for a physical card.
-func (c *Client) GetPhysicalCardPrice(ctx context.Context, request *GetPhysicalCardPriceRequest, opts ...RequestOpt) (*GetPhysicalCardPriceResponse, error) {
+// GetProductPrice retrieves the current price entry for a product.
+func (c *Client) GetProductPrice(ctx context.Context, request *GetProductPriceRequest, opts ...RequestOpt) (*GetProductPriceResponse, error) {
 	if request == nil {
 		return nil, errors.New("request must not be nil")
 	}
-	if strings.TrimSpace(request.PhysicalCardID) == "" {
-		return nil, errors.New("physicalCardID must not be empty")
+	if strings.TrimSpace(request.ProductID) == "" {
+		return nil, errors.New("productID must not be empty")
 	}
 
-	path := fmt.Sprintf("/v1/prices/%s", url.PathEscape(request.PhysicalCardID))
+	path := fmt.Sprintf("/v1/prices/%s", url.PathEscape(request.ProductID))
 	req, err := c.newRequest(ctx, http.MethodGet, path, nil)
 	if err != nil {
 		return nil, err
@@ -117,10 +116,9 @@ func (c *Client) GetPhysicalCardPrice(ctx context.Context, request *GetPhysicalC
 
 	query := req.URL.Query()
 	setQueryString(query, "source", request.Source)
-	setQueryString(query, "currency", request.Currency)
 	req.URL.RawQuery = query.Encode()
 
-	response := &GetPhysicalCardPriceResponse{}
+	response := &GetProductPriceResponse{}
 	if err := c.do(req, response, opts...); err != nil {
 		return nil, err
 	}
@@ -128,16 +126,16 @@ func (c *Client) GetPhysicalCardPrice(ctx context.Context, request *GetPhysicalC
 	return response, nil
 }
 
-// GetPhysicalCardPriceHistory retrieves pricing history for a card.
-func (c *Client) GetPhysicalCardPriceHistory(ctx context.Context, request *GetPhysicalCardPriceHistoryRequest, opts ...RequestOpt) (*GetPhysicalCardPriceHistoryResponse, error) {
+// GetProductPriceHistory retrieves pricing history for a product.
+func (c *Client) GetProductPriceHistory(ctx context.Context, request *GetProductPriceHistoryRequest, opts ...RequestOpt) (*GetProductPriceHistoryResponse, error) {
 	if request == nil {
 		return nil, errors.New("request must not be nil")
 	}
-	if strings.TrimSpace(request.PhysicalCardID) == "" {
-		return nil, errors.New("physicalCardID must not be empty")
+	if strings.TrimSpace(request.ProductID) == "" {
+		return nil, errors.New("productID must not be empty")
 	}
 
-	path := fmt.Sprintf("/v1/prices/%s/history", url.PathEscape(request.PhysicalCardID))
+	path := fmt.Sprintf("/v1/prices/%s/history", url.PathEscape(request.ProductID))
 	req, err := c.newRequest(ctx, http.MethodGet, path, nil)
 	if err != nil {
 		return nil, err
@@ -152,7 +150,7 @@ func (c *Client) GetPhysicalCardPriceHistory(ctx context.Context, request *GetPh
 	setQueryString(query, "source", request.Source)
 	req.URL.RawQuery = query.Encode()
 
-	response := &GetPhysicalCardPriceHistoryResponse{}
+	response := &GetProductPriceHistoryResponse{}
 	if err := c.do(req, response, opts...); err != nil {
 		return nil, err
 	}
@@ -160,13 +158,13 @@ func (c *Client) GetPhysicalCardPriceHistory(ctx context.Context, request *GetPh
 	return response, nil
 }
 
-// GetBulkPhysicalCardPrices retrieves prices for multiple cards.
-func (c *Client) GetBulkPhysicalCardPrices(ctx context.Context, request *GetBulkPhysicalCardPricesRequest, opts ...RequestOpt) (*GetBulkPhysicalCardPricesResponse, error) {
+// BatchGetProductPrices retrieves prices for multiple products.
+func (c *Client) BatchGetProductPrices(ctx context.Context, request *BatchGetProductPricesRequest, opts ...RequestOpt) (*BatchGetProductPricesResponse, error) {
 	if request == nil {
 		return nil, errors.New("request must not be nil")
 	}
-	if len(request.PhysicalCardIDs) == 0 {
-		return nil, errors.New("physicalCardIDs must not be empty")
+	if len(request.ProductIDs) == 0 {
+		return nil, errors.New("productIDs must not be empty")
 	}
 
 	body, err := jsonBody(request)
@@ -182,7 +180,7 @@ func (c *Client) GetBulkPhysicalCardPrices(ctx context.Context, request *GetBulk
 		req.Header.Set("Content-Type", "application/json")
 	}
 
-	response := &GetBulkPhysicalCardPricesResponse{}
+	response := &BatchGetProductPricesResponse{}
 	if err := c.do(req, response, opts...); err != nil {
 		return nil, err
 	}
