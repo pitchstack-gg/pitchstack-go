@@ -97,7 +97,7 @@ func TestClientSearchCards(t *testing.T) {
 func TestClientGetCard(t *testing.T) {
 	t.Run("when id provided, then card summary returned", func(t *testing.T) {
 		handler := func(w http.ResponseWriter, r *http.Request) {
-			require.Equal(t, "/api/v1/cards/card-1", r.URL.Path)
+			require.Equal(t, "/v1/cards/card-1", r.URL.Path)
 			resp := GetCardResponse{Summary: &CardSummary{Identifier: "card-1"}}
 			w.Header().Set("Content-Type", "application/json")
 			_ = json.NewEncoder(w).Encode(resp)
@@ -155,16 +155,16 @@ func TestClientBatchGetCards(t *testing.T) {
 	})
 }
 
-func TestClientListCardPrintings(t *testing.T) {
+func TestClientListPrintings(t *testing.T) {
 	t.Run("when card id provided, then printings listed", func(t *testing.T) {
 		pageSize := int32(15)
 		handler := func(w http.ResponseWriter, r *http.Request) {
-			require.Equal(t, "/api/v1/cards/card-1/printings", r.URL.Path)
+			require.Equal(t, "/v1/cards/card-1/printings", r.URL.Path)
 			require.Equal(t, "15", r.URL.Query().Get("pageSize"))
 			require.Equal(t, "token", r.URL.Query().Get("nextToken"))
 
-			resp := ListCardPrintingsResponse{
-				Summaries: []CardPrintingSummary{{Identifier: "printing-1"}},
+			resp := ListPrintingsResponse{
+				Summaries: []PrintingSummary{{Identifier: "printing-1"}},
 				NextToken: "next",
 			}
 			w.Header().Set("Content-Type", "application/json")
@@ -174,7 +174,7 @@ func TestClientListCardPrintings(t *testing.T) {
 		t.Cleanup(server.Close)
 
 		client := newTestClient(t, WithBaseURL(server.URL), WithHTTPClient(server.Client()))
-		resp, err := client.ListCardPrintings(context.Background(), &ListCardPrintingsRequest{
+		resp, err := client.ListPrintings(context.Background(), &ListPrintingsRequest{
 			CardID:    "card-1",
 			PageSize:  &pageSize,
 			NextToken: "token",
@@ -186,18 +186,18 @@ func TestClientListCardPrintings(t *testing.T) {
 
 	t.Run("when card id missing, then returns error", func(t *testing.T) {
 		client := newTestClient(t)
-		resp, err := client.ListCardPrintings(context.Background(), &ListCardPrintingsRequest{})
+		resp, err := client.ListPrintings(context.Background(), &ListPrintingsRequest{})
 		require.Error(t, err)
 		require.Nil(t, resp)
 	})
 }
 
-func TestClientListCardPrintingsForSetNumber(t *testing.T) {
+func TestClientListPrintingsForSetNumber(t *testing.T) {
 	t.Run("when set number provided, then summaries returned", func(t *testing.T) {
 		handler := func(w http.ResponseWriter, r *http.Request) {
-			require.Equal(t, "/api/v1/printings/set/XYZ123", r.URL.Path)
-			resp := ListCardPrintingsForSetNumberResponse{
-				Summaries: []CardPrintingSummary{{Identifier: "printing-1"}},
+			require.Equal(t, "/v1/printings/set/XYZ123", r.URL.Path)
+			resp := ListPrintingsForSetNumberResponse{
+				Summaries: []PrintingSummary{{Identifier: "printing-1"}},
 			}
 			w.Header().Set("Content-Type", "application/json")
 			_ = json.NewEncoder(w).Encode(resp)
@@ -207,7 +207,7 @@ func TestClientListCardPrintingsForSetNumber(t *testing.T) {
 		t.Cleanup(server.Close)
 
 		client := newTestClient(t, WithBaseURL(server.URL), WithHTTPClient(server.Client()))
-		resp, err := client.ListCardPrintingsForSetNumber(context.Background(), &ListCardPrintingsForSetNumberRequest{
+		resp, err := client.ListPrintingsForSetNumber(context.Background(), &ListPrintingsForSetNumberRequest{
 			SetNumber: "XYZ123",
 		})
 		require.NoError(t, err)
@@ -216,17 +216,17 @@ func TestClientListCardPrintingsForSetNumber(t *testing.T) {
 
 	t.Run("when set number missing, then returns error", func(t *testing.T) {
 		client := newTestClient(t)
-		resp, err := client.ListCardPrintingsForSetNumber(context.Background(), &ListCardPrintingsForSetNumberRequest{})
+		resp, err := client.ListPrintingsForSetNumber(context.Background(), &ListPrintingsForSetNumberRequest{})
 		require.Error(t, err)
 		require.Nil(t, resp)
 	})
 }
 
-func TestClientGetCardPrinting(t *testing.T) {
+func TestClientGetPrinting(t *testing.T) {
 	t.Run("when id provided, then printing returned", func(t *testing.T) {
 		handler := func(w http.ResponseWriter, r *http.Request) {
-			require.Equal(t, "/api/v1/printings/printing-1", r.URL.Path)
-			resp := GetCardPrintingResponse{Summary: &CardPrintingSummary{Identifier: "printing-1"}}
+			require.Equal(t, "/v1/printings/printing-1", r.URL.Path)
+			resp := GetPrintingResponse{Summary: &PrintingSummary{Identifier: "printing-1"}}
 			w.Header().Set("Content-Type", "application/json")
 			_ = json.NewEncoder(w).Encode(resp)
 		}
@@ -234,28 +234,28 @@ func TestClientGetCardPrinting(t *testing.T) {
 		t.Cleanup(server.Close)
 
 		client := newTestClient(t, WithBaseURL(server.URL), WithHTTPClient(server.Client()))
-		resp, err := client.GetCardPrinting(context.Background(), &GetCardPrintingRequest{PrintingID: "printing-1"})
+		resp, err := client.GetPrinting(context.Background(), &GetPrintingRequest{PrintingID: "printing-1"})
 		require.NoError(t, err)
 		require.Equal(t, "printing-1", resp.Summary.Identifier)
 	})
 
 	t.Run("when id missing, then returns error", func(t *testing.T) {
 		client := newTestClient(t)
-		resp, err := client.GetCardPrinting(context.Background(), &GetCardPrintingRequest{})
+		resp, err := client.GetPrinting(context.Background(), &GetPrintingRequest{})
 		require.Error(t, err)
 		require.Nil(t, resp)
 	})
 }
 
-func TestClientBatchGetCardPrintings(t *testing.T) {
+func TestClientBatchGetPrintings(t *testing.T) {
 	t.Run("when ids provided, then printings returned", func(t *testing.T) {
 		handler := func(w http.ResponseWriter, r *http.Request) {
-			var body BatchGetCardPrintingsRequest
+			var body BatchGetPrintingsRequest
 			require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
 			require.ElementsMatch(t, []string{"printing-1", "printing-2"}, body.PrintingIDs)
 
-			resp := BatchGetCardPrintingsResponse{
-				Printings:   map[string]CardPrintingSummary{"printing-1": {Identifier: "printing-1"}},
+			resp := BatchGetPrintingsResponse{
+				Printings:   map[string]PrintingSummary{"printing-1": {Identifier: "printing-1"}},
 				NotFoundIDs: []string{"printing-3"},
 			}
 			w.Header().Set("Content-Type", "application/json")
@@ -266,7 +266,7 @@ func TestClientBatchGetCardPrintings(t *testing.T) {
 		t.Cleanup(server.Close)
 
 		client := newTestClient(t, WithBaseURL(server.URL), WithHTTPClient(server.Client()))
-		resp, err := client.BatchGetCardPrintings(context.Background(), &BatchGetCardPrintingsRequest{
+		resp, err := client.BatchGetPrintings(context.Background(), &BatchGetPrintingsRequest{
 			PrintingIDs: []string{"printing-1", "printing-2"},
 		})
 		require.NoError(t, err)
@@ -276,7 +276,7 @@ func TestClientBatchGetCardPrintings(t *testing.T) {
 
 	t.Run("when request is nil, then returns error", func(t *testing.T) {
 		client := newTestClient(t)
-		resp, err := client.BatchGetCardPrintings(context.Background(), nil)
+		resp, err := client.BatchGetPrintings(context.Background(), nil)
 		require.Error(t, err)
 		require.Nil(t, resp)
 	})
@@ -285,7 +285,7 @@ func TestClientBatchGetCardPrintings(t *testing.T) {
 func TestClientGetProduct(t *testing.T) {
 	t.Run("when id provided, then product returned", func(t *testing.T) {
 		handler := func(w http.ResponseWriter, r *http.Request) {
-			require.Equal(t, "/api/v1/products/prod-1", r.URL.Path)
+			require.Equal(t, "/v1/products/prod-1", r.URL.Path)
 			resp := GetProductResponse{Summary: &ProductSummary{Identifier: "prod-1"}}
 			w.Header().Set("Content-Type", "application/json")
 			_ = json.NewEncoder(w).Encode(resp)

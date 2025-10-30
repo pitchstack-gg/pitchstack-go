@@ -145,8 +145,8 @@ type ProductSummary struct {
 	IsDFC           bool   `json:"isDfc,omitempty"`
 }
 
-// CardPrintingSummary mirrors v1CardPrintingSummary.
-type CardPrintingSummary struct {
+// PrintingSummary mirrors v1PrintingSummary.
+type PrintingSummary struct {
 	Identifier      string            `json:"identifier,omitempty"`
 	CardID          string            `json:"cardId,omitempty"`
 	SetPrintingID   string            `json:"setPrintingId,omitempty"`
@@ -265,68 +265,68 @@ func (r *BatchGetCardsResponse) setMetadata(metadata ResponseMetadata) {
 	r.Metadata = metadata
 }
 
-// ListCardPrintingsRequest enumerates printings for a card.
-type ListCardPrintingsRequest struct {
+// ListPrintingsRequest enumerates printings for a card.
+type ListPrintingsRequest struct {
 	CardID    string `json:"-"`
 	PageSize  *int32
 	NextToken string
 }
 
-// ListCardPrintingsResponse mirrors v1ListCardPrintingsResponse.
-type ListCardPrintingsResponse struct {
-	Summaries []CardPrintingSummary `json:"summaries,omitempty"`
-	NextToken string                `json:"nextToken,omitempty"`
-	Metadata  ResponseMetadata      `json:"-"`
+// ListPrintingsResponse mirrors v1ListPrintingsResponse.
+type ListPrintingsResponse struct {
+	Summaries []PrintingSummary `json:"summaries,omitempty"`
+	NextToken string            `json:"nextToken,omitempty"`
+	Metadata  ResponseMetadata  `json:"-"`
 }
 
-func (r *ListCardPrintingsResponse) setMetadata(metadata ResponseMetadata) {
+func (r *ListPrintingsResponse) setMetadata(metadata ResponseMetadata) {
 	r.Metadata = metadata
 }
 
-// ListCardPrintingsForSetNumberRequest enumerates printings by set number.
-type ListCardPrintingsForSetNumberRequest struct {
+// ListPrintingsForSetNumberRequest enumerates printings by set number.
+type ListPrintingsForSetNumberRequest struct {
 	SetNumber string `json:"-"`
 }
 
-// ListCardPrintingsForSetNumberResponse mirrors v1ListCardPrintingsForSetNumberResponse.
-type ListCardPrintingsForSetNumberResponse struct {
-	Summaries []CardPrintingSummary `json:"summaries,omitempty"`
-	Metadata  ResponseMetadata      `json:"-"`
+// ListPrintingsForSetNumberResponse mirrors v1ListPrintingsForSetNumberResponse.
+type ListPrintingsForSetNumberResponse struct {
+	Summaries []PrintingSummary `json:"summaries,omitempty"`
+	Metadata  ResponseMetadata  `json:"-"`
 }
 
-func (r *ListCardPrintingsForSetNumberResponse) setMetadata(metadata ResponseMetadata) {
+func (r *ListPrintingsForSetNumberResponse) setMetadata(metadata ResponseMetadata) {
 	r.Metadata = metadata
 }
 
-// GetCardPrintingRequest identifies a printing to fetch.
-type GetCardPrintingRequest struct {
+// GetPrintingRequest identifies a printing to fetch.
+type GetPrintingRequest struct {
 	PrintingID string `json:"-"`
 }
 
-// GetCardPrintingResponse contains a printing summary.
-type GetCardPrintingResponse struct {
-	Summary  *CardPrintingSummary `json:"summary,omitempty"`
-	Metadata ResponseMetadata     `json:"-"`
+// GetPrintingResponse contains a printing summary.
+type GetPrintingResponse struct {
+	Summary  *PrintingSummary `json:"summary,omitempty"`
+	Metadata ResponseMetadata `json:"-"`
 }
 
-func (r *GetCardPrintingResponse) setMetadata(metadata ResponseMetadata) {
+func (r *GetPrintingResponse) setMetadata(metadata ResponseMetadata) {
 	r.Metadata = metadata
 }
 
-// BatchGetCardPrintingsRequest fetches printings in bulk.
-type BatchGetCardPrintingsRequest struct {
+// BatchGetPrintingsRequest fetches printings in bulk.
+type BatchGetPrintingsRequest struct {
 	PrintingIDs  []string `json:"printingIds,omitempty"`
 	AllowPartial bool     `json:"allowPartial,omitempty"`
 }
 
-// BatchGetCardPrintingsResponse returns bulk printing summaries.
-type BatchGetCardPrintingsResponse struct {
-	Printings   map[string]CardPrintingSummary `json:"printings,omitempty"`
-	NotFoundIDs []string                       `json:"notFoundIds,omitempty"`
-	Metadata    ResponseMetadata               `json:"-"`
+// BatchGetPrintingsResponse returns bulk printing summaries.
+type BatchGetPrintingsResponse struct {
+	Printings   map[string]PrintingSummary `json:"printings,omitempty"`
+	NotFoundIDs []string                   `json:"notFoundIds,omitempty"`
+	Metadata    ResponseMetadata           `json:"-"`
 }
 
-func (r *BatchGetCardPrintingsResponse) setMetadata(metadata ResponseMetadata) {
+func (r *BatchGetPrintingsResponse) setMetadata(metadata ResponseMetadata) {
 	r.Metadata = metadata
 }
 
@@ -384,7 +384,7 @@ func (c *Client) SearchCards(ctx context.Context, request *SearchCardsRequest, o
 		request = &SearchCardsRequest{}
 	}
 
-	req, err := c.newRequest(ctx, http.MethodGet, "/api/v1/cards", nil)
+	req, err := c.newRequest(ctx, http.MethodGet, "/v1/cards", nil)
 	if err != nil {
 		return nil, err
 	}
@@ -446,7 +446,7 @@ func (c *Client) GetCard(ctx context.Context, request *GetCardRequest, opts ...R
 		return nil, errors.New("cardID must not be empty")
 	}
 
-	path := fmt.Sprintf("/api/v1/cards/%s", url.PathEscape(request.CardID))
+	path := fmt.Sprintf("/v1/cards/%s", url.PathEscape(request.CardID))
 	req, err := c.newRequest(ctx, http.MethodGet, path, nil)
 	if err != nil {
 		return nil, err
@@ -471,7 +471,7 @@ func (c *Client) BatchGetCards(ctx context.Context, request *BatchGetCardsReques
 		return nil, fmt.Errorf("encode body: %w", err)
 	}
 
-	req, err := c.newRequest(ctx, http.MethodPost, "/api/v1/cards:batchGet", body)
+	req, err := c.newRequest(ctx, http.MethodPost, "/v1/cards:batchGet", body)
 	if err != nil {
 		return nil, err
 	}
@@ -487,8 +487,8 @@ func (c *Client) BatchGetCards(ctx context.Context, request *BatchGetCardsReques
 	return response, nil
 }
 
-// ListCardPrintings lists printings for a specific card.
-func (c *Client) ListCardPrintings(ctx context.Context, request *ListCardPrintingsRequest, opts ...RequestOpt) (*ListCardPrintingsResponse, error) {
+// ListPrintings lists printings for a specific card.
+func (c *Client) ListPrintings(ctx context.Context, request *ListPrintingsRequest, opts ...RequestOpt) (*ListPrintingsResponse, error) {
 	if request == nil {
 		return nil, errors.New("request must not be nil")
 	}
@@ -496,7 +496,7 @@ func (c *Client) ListCardPrintings(ctx context.Context, request *ListCardPrintin
 		return nil, errors.New("cardID must not be empty")
 	}
 
-	path := fmt.Sprintf("/api/v1/cards/%s/printings", url.PathEscape(request.CardID))
+	path := fmt.Sprintf("/v1/cards/%s/printings", url.PathEscape(request.CardID))
 	req, err := c.newRequest(ctx, http.MethodGet, path, nil)
 	if err != nil {
 		return nil, err
@@ -509,7 +509,7 @@ func (c *Client) ListCardPrintings(ctx context.Context, request *ListCardPrintin
 	setQueryString(query, "nextToken", request.NextToken)
 	req.URL.RawQuery = query.Encode()
 
-	response := &ListCardPrintingsResponse{}
+	response := &ListPrintingsResponse{}
 	if err := c.do(req, response, opts...); err != nil {
 		return nil, err
 	}
@@ -517,8 +517,8 @@ func (c *Client) ListCardPrintings(ctx context.Context, request *ListCardPrintin
 	return response, nil
 }
 
-// ListCardPrintingsForSetNumber lists printings for a set number.
-func (c *Client) ListCardPrintingsForSetNumber(ctx context.Context, request *ListCardPrintingsForSetNumberRequest, opts ...RequestOpt) (*ListCardPrintingsForSetNumberResponse, error) {
+// ListPrintingsForSetNumber lists printings for a set number.
+func (c *Client) ListPrintingsForSetNumber(ctx context.Context, request *ListPrintingsForSetNumberRequest, opts ...RequestOpt) (*ListPrintingsForSetNumberResponse, error) {
 	if request == nil {
 		return nil, errors.New("request must not be nil")
 	}
@@ -526,13 +526,13 @@ func (c *Client) ListCardPrintingsForSetNumber(ctx context.Context, request *Lis
 		return nil, errors.New("setNumber must not be empty")
 	}
 
-	path := fmt.Sprintf("/api/v1/printings/set/%s", url.PathEscape(request.SetNumber))
+	path := fmt.Sprintf("/v1/printings/set/%s", url.PathEscape(request.SetNumber))
 	req, err := c.newRequest(ctx, http.MethodGet, path, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	response := &ListCardPrintingsForSetNumberResponse{}
+	response := &ListPrintingsForSetNumberResponse{}
 	if err := c.do(req, response, opts...); err != nil {
 		return nil, err
 	}
@@ -540,8 +540,8 @@ func (c *Client) ListCardPrintingsForSetNumber(ctx context.Context, request *Lis
 	return response, nil
 }
 
-// GetCardPrinting fetches a card printing by ID.
-func (c *Client) GetCardPrinting(ctx context.Context, request *GetCardPrintingRequest, opts ...RequestOpt) (*GetCardPrintingResponse, error) {
+// GetPrinting fetches a printing by ID.
+func (c *Client) GetPrinting(ctx context.Context, request *GetPrintingRequest, opts ...RequestOpt) (*GetPrintingResponse, error) {
 	if request == nil {
 		return nil, errors.New("request must not be nil")
 	}
@@ -549,13 +549,13 @@ func (c *Client) GetCardPrinting(ctx context.Context, request *GetCardPrintingRe
 		return nil, errors.New("printingID must not be empty")
 	}
 
-	path := fmt.Sprintf("/api/v1/printings/%s", url.PathEscape(request.PrintingID))
+	path := fmt.Sprintf("/v1/printings/%s", url.PathEscape(request.PrintingID))
 	req, err := c.newRequest(ctx, http.MethodGet, path, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	response := &GetCardPrintingResponse{}
+	response := &GetPrintingResponse{}
 	if err := c.do(req, response, opts...); err != nil {
 		return nil, err
 	}
@@ -563,8 +563,8 @@ func (c *Client) GetCardPrinting(ctx context.Context, request *GetCardPrintingRe
 	return response, nil
 }
 
-// BatchGetCardPrintings fetches multiple card printings at once.
-func (c *Client) BatchGetCardPrintings(ctx context.Context, request *BatchGetCardPrintingsRequest, opts ...RequestOpt) (*BatchGetCardPrintingsResponse, error) {
+// BatchGetPrintings fetches multiple printings at once.
+func (c *Client) BatchGetPrintings(ctx context.Context, request *BatchGetPrintingsRequest, opts ...RequestOpt) (*BatchGetPrintingsResponse, error) {
 	if request == nil {
 		return nil, errors.New("request must not be nil")
 	}
@@ -574,7 +574,7 @@ func (c *Client) BatchGetCardPrintings(ctx context.Context, request *BatchGetCar
 		return nil, fmt.Errorf("encode body: %w", err)
 	}
 
-	req, err := c.newRequest(ctx, http.MethodPost, "/api/v1/printings:batchGet", body)
+	req, err := c.newRequest(ctx, http.MethodPost, "/v1/printings:batchGet", body)
 	if err != nil {
 		return nil, err
 	}
@@ -582,7 +582,7 @@ func (c *Client) BatchGetCardPrintings(ctx context.Context, request *BatchGetCar
 		req.Header.Set("Content-Type", "application/json")
 	}
 
-	response := &BatchGetCardPrintingsResponse{}
+	response := &BatchGetPrintingsResponse{}
 	if err := c.do(req, response, opts...); err != nil {
 		return nil, err
 	}
@@ -599,7 +599,7 @@ func (c *Client) GetProduct(ctx context.Context, request *GetProductRequest, opt
 		return nil, errors.New("productID must not be empty")
 	}
 
-	path := fmt.Sprintf("/api/v1/products/%s", url.PathEscape(request.ProductID))
+	path := fmt.Sprintf("/v1/products/%s", url.PathEscape(request.ProductID))
 	req, err := c.newRequest(ctx, http.MethodGet, path, nil)
 	if err != nil {
 		return nil, err
@@ -624,7 +624,7 @@ func (c *Client) BatchGetProducts(ctx context.Context, request *BatchGetProducts
 		return nil, fmt.Errorf("encode body: %w", err)
 	}
 
-	req, err := c.newRequest(ctx, http.MethodPost, "/api/v1/products:batchGet", body)
+	req, err := c.newRequest(ctx, http.MethodPost, "/v1/products:batchGet", body)
 	if err != nil {
 		return nil, err
 	}
