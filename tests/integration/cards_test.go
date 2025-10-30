@@ -44,12 +44,12 @@ func TestGetCardReturnsSummary(t *testing.T) {
 	require.Equal(t, cardID, resp.Summary.Identifier, "expected identifier to match")
 }
 
-func TestGetCardPrintingReturnsSummary(t *testing.T) {
+func TestGetPrintingReturnsSummary(t *testing.T) {
 	printingID := requireString(t, cfg.PrintingID, envPrintingID)
 
 	ctx := contextWithTimeout(t)
-	resp, err := integrationClient.GetCardPrinting(ctx, &client.GetCardPrintingRequest{PrintingID: printingID})
-	require.NoError(t, err, "GetCardPrinting")
+	resp, err := integrationClient.GetPrinting(ctx, &client.GetPrintingRequest{PrintingID: printingID})
+	require.NoError(t, err, "GetPrinting")
 	require.NotNil(t, resp.Summary, "expected summary in response")
 
 	ensureMetadata(t, resp.Metadata)
