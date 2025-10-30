@@ -135,8 +135,8 @@ type TCGPlayerSummary struct {
 	URL       string `json:"url,omitempty"`
 }
 
-// PhysicalCardSummary mirrors v1PhysicalCardSummary.
-type PhysicalCardSummary struct {
+// ProductSummary mirrors v1ProductSummary.
+type ProductSummary struct {
 	Identifier      string `json:"identifier,omitempty"`
 	FrontCardID     string `json:"frontCardId,omitempty"`
 	FrontPrintingID string `json:"frontPrintingId,omitempty"`
@@ -147,22 +147,22 @@ type PhysicalCardSummary struct {
 
 // CardPrintingSummary mirrors v1CardPrintingSummary.
 type CardPrintingSummary struct {
-	Identifier      string                `json:"identifier,omitempty"`
-	CardID          string                `json:"cardId,omitempty"`
-	SetPrintingID   string                `json:"setPrintingId,omitempty"`
-	PrintingName    string                `json:"printingName,omitempty"`
-	Artists         []string              `json:"artists,omitempty"`
-	ArtVariations   []string              `json:"artVariations,omitempty"`
-	FlavorText      string                `json:"flavorText,omitempty"`
-	ImageURL        string                `json:"imageUrl,omitempty"`
-	SetID           string                `json:"setId,omitempty"`
-	SetName         string                `json:"setName,omitempty"`
-	Edition         Edition               `json:"edition,omitempty"`
-	IsExpansionSlot bool                  `json:"isExpansionSlot,omitempty"`
-	Foiling         Foiling               `json:"foiling,omitempty"`
-	Rarity          Rarity                `json:"rarity,omitempty"`
-	TCGPlayer       *TCGPlayerSummary     `json:"tcgPlayer,omitempty"`
-	PhysicalCards   []PhysicalCardSummary `json:"physicalCards,omitempty"`
+	Identifier      string            `json:"identifier,omitempty"`
+	CardID          string            `json:"cardId,omitempty"`
+	SetPrintingID   string            `json:"setPrintingId,omitempty"`
+	PrintingName    string            `json:"printingName,omitempty"`
+	Artists         []string          `json:"artists,omitempty"`
+	ArtVariations   []string          `json:"artVariations,omitempty"`
+	FlavorText      string            `json:"flavorText,omitempty"`
+	ImageURL        string            `json:"imageUrl,omitempty"`
+	SetID           string            `json:"setId,omitempty"`
+	SetName         string            `json:"setName,omitempty"`
+	Edition         Edition           `json:"edition,omitempty"`
+	IsExpansionSlot bool              `json:"isExpansionSlot,omitempty"`
+	Foiling         Foiling           `json:"foiling,omitempty"`
+	Rarity          Rarity            `json:"rarity,omitempty"`
+	TCGPlayer       *TCGPlayerSummary `json:"tcgPlayer,omitempty"`
+	Products        []ProductSummary  `json:"products,omitempty"`
 }
 
 // DataSnapshotFile mirrors v1DataSnapshotFile.
@@ -330,35 +330,35 @@ func (r *BatchGetCardPrintingsResponse) setMetadata(metadata ResponseMetadata) {
 	r.Metadata = metadata
 }
 
-// GetPhysicalCardRequest identifies a physical card to fetch.
-type GetPhysicalCardRequest struct {
-	PhysicalCardID string `json:"-"`
+// GetProductRequest identifies a product to fetch.
+type GetProductRequest struct {
+	ProductID string `json:"-"`
 }
 
-// GetPhysicalCardResponse contains a physical card summary.
-type GetPhysicalCardResponse struct {
-	Summary  *PhysicalCardSummary `json:"summary,omitempty"`
-	Metadata ResponseMetadata     `json:"-"`
+// GetProductResponse contains a product summary.
+type GetProductResponse struct {
+	Summary  *ProductSummary  `json:"summary,omitempty"`
+	Metadata ResponseMetadata `json:"-"`
 }
 
-func (r *GetPhysicalCardResponse) setMetadata(metadata ResponseMetadata) {
+func (r *GetProductResponse) setMetadata(metadata ResponseMetadata) {
 	r.Metadata = metadata
 }
 
-// BatchGetPhysicalCardsRequest fetches physical cards in bulk.
-type BatchGetPhysicalCardsRequest struct {
-	PhysicalCardIDs []string `json:"physicalCardIds,omitempty"`
-	AllowPartial    bool     `json:"allowPartial,omitempty"`
+// BatchGetProductsRequest fetches products in bulk.
+type BatchGetProductsRequest struct {
+	ProductIDs   []string `json:"productIds,omitempty"`
+	AllowPartial bool     `json:"allowPartial,omitempty"`
 }
 
-// BatchGetPhysicalCardsResponse returns bulk physical card summaries.
-type BatchGetPhysicalCardsResponse struct {
-	PhysicalCards map[string]PhysicalCardSummary `json:"physicalCards,omitempty"`
-	NotFoundIDs   []string                       `json:"notFoundIds,omitempty"`
-	Metadata      ResponseMetadata               `json:"-"`
+// BatchGetProductsResponse returns bulk product summaries.
+type BatchGetProductsResponse struct {
+	Products    map[string]ProductSummary `json:"products,omitempty"`
+	NotFoundIDs []string                  `json:"notFoundIds,omitempty"`
+	Metadata    ResponseMetadata          `json:"-"`
 }
 
-func (r *BatchGetPhysicalCardsResponse) setMetadata(metadata ResponseMetadata) {
+func (r *BatchGetProductsResponse) setMetadata(metadata ResponseMetadata) {
 	r.Metadata = metadata
 }
 
@@ -590,22 +590,22 @@ func (c *Client) BatchGetCardPrintings(ctx context.Context, request *BatchGetCar
 	return response, nil
 }
 
-// GetPhysicalCard fetches a physical card summary.
-func (c *Client) GetPhysicalCard(ctx context.Context, request *GetPhysicalCardRequest, opts ...RequestOpt) (*GetPhysicalCardResponse, error) {
+// GetProduct fetches a product summary.
+func (c *Client) GetProduct(ctx context.Context, request *GetProductRequest, opts ...RequestOpt) (*GetProductResponse, error) {
 	if request == nil {
 		return nil, errors.New("request must not be nil")
 	}
-	if strings.TrimSpace(request.PhysicalCardID) == "" {
-		return nil, errors.New("physicalCardID must not be empty")
+	if strings.TrimSpace(request.ProductID) == "" {
+		return nil, errors.New("productID must not be empty")
 	}
 
-	path := fmt.Sprintf("/api/v1/physical_cards/%s", url.PathEscape(request.PhysicalCardID))
+	path := fmt.Sprintf("/api/v1/products/%s", url.PathEscape(request.ProductID))
 	req, err := c.newRequest(ctx, http.MethodGet, path, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	response := &GetPhysicalCardResponse{}
+	response := &GetProductResponse{}
 	if err := c.do(req, response, opts...); err != nil {
 		return nil, err
 	}
@@ -613,8 +613,8 @@ func (c *Client) GetPhysicalCard(ctx context.Context, request *GetPhysicalCardRe
 	return response, nil
 }
 
-// BatchGetPhysicalCards fetches multiple physical cards.
-func (c *Client) BatchGetPhysicalCards(ctx context.Context, request *BatchGetPhysicalCardsRequest, opts ...RequestOpt) (*BatchGetPhysicalCardsResponse, error) {
+// BatchGetProducts fetches multiple products.
+func (c *Client) BatchGetProducts(ctx context.Context, request *BatchGetProductsRequest, opts ...RequestOpt) (*BatchGetProductsResponse, error) {
 	if request == nil {
 		return nil, errors.New("request must not be nil")
 	}
@@ -624,7 +624,7 @@ func (c *Client) BatchGetPhysicalCards(ctx context.Context, request *BatchGetPhy
 		return nil, fmt.Errorf("encode body: %w", err)
 	}
 
-	req, err := c.newRequest(ctx, http.MethodPost, "/api/v1/physical_cards:batchGet", body)
+	req, err := c.newRequest(ctx, http.MethodPost, "/api/v1/products:batchGet", body)
 	if err != nil {
 		return nil, err
 	}
@@ -632,7 +632,7 @@ func (c *Client) BatchGetPhysicalCards(ctx context.Context, request *BatchGetPhy
 		req.Header.Set("Content-Type", "application/json")
 	}
 
-	response := &BatchGetPhysicalCardsResponse{}
+	response := &BatchGetProductsResponse{}
 	if err := c.do(req, response, opts...); err != nil {
 		return nil, err
 	}

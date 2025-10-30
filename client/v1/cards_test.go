@@ -282,11 +282,11 @@ func TestClientBatchGetCardPrintings(t *testing.T) {
 	})
 }
 
-func TestClientGetPhysicalCard(t *testing.T) {
-	t.Run("when id provided, then physical card returned", func(t *testing.T) {
+func TestClientGetProduct(t *testing.T) {
+	t.Run("when id provided, then product returned", func(t *testing.T) {
 		handler := func(w http.ResponseWriter, r *http.Request) {
-			require.Equal(t, "/api/v1/physical_cards/phys-1", r.URL.Path)
-			resp := GetPhysicalCardResponse{Summary: &PhysicalCardSummary{Identifier: "phys-1"}}
+			require.Equal(t, "/api/v1/products/prod-1", r.URL.Path)
+			resp := GetProductResponse{Summary: &ProductSummary{Identifier: "prod-1"}}
 			w.Header().Set("Content-Type", "application/json")
 			_ = json.NewEncoder(w).Encode(resp)
 		}
@@ -295,29 +295,29 @@ func TestClientGetPhysicalCard(t *testing.T) {
 		t.Cleanup(server.Close)
 
 		client := newTestClient(t, WithBaseURL(server.URL), WithHTTPClient(server.Client()))
-		resp, err := client.GetPhysicalCard(context.Background(), &GetPhysicalCardRequest{PhysicalCardID: "phys-1"})
+		resp, err := client.GetProduct(context.Background(), &GetProductRequest{ProductID: "prod-1"})
 		require.NoError(t, err)
-		require.Equal(t, "phys-1", resp.Summary.Identifier)
+		require.Equal(t, "prod-1", resp.Summary.Identifier)
 	})
 
 	t.Run("when id missing, then returns error", func(t *testing.T) {
 		client := newTestClient(t)
-		resp, err := client.GetPhysicalCard(context.Background(), &GetPhysicalCardRequest{})
+		resp, err := client.GetProduct(context.Background(), &GetProductRequest{})
 		require.Error(t, err)
 		require.Nil(t, resp)
 	})
 }
 
-func TestClientBatchGetPhysicalCards(t *testing.T) {
+func TestClientBatchGetProducts(t *testing.T) {
 	t.Run("when ids provided, then summaries returned", func(t *testing.T) {
 		handler := func(w http.ResponseWriter, r *http.Request) {
-			var body BatchGetPhysicalCardsRequest
+			var body BatchGetProductsRequest
 			require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
-			require.ElementsMatch(t, []string{"phys-1", "phys-2"}, body.PhysicalCardIDs)
+			require.ElementsMatch(t, []string{"prod-1", "prod-2"}, body.ProductIDs)
 			require.True(t, body.AllowPartial)
 
-			resp := BatchGetPhysicalCardsResponse{
-				PhysicalCards: map[string]PhysicalCardSummary{"phys-1": {Identifier: "phys-1"}},
+			resp := BatchGetProductsResponse{
+				Products: map[string]ProductSummary{"prod-1": {Identifier: "prod-1"}},
 			}
 			w.Header().Set("Content-Type", "application/json")
 			_ = json.NewEncoder(w).Encode(resp)
@@ -327,17 +327,17 @@ func TestClientBatchGetPhysicalCards(t *testing.T) {
 		t.Cleanup(server.Close)
 
 		client := newTestClient(t, WithBaseURL(server.URL), WithHTTPClient(server.Client()))
-		resp, err := client.BatchGetPhysicalCards(context.Background(), &BatchGetPhysicalCardsRequest{
-			PhysicalCardIDs: []string{"phys-1", "phys-2"},
-			AllowPartial:    true,
+		resp, err := client.BatchGetProducts(context.Background(), &BatchGetProductsRequest{
+			ProductIDs:   []string{"prod-1", "prod-2"},
+			AllowPartial: true,
 		})
 		require.NoError(t, err)
-		require.Len(t, resp.PhysicalCards, 1)
+		require.Len(t, resp.Products, 1)
 	})
 
 	t.Run("when request is nil, then returns error", func(t *testing.T) {
 		client := newTestClient(t)
-		resp, err := client.BatchGetPhysicalCards(context.Background(), nil)
+		resp, err := client.BatchGetProducts(context.Background(), nil)
 		require.Error(t, err)
 		require.Nil(t, resp)
 	})
