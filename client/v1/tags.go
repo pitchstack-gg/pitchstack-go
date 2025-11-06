@@ -45,10 +45,16 @@ type Resource struct {
 	Type ResourceType `json:"type,omitempty"`
 }
 
-// Tag represents a key/value label on a resource.
-type Tag struct {
+// TagKeyValue represents a key/value tag specification.
+type TagKeyValue struct {
 	Key   string `json:"key,omitempty"`
 	Value string `json:"value,omitempty"`
+}
+
+// Tag represents a label or key/value tag on a resource.
+type Tag struct {
+	Label    string       `json:"label,omitempty"`
+	KeyValue *TagKeyValue `json:"keyValue,omitempty"`
 }
 
 // TagFilter filters resources by tag values.
@@ -60,20 +66,23 @@ type TagFilter struct {
 
 // ResourceTags associates a resource with its tags.
 type ResourceTags struct {
-	Resource Resource `json:"resource,omitempty"`
-	Tags     []Tag    `json:"tags,omitempty"`
+	Resource  Resource `json:"resource,omitempty"`
+	Tags      []Tag    `json:"tags,omitempty"`
+	NextToken string   `json:"nextToken,omitempty"`
 }
 
 // ListResourceTagsRequest fetches tags for a resource.
 type ListResourceTagsRequest struct {
 	ResourceID   string
 	ResourceType ResourceType
+	NextToken    string
 }
 
 // ListResourceTagsResponse returns tags assigned to a resource.
 type ListResourceTagsResponse struct {
-	Tags     []Tag            `json:"tags,omitempty"`
-	Metadata ResponseMetadata `json:"-"`
+	Tags      []Tag            `json:"tags,omitempty"`
+	NextToken string           `json:"nextToken,omitempty"`
+	Metadata  ResponseMetadata `json:"-"`
 }
 
 func (r *ListResourceTagsResponse) setMetadata(metadata ResponseMetadata) {
@@ -206,9 +215,14 @@ func (c *Client) ListResourceTags(ctx context.Context, request *ListResourceTags
 		return nil, err
 	}
 
+	query := req.URL.Query()
 	if t := strings.TrimSpace(string(request.ResourceType)); t != "" && t != string(ResourceTypeUnspecified) {
-		query := req.URL.Query()
 		query.Set("resource.type", t)
+	}
+	if token := strings.TrimSpace(request.NextToken); token != "" {
+		query.Set("nextToken", token)
+	}
+	if len(query) > 0 {
 		req.URL.RawQuery = query.Encode()
 	}
 
@@ -561,8 +575,19 @@ func validateResourceType(resourceType ResourceType) error {
 }
 
 func validateTag(tag Tag) error {
-	if strings.TrimSpace(tag.Key) == "" {
-		return errors.New("tag key must not be empty")
+	hasLabel := strings.TrimSpace(tag.Label) != ""
+	hasKeyValue := tag.KeyValue != nil
+
+	if !hasLabel && !hasKeyValue {
+		return errors.New("tag must include label or keyValue")
+	}
+	if hasLabel && hasKeyValue {
+		return errors.New("tag must not include both label and keyValue")
+	}
+	if hasKeyValue {
+		if strings.TrimSpace(tag.KeyValue.Key) == "" {
+			return errors.New("tag key must not be empty")
+		}
 	}
 	return nil
 }

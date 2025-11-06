@@ -15,9 +15,11 @@ func TestClientListResourceTags(t *testing.T) {
 		require.Equal(t, http.MethodGet, r.Method)
 		require.Equal(t, "/api/v1/tags/resource-1", r.URL.Path)
 		require.Equal(t, string(ResourceTypeDeck), r.URL.Query().Get("resource.type"))
+		require.Equal(t, "tok-1", r.URL.Query().Get("nextToken"))
 
 		require.NoError(t, json.NewEncoder(w).Encode(ListResourceTagsResponse{
-			Tags: []Tag{{Key: "format", Value: "cc"}},
+			Tags:      []Tag{{Label: "format:cc"}},
+			NextToken: "tok-2",
 		}))
 	}))
 	t.Cleanup(server.Close)
@@ -26,9 +28,12 @@ func TestClientListResourceTags(t *testing.T) {
 	resp, err := client.ListResourceTags(context.Background(), &ListResourceTagsRequest{
 		ResourceID:   "resource-1",
 		ResourceType: ResourceTypeDeck,
+		NextToken:    "tok-1",
 	})
 	require.NoError(t, err)
 	require.Len(t, resp.Tags, 1)
+	require.Equal(t, "format:cc", resp.Tags[0].Label)
+	require.Equal(t, "tok-2", resp.NextToken)
 
 	resp, err = client.ListResourceTags(context.Background(), &ListResourceTagsRequest{})
 	require.Nil(t, resp)
@@ -49,8 +54,10 @@ func TestClientTagResource(t *testing.T) {
 		}
 		require.NoError(t, json.NewDecoder(r.Body).Decode(&payload))
 		require.Equal(t, ResourceTypeCollection, payload.Resource.Type)
-		require.Equal(t, "category", payload.Tag.Key)
-		require.Equal(t, "guardian", payload.Tag.Value)
+		require.NotNil(t, payload.Tag.KeyValue)
+		require.Equal(t, "category", payload.Tag.KeyValue.Key)
+		require.Equal(t, "guardian", payload.Tag.KeyValue.Value)
+		require.Empty(t, payload.Tag.Label)
 
 		w.Header().Set("X-Request-Id", "req-tag")
 		_, _ = w.Write([]byte(`{}`))
@@ -62,8 +69,10 @@ func TestClientTagResource(t *testing.T) {
 		ResourceID:   "resource-1",
 		ResourceType: ResourceTypeCollection,
 		Tag: Tag{
-			Key:   "category",
-			Value: "guardian",
+			KeyValue: &TagKeyValue{
+				Key:   "category",
+				Value: "guardian",
+			},
 		},
 	})
 	require.NoError(t, err)
@@ -83,7 +92,9 @@ func TestClientUntagResource(t *testing.T) {
 		}
 		require.NoError(t, json.NewDecoder(r.Body).Decode(&payload))
 		require.Equal(t, ResourceTypeDeck, payload.Resource.Type)
-		require.Equal(t, "format", payload.Tag.Key)
+		require.NotNil(t, payload.Tag.KeyValue)
+		require.Equal(t, "format", payload.Tag.KeyValue.Key)
+		require.Empty(t, payload.Tag.Label)
 
 		w.Header().Set("X-Request-Id", "req-untag")
 		_, _ = w.Write([]byte(`{}`))
@@ -95,7 +106,9 @@ func TestClientUntagResource(t *testing.T) {
 		ResourceID:   "resource-1",
 		ResourceType: ResourceTypeDeck,
 		Tag: Tag{
-			Key: "format",
+			KeyValue: &TagKeyValue{
+				Key: "format",
+			},
 		},
 	})
 	require.NoError(t, err)
@@ -143,8 +156,9 @@ func TestClientBatchListResourceTags(t *testing.T) {
 		require.NoError(t, json.NewEncoder(w).Encode(BatchListResourceTagsResponse{
 			Results: []ResourceTags{
 				{
-					Resource: Resource{ID: "resource-1"},
-					Tags:     []Tag{{Key: "format", Value: "cc"}},
+					Resource:  Resource{ID: "resource-1"},
+					Tags:      []Tag{{KeyValue: &TagKeyValue{Key: "format", Value: "cc"}}},
+					NextToken: "rt-2",
 				},
 			},
 		}))
@@ -159,6 +173,7 @@ func TestClientBatchListResourceTags(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.Len(t, resp.Results, 1)
+	require.Equal(t, "rt-2", resp.Results[0].NextToken)
 }
 
 func TestClientBatchTagResources(t *testing.T) {
@@ -176,7 +191,9 @@ func TestClientBatchTagResources(t *testing.T) {
 		require.Len(t, payload.Items, 1)
 		require.Equal(t, "resource-1", payload.Items[0].Resource.ID)
 		require.Equal(t, ResourceTypeDeck, payload.Items[0].Resource.Type)
-		require.Equal(t, "format", payload.Items[0].Tag.Key)
+		require.NotNil(t, payload.Items[0].Tag.KeyValue)
+		require.Equal(t, "format", payload.Items[0].Tag.KeyValue.Key)
+		require.Equal(t, "cc", payload.Items[0].Tag.KeyValue.Value)
 
 		w.Header().Set("X-Request-Id", "req-batch-tag")
 		_, _ = w.Write([]byte(`{}`))
@@ -190,8 +207,10 @@ func TestClientBatchTagResources(t *testing.T) {
 				ResourceID:   "resource-1",
 				ResourceType: ResourceTypeDeck,
 				Tag: Tag{
-					Key:   "format",
-					Value: "cc",
+					KeyValue: &TagKeyValue{
+						Key:   "format",
+						Value: "cc",
+					},
 				},
 			},
 		},
@@ -214,7 +233,8 @@ func TestClientBatchUntagResources(t *testing.T) {
 		require.NoError(t, json.NewDecoder(r.Body).Decode(&payload))
 		require.Len(t, payload.Items, 1)
 		require.Equal(t, ResourceTypeDeck, payload.Items[0].Resource.Type)
-		require.Equal(t, "format", payload.Items[0].Tag.Key)
+		require.Nil(t, payload.Items[0].Tag.KeyValue)
+		require.Equal(t, "favorites", payload.Items[0].Tag.Label)
 
 		w.Header().Set("X-Request-Id", "req-batch-untag")
 		_, _ = w.Write([]byte(`{}`))
@@ -228,7 +248,7 @@ func TestClientBatchUntagResources(t *testing.T) {
 				ResourceID:   "resource-1",
 				ResourceType: ResourceTypeDeck,
 				Tag: Tag{
-					Key: "format",
+					Label: "favorites",
 				},
 			},
 		},
