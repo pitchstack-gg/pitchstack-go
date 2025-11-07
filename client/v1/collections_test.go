@@ -200,6 +200,56 @@ func TestClientUpdateCollection(t *testing.T) {
 	})
 }
 
+func TestClientUpdateCollectionVisibility(t *testing.T) {
+	t.Run("when visibility provided, then targeted update is sent", func(t *testing.T) {
+		handler := func(w http.ResponseWriter, r *http.Request) {
+			require.Equal(t, http.MethodPatch, r.Method)
+			require.Equal(t, "/v1/collections/col-1/visibility", r.URL.Path)
+
+			var body map[string]interface{}
+			require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+			require.Equal(t, VisibilityLevelPublic, VisibilityLevel(body["visibility"].(string)))
+
+			resp := UpdateCollectionVisibilityResponse{
+				Collection: &Collection{ID: "col-1", Visibility: VisibilityLevelPublic},
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(resp)
+		}
+
+		server := httptest.NewServer(http.HandlerFunc(handler))
+		t.Cleanup(server.Close)
+
+		visibility := VisibilityLevelPublic
+		client := newTestClient(t, WithBaseURL(server.URL), WithHTTPClient(server.Client()))
+		resp, err := client.UpdateCollectionVisibility(context.Background(), &UpdateCollectionVisibilityRequest{
+			CollectionID: "col-1",
+			Visibility:   &visibility,
+		})
+		require.NoError(t, err)
+		require.Equal(t, VisibilityLevelPublic, resp.Collection.Visibility)
+	})
+
+	t.Run("when id missing, then returns error", func(t *testing.T) {
+		client := newTestClient(t)
+		visibility := VisibilityLevelShared
+		resp, err := client.UpdateCollectionVisibility(context.Background(), &UpdateCollectionVisibilityRequest{
+			Visibility: &visibility,
+		})
+		require.Error(t, err)
+		require.Nil(t, resp)
+	})
+
+	t.Run("when visibility missing, then returns error", func(t *testing.T) {
+		client := newTestClient(t)
+		resp, err := client.UpdateCollectionVisibility(context.Background(), &UpdateCollectionVisibilityRequest{
+			CollectionID: "col-1",
+		})
+		require.Error(t, err)
+		require.Nil(t, resp)
+	})
+}
+
 func TestClientDeleteCollection(t *testing.T) {
 	t.Run("when id provided, then delete is issued", func(t *testing.T) {
 		handler := func(w http.ResponseWriter, r *http.Request) {

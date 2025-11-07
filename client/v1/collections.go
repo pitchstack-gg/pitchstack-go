@@ -131,10 +131,9 @@ func (r *GetCollectionResponse) setMetadata(metadata ResponseMetadata) {
 
 // UpdateCollectionRequest models a partial update for a collection.
 type UpdateCollectionRequest struct {
-	CollectionID string           `json:"-"`
-	Name         *string          `json:"name,omitempty"`
-	Description  *string          `json:"description,omitempty"`
-	Visibility   *VisibilityLevel `json:"visibility,omitempty"`
+	CollectionID string  `json:"-"`
+	Name         *string `json:"name,omitempty"`
+	Description  *string `json:"description,omitempty"`
 }
 
 // UpdateCollectionResponse returns the updated collection.
@@ -144,6 +143,22 @@ type UpdateCollectionResponse struct {
 }
 
 func (r *UpdateCollectionResponse) setMetadata(metadata ResponseMetadata) {
+	r.Metadata = metadata
+}
+
+// UpdateCollectionVisibilityRequest updates only the visibility field of a collection.
+type UpdateCollectionVisibilityRequest struct {
+	CollectionID string           `json:"-"`
+	Visibility   *VisibilityLevel `json:"visibility,omitempty"`
+}
+
+// UpdateCollectionVisibilityResponse returns the updated collection.
+type UpdateCollectionVisibilityResponse struct {
+	Collection *Collection      `json:"collection,omitempty"`
+	Metadata   ResponseMetadata `json:"-"`
+}
+
+func (r *UpdateCollectionVisibilityResponse) setMetadata(metadata ResponseMetadata) {
 	r.Metadata = metadata
 }
 
@@ -329,13 +344,11 @@ func (c *Client) UpdateCollection(ctx context.Context, request *UpdateCollection
 	}
 
 	body, err := jsonBody(struct {
-		Name        *string          `json:"name,omitempty"`
-		Description *string          `json:"description,omitempty"`
-		Visibility  *VisibilityLevel `json:"visibility,omitempty"`
+		Name        *string `json:"name,omitempty"`
+		Description *string `json:"description,omitempty"`
 	}{
 		Name:        request.Name,
 		Description: request.Description,
-		Visibility:  request.Visibility,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("encode body: %w", err)
@@ -351,6 +364,44 @@ func (c *Client) UpdateCollection(ctx context.Context, request *UpdateCollection
 	}
 
 	response := &UpdateCollectionResponse{}
+	if err := c.do(req, response, opts...); err != nil {
+		return nil, err
+	}
+
+	return response, nil
+}
+
+// UpdateCollectionVisibility updates only the visibility of a collection.
+func (c *Client) UpdateCollectionVisibility(ctx context.Context, request *UpdateCollectionVisibilityRequest, opts ...RequestOpt) (*UpdateCollectionVisibilityResponse, error) {
+	if request == nil {
+		return nil, errors.New("request must not be nil")
+	}
+	if strings.TrimSpace(request.CollectionID) == "" {
+		return nil, errors.New("collectionID must not be empty")
+	}
+	if request.Visibility == nil {
+		return nil, errors.New("visibility must not be nil")
+	}
+
+	body, err := jsonBody(struct {
+		Visibility *VisibilityLevel `json:"visibility,omitempty"`
+	}{
+		Visibility: request.Visibility,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("encode body: %w", err)
+	}
+
+	path := fmt.Sprintf("/v1/collections/%s/visibility", url.PathEscape(request.CollectionID))
+	req, err := c.newRequest(ctx, http.MethodPatch, path, body)
+	if err != nil {
+		return nil, err
+	}
+	if body != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
+
+	response := &UpdateCollectionVisibilityResponse{}
 	if err := c.do(req, response, opts...); err != nil {
 		return nil, err
 	}
