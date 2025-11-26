@@ -13,7 +13,7 @@ import (
 func TestClientSetAvatarURL(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		require.Equal(t, http.MethodPut, r.Method)
-		require.Equal(t, "/api/v1/me/avatar", r.URL.Path)
+		require.Equal(t, "/v1/me/avatar", r.URL.Path)
 		require.Equal(t, "application/json", r.Header.Get("Content-Type"))
 
 		var payload struct {
@@ -39,7 +39,7 @@ func TestClientSetAvatarURL(t *testing.T) {
 func TestClientUpdateProfile(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		require.Equal(t, http.MethodPatch, r.Method)
-		require.Equal(t, "/api/v1/me/profile", r.URL.Path)
+		require.Equal(t, "/v1/me/profile", r.URL.Path)
 
 		var payload struct {
 			Profile struct {
@@ -77,7 +77,7 @@ func TestClientUpdateProfile(t *testing.T) {
 func TestClientGetProfile(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		require.Equal(t, http.MethodGet, r.Method)
-		require.Equal(t, "/api/v1/users/user-1/profile", r.URL.Path)
+		require.Equal(t, "/v1/users/user-1/profile", r.URL.Path)
 		require.NoError(t, json.NewEncoder(w).Encode(GetProfileResponse{
 			Profile: &UserProfile{Username: "tester"},
 		}))
@@ -96,7 +96,7 @@ func TestClientGetProfile(t *testing.T) {
 func TestClientGetProfileSettings(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		require.Equal(t, http.MethodGet, r.Method)
-		require.Equal(t, "/api/v1/me/profile/settings", r.URL.Path)
+		require.Equal(t, "/v1/me/profile/settings", r.URL.Path)
 		require.Equal(t, "userId=user-1", r.URL.RawQuery)
 		require.NoError(t, json.NewEncoder(w).Encode(GetProfileSettingsResponse{
 			Settings: &ProfileSettings{AllowMessages: "ANYONE"},
@@ -113,7 +113,7 @@ func TestClientGetProfileSettings(t *testing.T) {
 func TestClientUpdateProfileSettings(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		require.Equal(t, http.MethodPut, r.Method)
-		require.Equal(t, "/api/v1/me/profile/settings", r.URL.Path)
+		require.Equal(t, "/v1/me/profile/settings", r.URL.Path)
 
 		var payload struct {
 			Settings struct {
@@ -146,7 +146,7 @@ func TestClientUpdateProfileSettings(t *testing.T) {
 func TestClientUpsertSocialProfile(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		require.Equal(t, http.MethodPost, r.Method)
-		require.Equal(t, "/api/v1/me/social_profiles", r.URL.Path)
+		require.Equal(t, "/v1/me/social_profiles", r.URL.Path)
 
 		var payload UpsertSocialProfileRequest
 		require.NoError(t, json.NewDecoder(r.Body).Decode(&payload))
@@ -176,7 +176,7 @@ func TestClientRemoveSocialProfile(t *testing.T) {
 	var called bool
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		require.Equal(t, http.MethodDelete, r.Method)
-		require.Equal(t, "/api/v1/me/social_profiles/bluesky", r.URL.Path)
+		require.Equal(t, "/v1/me/social_profiles/bluesky", r.URL.Path)
 		called = true
 		w.Header().Set("X-Request-Id", "req-remove-social")
 		_, _ = w.Write([]byte(`{}`))
@@ -196,7 +196,7 @@ func TestClientRemoveSocialProfile(t *testing.T) {
 func TestClientGetSocialProfiles(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		require.Equal(t, http.MethodGet, r.Method)
-		require.Equal(t, "/api/v1/users/user-1/social_profiles", r.URL.Path)
+		require.Equal(t, "/v1/users/user-1/social_profiles", r.URL.Path)
 		require.NoError(t, json.NewEncoder(w).Encode(GetSocialProfilesResponse{
 			SocialProfiles: []SocialProfile{{Platform: "bluesky"}},
 		}))

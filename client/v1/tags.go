@@ -209,7 +209,7 @@ func (c *Client) ListResourceTags(ctx context.Context, request *ListResourceTags
 		return nil, errors.New("resourceID must not be empty")
 	}
 
-	path := fmt.Sprintf("/api/v1/tags/%s", url.PathEscape(resourceID))
+	path := fmt.Sprintf("/v1/tags/%s", url.PathEscape(resourceID))
 	req, err := c.newRequest(ctx, http.MethodGet, path, nil)
 	if err != nil {
 		return nil, err
@@ -265,7 +265,7 @@ func (c *Client) TagResource(ctx context.Context, request *TagResourceRequest, o
 		return nil, fmt.Errorf("encode body: %w", err)
 	}
 
-	path := fmt.Sprintf("/api/v1/tags/%s", url.PathEscape(resourceID))
+	path := fmt.Sprintf("/v1/tags/%s", url.PathEscape(resourceID))
 	req, err := c.newRequest(ctx, http.MethodPost, path, body)
 	if err != nil {
 		return nil, err
@@ -311,7 +311,7 @@ func (c *Client) UntagResource(ctx context.Context, request *UntagResourceReques
 		return nil, fmt.Errorf("encode body: %w", err)
 	}
 
-	path := fmt.Sprintf("/api/v1/tags/%s:untag", url.PathEscape(resourceID))
+	path := fmt.Sprintf("/v1/tags/%s:untag", url.PathEscape(resourceID))
 	req, err := c.newRequest(ctx, http.MethodPost, path, body)
 	if err != nil {
 		return nil, err
@@ -348,7 +348,7 @@ func (c *Client) UntagAllForResource(ctx context.Context, request *UntagAllForRe
 		return nil, fmt.Errorf("encode body: %w", err)
 	}
 
-	path := fmt.Sprintf("/api/v1/tags/%s:untagAll", url.PathEscape(resourceID))
+	path := fmt.Sprintf("/v1/tags/%s:untagAll", url.PathEscape(resourceID))
 	req, err := c.newRequest(ctx, http.MethodPost, path, body)
 	if err != nil {
 		return nil, err
@@ -388,7 +388,7 @@ func (c *Client) BatchListResourceTags(ctx context.Context, request *BatchListRe
 		return nil, fmt.Errorf("encode body: %w", err)
 	}
 
-	req, err := c.newRequest(ctx, http.MethodPost, "/api/v1/tags:batchList", body)
+	req, err := c.newRequest(ctx, http.MethodPost, "/v1/tags:batchList", body)
 	if err != nil {
 		return nil, err
 	}
@@ -442,7 +442,7 @@ func (c *Client) BatchTagResources(ctx context.Context, request *BatchTagResourc
 		return nil, fmt.Errorf("encode body: %w", err)
 	}
 
-	req, err := c.newRequest(ctx, http.MethodPost, "/api/v1/tags:batchTag", body)
+	req, err := c.newRequest(ctx, http.MethodPost, "/v1/tags:batchTag", body)
 	if err != nil {
 		return nil, err
 	}
@@ -496,7 +496,7 @@ func (c *Client) BatchUntagResources(ctx context.Context, request *BatchUntagRes
 		return nil, fmt.Errorf("encode body: %w", err)
 	}
 
-	req, err := c.newRequest(ctx, http.MethodPost, "/api/v1/tags:batchUntag", body)
+	req, err := c.newRequest(ctx, http.MethodPost, "/v1/tags:batchUntag", body)
 	if err != nil {
 		return nil, err
 	}
@@ -553,7 +553,7 @@ func (c *Client) QueryResourcesByTags(ctx context.Context, request *QueryResourc
 		return nil, fmt.Errorf("encode body: %w", err)
 	}
 
-	req, err := c.newRequest(ctx, http.MethodPost, "/api/v1/tags:queryResources", body)
+	req, err := c.newRequest(ctx, http.MethodPost, "/v1/tags:queryResources", body)
 	if err != nil {
 		return nil, err
 	}

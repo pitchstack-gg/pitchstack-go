@@ -416,7 +416,7 @@ func (c *Client) ListDecks(ctx context.Context, request *ListDecksRequest, opts 
 		request = &ListDecksRequest{}
 	}
 
-	req, err := c.newRequest(ctx, http.MethodGet, "/api/v1/decks", nil)
+	req, err := c.newRequest(ctx, http.MethodGet, "/v1/decks", nil)
 	if err != nil {
 		return nil, err
 	}
@@ -464,7 +464,7 @@ func (c *Client) CreateDeck(ctx context.Context, request *CreateDeckRequest, opt
 		return nil, fmt.Errorf("encode body: %w", err)
 	}
 
-	req, err := c.newRequest(ctx, http.MethodPost, "/api/v1/decks", body)
+	req, err := c.newRequest(ctx, http.MethodPost, "/v1/decks", body)
 	if err != nil {
 		return nil, err
 	}
@@ -486,7 +486,7 @@ func (c *Client) SearchDecks(ctx context.Context, request *SearchDecksRequest, o
 		request = &SearchDecksRequest{}
 	}
 
-	req, err := c.newRequest(ctx, http.MethodGet, "/api/v1/decks/search", nil)
+	req, err := c.newRequest(ctx, http.MethodGet, "/v1/decks/search", nil)
 	if err != nil {
 		return nil, err
 	}
@@ -528,7 +528,7 @@ func (c *Client) GetDeck(ctx context.Context, request *GetDeckRequest, opts ...R
 		return nil, errors.New("deckID must not be empty")
 	}
 
-	path := fmt.Sprintf("/api/v1/decks/%s", url.PathEscape(deckID))
+	path := fmt.Sprintf("/v1/decks/%s", url.PathEscape(deckID))
 	req, err := c.newRequest(ctx, http.MethodGet, path, nil)
 	if err != nil {
 		return nil, err
@@ -553,7 +553,7 @@ func (c *Client) DeleteDeck(ctx context.Context, request *DeleteDeckRequest, opt
 		return nil, errors.New("deckID must not be empty")
 	}
 
-	path := fmt.Sprintf("/api/v1/decks/%s", url.PathEscape(deckID))
+	path := fmt.Sprintf("/v1/decks/%s", url.PathEscape(deckID))
 	req, err := c.newRequest(ctx, http.MethodDelete, path, nil)
 	if err != nil {
 		return nil, err
@@ -589,7 +589,7 @@ func (c *Client) UpdateDeck(ctx context.Context, request *UpdateDeckRequest, opt
 		return nil, fmt.Errorf("encode body: %w", err)
 	}
 
-	path := fmt.Sprintf("/api/v1/decks/%s", url.PathEscape(deckID))
+	path := fmt.Sprintf("/v1/decks/%s", url.PathEscape(deckID))
 	req, err := c.newRequest(ctx, http.MethodPut, path, body)
 	if err != nil {
 		return nil, err
@@ -617,7 +617,7 @@ func (c *Client) StarDeck(ctx context.Context, request *StarDeckRequest, opts ..
 		return nil, errors.New("deckID must not be empty")
 	}
 
-	path := fmt.Sprintf("/api/v1/decks/%s/stars", url.PathEscape(deckID))
+	path := fmt.Sprintf("/v1/decks/%s/stars", url.PathEscape(deckID))
 	req, err := c.newRequest(ctx, http.MethodPost, path, nil)
 	if err != nil {
 		return nil, err
@@ -642,7 +642,7 @@ func (c *Client) UnstarDeck(ctx context.Context, request *UnstarDeckRequest, opt
 		return nil, errors.New("deckID must not be empty")
 	}
 
-	path := fmt.Sprintf("/api/v1/decks/%s/stars", url.PathEscape(deckID))
+	path := fmt.Sprintf("/v1/decks/%s/stars", url.PathEscape(deckID))
 	req, err := c.newRequest(ctx, http.MethodDelete, path, nil)
 	if err != nil {
 		return nil, err
@@ -667,7 +667,7 @@ func (c *Client) ListDeckVersions(ctx context.Context, request *ListDeckVersions
 		return nil, errors.New("deckID must not be empty")
 	}
 
-	path := fmt.Sprintf("/api/v1/decks/%s/versions", url.PathEscape(deckID))
+	path := fmt.Sprintf("/v1/decks/%s/versions", url.PathEscape(deckID))
 	req, err := c.newRequest(ctx, http.MethodGet, path, nil)
 	if err != nil {
 		return nil, err
@@ -714,7 +714,7 @@ func (c *Client) CreateDeckVersion(ctx context.Context, request *CreateDeckVersi
 		return nil, fmt.Errorf("encode body: %w", err)
 	}
 
-	path := fmt.Sprintf("/api/v1/decks/%s/versions", url.PathEscape(deckID))
+	path := fmt.Sprintf("/v1/decks/%s/versions", url.PathEscape(deckID))
 	req, err := c.newRequest(ctx, http.MethodPost, path, body)
 	if err != nil {
 		return nil, err
@@ -746,7 +746,7 @@ func (c *Client) GetDeckVersion(ctx context.Context, request *GetDeckVersionRequ
 		return nil, errors.New("version must not be empty")
 	}
 
-	path := fmt.Sprintf("/api/v1/decks/%s/versions/%s", url.PathEscape(deckID), url.PathEscape(version))
+	path := fmt.Sprintf("/v1/decks/%s/versions/%s", url.PathEscape(deckID), url.PathEscape(version))
 	req, err := c.newRequest(ctx, http.MethodGet, path, nil)
 	if err != nil {
 		return nil, err
@@ -781,7 +781,7 @@ func (c *Client) DeleteDeckVersion(ctx context.Context, request *DeleteDeckVersi
 		return nil, errors.New("version must not be empty")
 	}
 
-	path := fmt.Sprintf("/api/v1/decks/%s/versions/%s", url.PathEscape(deckID), url.PathEscape(version))
+	path := fmt.Sprintf("/v1/decks/%s/versions/%s", url.PathEscape(deckID), url.PathEscape(version))
 	req, err := c.newRequest(ctx, http.MethodDelete, path, nil)
 	if err != nil {
 		return nil, err
@@ -821,7 +821,7 @@ func (c *Client) UpdateDeckVersion(ctx context.Context, request *UpdateDeckVersi
 		return nil, fmt.Errorf("encode body: %w", err)
 	}
 
-	path := fmt.Sprintf("/api/v1/decks/%s/versions/%s", url.PathEscape(deckID), url.PathEscape(version))
+	path := fmt.Sprintf("/v1/decks/%s/versions/%s", url.PathEscape(deckID), url.PathEscape(version))
 	req, err := c.newRequest(ctx, http.MethodPut, path, body)
 	if err != nil {
 		return nil, err
@@ -853,7 +853,7 @@ func (c *Client) ListDeckVersionCards(ctx context.Context, request *ListDeckVers
 		return nil, errors.New("version must not be empty")
 	}
 
-	path := fmt.Sprintf("/api/v1/decks/%s/versions/%s/cards", url.PathEscape(deckID), url.PathEscape(version))
+	path := fmt.Sprintf("/v1/decks/%s/versions/%s/cards", url.PathEscape(deckID), url.PathEscape(version))
 	req, err := c.newRequest(ctx, http.MethodGet, path, nil)
 	if err != nil {
 		return nil, err
@@ -903,7 +903,7 @@ func (c *Client) ModifyDeckVersionCard(ctx context.Context, request *ModifyDeckV
 		return nil, fmt.Errorf("encode body: %w", err)
 	}
 
-	path := fmt.Sprintf("/api/v1/decks/%s/versions/%s/cards", url.PathEscape(deckID), url.PathEscape(version))
+	path := fmt.Sprintf("/v1/decks/%s/versions/%s/cards", url.PathEscape(deckID), url.PathEscape(version))
 	req, err := c.newRequest(ctx, http.MethodPost, path, body)
 	if err != nil {
 		return nil, err
@@ -935,7 +935,7 @@ func (c *Client) GetDeckVersionHistory(ctx context.Context, request *GetDeckVers
 		return nil, errors.New("version must not be empty")
 	}
 
-	path := fmt.Sprintf("/api/v1/decks/%s/versions/%s/history", url.PathEscape(deckID), url.PathEscape(version))
+	path := fmt.Sprintf("/v1/decks/%s/versions/%s/history", url.PathEscape(deckID), url.PathEscape(version))
 	req, err := c.newRequest(ctx, http.MethodGet, path, nil)
 	if err != nil {
 		return nil, err
@@ -964,7 +964,7 @@ func (c *Client) GetDeckVersionNotes(ctx context.Context, request *GetDeckVersio
 		return nil, errors.New("version must not be empty")
 	}
 
-	path := fmt.Sprintf("/api/v1/decks/%s/versions/%s/notes", url.PathEscape(deckID), url.PathEscape(version))
+	path := fmt.Sprintf("/v1/decks/%s/versions/%s/notes", url.PathEscape(deckID), url.PathEscape(version))
 	req, err := c.newRequest(ctx, http.MethodGet, path, nil)
 	if err != nil {
 		return nil, err
@@ -1002,7 +1002,7 @@ func (c *Client) UpdateDeckVersionNotes(ctx context.Context, request *UpdateDeck
 		return nil, fmt.Errorf("encode body: %w", err)
 	}
 
-	path := fmt.Sprintf("/api/v1/decks/%s/versions/%s/notes", url.PathEscape(deckID), url.PathEscape(version))
+	path := fmt.Sprintf("/v1/decks/%s/versions/%s/notes", url.PathEscape(deckID), url.PathEscape(version))
 	req, err := c.newRequest(ctx, http.MethodPut, path, body)
 	if err != nil {
 		return nil, err
@@ -1033,7 +1033,7 @@ func (c *Client) BatchGetDecks(ctx context.Context, request *BatchGetDecksReques
 		return nil, fmt.Errorf("encode body: %w", err)
 	}
 
-	req, err := c.newRequest(ctx, http.MethodPost, "/api/v1/decks:batchGet", body)
+	req, err := c.newRequest(ctx, http.MethodPost, "/v1/decks:batchGet", body)
 	if err != nil {
 		return nil, err
 	}
@@ -1060,7 +1060,7 @@ func (c *Client) ListStarredDecks(ctx context.Context, request *ListStarredDecks
 		return nil, errors.New("userID must not be empty")
 	}
 
-	path := fmt.Sprintf("/api/v1/users/%s/stars/decks", url.PathEscape(userID))
+	path := fmt.Sprintf("/v1/users/%s/stars/decks", url.PathEscape(userID))
 	req, err := c.newRequest(ctx, http.MethodGet, path, nil)
 	if err != nil {
 		return nil, err

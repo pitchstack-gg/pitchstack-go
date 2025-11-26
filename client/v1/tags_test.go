@@ -13,7 +13,7 @@ import (
 func TestClientListResourceTags(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		require.Equal(t, http.MethodGet, r.Method)
-		require.Equal(t, "/api/v1/tags/resource-1", r.URL.Path)
+		require.Equal(t, "/v1/tags/resource-1", r.URL.Path)
 		require.Equal(t, string(ResourceTypeDeck), r.URL.Query().Get("resource.type"))
 		require.Equal(t, "tok-1", r.URL.Query().Get("nextToken"))
 
@@ -43,7 +43,7 @@ func TestClientListResourceTags(t *testing.T) {
 func TestClientTagResource(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		require.Equal(t, http.MethodPost, r.Method)
-		require.Equal(t, "/api/v1/tags/resource-1", r.URL.Path)
+		require.Equal(t, "/v1/tags/resource-1", r.URL.Path)
 		require.Equal(t, "application/json", r.Header.Get("Content-Type"))
 
 		var payload struct {
@@ -82,7 +82,7 @@ func TestClientTagResource(t *testing.T) {
 func TestClientUntagResource(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		require.Equal(t, http.MethodPost, r.Method)
-		require.Equal(t, "/api/v1/tags/resource-1:untag", r.URL.Path)
+		require.Equal(t, "/v1/tags/resource-1:untag", r.URL.Path)
 
 		var payload struct {
 			Resource struct {
@@ -118,7 +118,7 @@ func TestClientUntagResource(t *testing.T) {
 func TestClientUntagAllForResource(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		require.Equal(t, http.MethodPost, r.Method)
-		require.Equal(t, "/api/v1/tags/resource-1:untagAll", r.URL.Path)
+		require.Equal(t, "/v1/tags/resource-1:untagAll", r.URL.Path)
 
 		var payload struct {
 			Type ResourceType `json:"type"`
@@ -143,7 +143,7 @@ func TestClientUntagAllForResource(t *testing.T) {
 func TestClientBatchListResourceTags(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		require.Equal(t, http.MethodPost, r.Method)
-		require.Equal(t, "/api/v1/tags:batchList", r.URL.Path)
+		require.Equal(t, "/v1/tags:batchList", r.URL.Path)
 
 		var payload struct {
 			Resources []Resource `json:"resources"`
@@ -179,7 +179,7 @@ func TestClientBatchListResourceTags(t *testing.T) {
 func TestClientBatchTagResources(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		require.Equal(t, http.MethodPost, r.Method)
-		require.Equal(t, "/api/v1/tags:batchTag", r.URL.Path)
+		require.Equal(t, "/v1/tags:batchTag", r.URL.Path)
 
 		var payload struct {
 			Items []struct {
@@ -222,7 +222,7 @@ func TestClientBatchTagResources(t *testing.T) {
 func TestClientBatchUntagResources(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		require.Equal(t, http.MethodPost, r.Method)
-		require.Equal(t, "/api/v1/tags:batchUntag", r.URL.Path)
+		require.Equal(t, "/v1/tags:batchUntag", r.URL.Path)
 
 		var payload struct {
 			Items []struct {
@@ -260,7 +260,7 @@ func TestClientBatchUntagResources(t *testing.T) {
 func TestClientQueryResourcesByTags(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		require.Equal(t, http.MethodPost, r.Method)
-		require.Equal(t, "/api/v1/tags:queryResources", r.URL.Path)
+		require.Equal(t, "/v1/tags:queryResources", r.URL.Path)
 
 		var payload struct {
 			Filters      []TagFilter  `json:"filters"`

@@ -185,7 +185,7 @@ func (c *Client) SetAvatarURL(ctx context.Context, request *SetAvatarURLRequest,
 		return nil, fmt.Errorf("encode body: %w", err)
 	}
 
-	req, err := c.newRequest(ctx, http.MethodPut, "/api/v1/me/avatar", body)
+	req, err := c.newRequest(ctx, http.MethodPut, "/v1/me/avatar", body)
 	if err != nil {
 		return nil, err
 	}
@@ -218,7 +218,7 @@ func (c *Client) UpdateProfile(ctx context.Context, request *UpdateProfileReques
 		return nil, fmt.Errorf("encode body: %w", err)
 	}
 
-	req, err := c.newRequest(ctx, http.MethodPatch, "/api/v1/me/profile", body)
+	req, err := c.newRequest(ctx, http.MethodPatch, "/v1/me/profile", body)
 	if err != nil {
 		return nil, err
 	}
@@ -241,7 +241,7 @@ func (c *Client) GetProfile(ctx context.Context, request *GetProfileRequest, opt
 		return nil, errors.New("userID must not be empty")
 	}
 
-	path := fmt.Sprintf("/api/v1/users/%s/profile", url.PathEscape(userID))
+	path := fmt.Sprintf("/v1/users/%s/profile", url.PathEscape(userID))
 	req, err := c.newRequest(ctx, http.MethodGet, path, nil)
 	if err != nil {
 		return nil, err
@@ -260,7 +260,7 @@ func (c *Client) GetProfileSettings(ctx context.Context, request *GetProfileSett
 		request = &GetProfileSettingsRequest{}
 	}
 
-	req, err := c.newRequest(ctx, http.MethodGet, "/api/v1/me/profile/settings", nil)
+	req, err := c.newRequest(ctx, http.MethodGet, "/v1/me/profile/settings", nil)
 	if err != nil {
 		return nil, err
 	}
@@ -298,7 +298,7 @@ func (c *Client) UpdateProfileSettings(ctx context.Context, request *UpdateProfi
 		return nil, fmt.Errorf("encode body: %w", err)
 	}
 
-	req, err := c.newRequest(ctx, http.MethodPut, "/api/v1/me/profile/settings", body)
+	req, err := c.newRequest(ctx, http.MethodPut, "/v1/me/profile/settings", body)
 	if err != nil {
 		return nil, err
 	}
@@ -334,7 +334,7 @@ func (c *Client) UpsertSocialProfile(ctx context.Context, request *UpsertSocialP
 		return nil, fmt.Errorf("encode body: %w", err)
 	}
 
-	req, err := c.newRequest(ctx, http.MethodPost, "/api/v1/me/social_profiles", body)
+	req, err := c.newRequest(ctx, http.MethodPost, "/v1/me/social_profiles", body)
 	if err != nil {
 		return nil, err
 	}
@@ -357,7 +357,7 @@ func (c *Client) RemoveSocialProfile(ctx context.Context, request *RemoveSocialP
 		return nil, errors.New("platform must not be empty")
 	}
 
-	path := fmt.Sprintf("/api/v1/me/social_profiles/%s", url.PathEscape(platform))
+	path := fmt.Sprintf("/v1/me/social_profiles/%s", url.PathEscape(platform))
 	req, err := c.newRequest(ctx, http.MethodDelete, path, nil)
 	if err != nil {
 		return nil, err
@@ -380,7 +380,7 @@ func (c *Client) GetSocialProfiles(ctx context.Context, request *GetSocialProfil
 		return nil, errors.New("userID must not be empty")
 	}
 
-	path := fmt.Sprintf("/api/v1/users/%s/social_profiles", url.PathEscape(userID))
+	path := fmt.Sprintf("/v1/users/%s/social_profiles", url.PathEscape(userID))
 	req, err := c.newRequest(ctx, http.MethodGet, path, nil)
 	if err != nil {
 		return nil, err
