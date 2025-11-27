@@ -31,6 +31,15 @@ const (
 	BoardTypeMaybeboard  BoardType = "BOARD_TYPE_MAYBEBOARD"
 )
 
+// DeckPermission mirrors authzv1Permission for decks.
+type DeckPermission string
+
+const (
+	DeckPermissionUnspecified DeckPermission = "PERMISSION_UNSPECIFIED"
+	DeckPermissionReader      DeckPermission = "PERMISSION_READER"
+	DeckPermissionWriter      DeckPermission = "PERMISSION_WRITER"
+)
+
 // Deck models v1Deck.
 type Deck struct {
 	ID          string          `json:"id,omitempty"`
@@ -160,9 +169,8 @@ func (r *DeleteDeckResponse) setMetadata(metadata ResponseMetadata) {
 
 // UpdateDeckRequest applies changes to a deck.
 type UpdateDeckRequest struct {
-	DeckID     string           `json:"-"`
-	Name       *string          `json:"name,omitempty"`
-	Visibility *VisibilityLevel `json:"visibility,omitempty"`
+	DeckID string  `json:"-"`
+	Name   *string `json:"name,omitempty"`
 }
 
 // UpdateDeckResponse contains the updated deck.
@@ -172,6 +180,54 @@ type UpdateDeckResponse struct {
 }
 
 func (r *UpdateDeckResponse) setMetadata(metadata ResponseMetadata) {
+	r.Metadata = metadata
+}
+
+// UpdateDeckVisibilityRequest updates only the visibility field for a deck.
+type UpdateDeckVisibilityRequest struct {
+	DeckID     string           `json:"-"`
+	Visibility *VisibilityLevel `json:"visibility,omitempty"`
+}
+
+// UpdateDeckVisibilityResponse returns the updated deck.
+type UpdateDeckVisibilityResponse struct {
+	Deck     *Deck            `json:"deck,omitempty"`
+	Metadata ResponseMetadata `json:"-"`
+}
+
+func (r *UpdateDeckVisibilityResponse) setMetadata(metadata ResponseMetadata) {
+	r.Metadata = metadata
+}
+
+// GrantDeckAccessRequest assigns a permission for a deck.
+type GrantDeckAccessRequest struct {
+	DeckID     string         `json:"resourceId,omitempty"`
+	SubjectID  string         `json:"subjectId,omitempty"`
+	Permission DeckPermission `json:"permission,omitempty"`
+}
+
+// GrantDeckAccessResponse captures metadata for grant operations.
+type GrantDeckAccessResponse struct {
+	Metadata ResponseMetadata `json:"-"`
+}
+
+func (r *GrantDeckAccessResponse) setMetadata(metadata ResponseMetadata) {
+	r.Metadata = metadata
+}
+
+// RevokeDeckAccessRequest removes a permission for a deck.
+type RevokeDeckAccessRequest struct {
+	DeckID     string         `json:"resourceId,omitempty"`
+	SubjectID  string         `json:"subjectId,omitempty"`
+	Permission DeckPermission `json:"permission,omitempty"`
+}
+
+// RevokeDeckAccessResponse captures metadata for revoke operations.
+type RevokeDeckAccessResponse struct {
+	Metadata ResponseMetadata `json:"-"`
+}
+
+func (r *RevokeDeckAccessResponse) setMetadata(metadata ResponseMetadata) {
 	r.Metadata = metadata
 }
 
@@ -577,13 +633,14 @@ func (c *Client) UpdateDeck(ctx context.Context, request *UpdateDeckRequest, opt
 	if deckID == "" {
 		return nil, errors.New("deckID must not be empty")
 	}
+	if request.Name == nil {
+		return nil, errors.New("name must not be nil")
+	}
 
 	body, err := jsonBody(struct {
-		Name       *string          `json:"name,omitempty"`
-		Visibility *VisibilityLevel `json:"visibility,omitempty"`
+		Name *string `json:"name,omitempty"`
 	}{
-		Name:       request.Name,
-		Visibility: request.Visibility,
+		Name: request.Name,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("encode body: %w", err)
@@ -599,6 +656,142 @@ func (c *Client) UpdateDeck(ctx context.Context, request *UpdateDeckRequest, opt
 	}
 
 	response := &UpdateDeckResponse{}
+	if err := c.do(req, response, opts...); err != nil {
+		return nil, err
+	}
+
+	return response, nil
+}
+
+// UpdateDeckVisibility updates only the visibility of an existing deck.
+func (c *Client) UpdateDeckVisibility(ctx context.Context, request *UpdateDeckVisibilityRequest, opts ...RequestOpt) (*UpdateDeckVisibilityResponse, error) {
+	if request == nil {
+		return nil, errors.New("request must not be nil")
+	}
+
+	deckID := strings.TrimSpace(request.DeckID)
+	if deckID == "" {
+		return nil, errors.New("deckID must not be empty")
+	}
+	if request.Visibility == nil {
+		return nil, errors.New("visibility must not be nil")
+	}
+
+	body, err := jsonBody(struct {
+		Visibility *VisibilityLevel `json:"visibility,omitempty"`
+	}{
+		Visibility: request.Visibility,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("encode body: %w", err)
+	}
+
+	path := fmt.Sprintf("/v1/decks/%s/visibility", url.PathEscape(deckID))
+	req, err := c.newRequest(ctx, http.MethodPatch, path, body)
+	if err != nil {
+		return nil, err
+	}
+	if body != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
+
+	response := &UpdateDeckVisibilityResponse{}
+	if err := c.do(req, response, opts...); err != nil {
+		return nil, err
+	}
+
+	return response, nil
+}
+
+// GrantDeckAccess assigns a permission for a user to access a deck.
+func (c *Client) GrantDeckAccess(ctx context.Context, request *GrantDeckAccessRequest, opts ...RequestOpt) (*GrantDeckAccessResponse, error) {
+	if request == nil {
+		return nil, errors.New("request must not be nil")
+	}
+
+	deckID := strings.TrimSpace(request.DeckID)
+	if deckID == "" {
+		return nil, errors.New("deckID must not be empty")
+	}
+	subjectID := strings.TrimSpace(request.SubjectID)
+	if subjectID == "" {
+		return nil, errors.New("subjectID must not be empty")
+	}
+	permission := DeckPermission(strings.TrimSpace(string(request.Permission)))
+	if permission == "" || permission == DeckPermissionUnspecified {
+		return nil, errors.New("permission must be specified")
+	}
+
+	body, err := jsonBody(struct {
+		DeckID     string         `json:"resourceId,omitempty"`
+		SubjectID  string         `json:"subjectId,omitempty"`
+		Permission DeckPermission `json:"permission,omitempty"`
+	}{
+		DeckID:     deckID,
+		SubjectID:  subjectID,
+		Permission: permission,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("encode body: %w", err)
+	}
+
+	req, err := c.newRequest(ctx, http.MethodPost, "/v1/decks/permissions:grant", body)
+	if err != nil {
+		return nil, err
+	}
+	if body != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
+
+	response := &GrantDeckAccessResponse{}
+	if err := c.do(req, response, opts...); err != nil {
+		return nil, err
+	}
+
+	return response, nil
+}
+
+// RevokeDeckAccess removes a previously granted permission from a deck.
+func (c *Client) RevokeDeckAccess(ctx context.Context, request *RevokeDeckAccessRequest, opts ...RequestOpt) (*RevokeDeckAccessResponse, error) {
+	if request == nil {
+		return nil, errors.New("request must not be nil")
+	}
+
+	deckID := strings.TrimSpace(request.DeckID)
+	if deckID == "" {
+		return nil, errors.New("deckID must not be empty")
+	}
+	subjectID := strings.TrimSpace(request.SubjectID)
+	if subjectID == "" {
+		return nil, errors.New("subjectID must not be empty")
+	}
+	permission := DeckPermission(strings.TrimSpace(string(request.Permission)))
+	if permission == "" || permission == DeckPermissionUnspecified {
+		return nil, errors.New("permission must be specified")
+	}
+
+	body, err := jsonBody(struct {
+		DeckID     string         `json:"resourceId,omitempty"`
+		SubjectID  string         `json:"subjectId,omitempty"`
+		Permission DeckPermission `json:"permission,omitempty"`
+	}{
+		DeckID:     deckID,
+		SubjectID:  subjectID,
+		Permission: permission,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("encode body: %w", err)
+	}
+
+	req, err := c.newRequest(ctx, http.MethodPost, "/v1/decks/permissions:revoke", body)
+	if err != nil {
+		return nil, err
+	}
+	if body != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
+
+	response := &RevokeDeckAccessResponse{}
 	if err := c.do(req, response, opts...); err != nil {
 		return nil, err
 	}

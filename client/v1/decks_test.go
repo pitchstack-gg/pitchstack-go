@@ -147,12 +147,10 @@ func TestClientUpdateDeck(t *testing.T) {
 		require.Equal(t, "/v1/decks/deck-1", r.URL.Path)
 
 		var payload struct {
-			Name       string `json:"name"`
-			Visibility string `json:"visibility"`
+			Name string `json:"name"`
 		}
 		require.NoError(t, json.NewDecoder(r.Body).Decode(&payload))
 		require.Equal(t, "Updated", payload.Name)
-		require.Equal(t, string(VisibilityLevelPublic), payload.Visibility)
 
 		require.NoError(t, json.NewEncoder(w).Encode(UpdateDeckResponse{
 			Deck: &Deck{ID: "deck-1", Name: "Updated"},
@@ -162,14 +160,116 @@ func TestClientUpdateDeck(t *testing.T) {
 
 	client := newTestClient(t, WithBaseURL(server.URL), WithHTTPClient(server.Client()))
 	name := "Updated"
-	visibility := VisibilityLevelPublic
 	resp, err := client.UpdateDeck(context.Background(), &UpdateDeckRequest{
-		DeckID:     "deck-1",
-		Name:       &name,
-		Visibility: &visibility,
+		DeckID: "deck-1",
+		Name:   &name,
 	})
 	require.NoError(t, err)
 	require.Equal(t, "Updated", resp.Deck.Name)
+
+	resp, err = client.UpdateDeck(context.Background(), &UpdateDeckRequest{DeckID: "deck-1"})
+	require.Nil(t, resp)
+	require.Error(t, err)
+}
+
+func TestClientUpdateDeckVisibility(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, http.MethodPatch, r.Method)
+		require.Equal(t, "/v1/decks/deck-1/visibility", r.URL.Path)
+		var payload struct {
+			Visibility string `json:"visibility"`
+		}
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&payload))
+		require.Equal(t, string(VisibilityLevelShared), payload.Visibility)
+
+		require.NoError(t, json.NewEncoder(w).Encode(UpdateDeckVisibilityResponse{
+			Deck: &Deck{ID: "deck-1", Visibility: VisibilityLevelShared},
+		}))
+	}))
+	t.Cleanup(server.Close)
+
+	client := newTestClient(t, WithBaseURL(server.URL), WithHTTPClient(server.Client()))
+	visibility := VisibilityLevelShared
+	resp, err := client.UpdateDeckVisibility(context.Background(), &UpdateDeckVisibilityRequest{
+		DeckID:     "deck-1",
+		Visibility: &visibility,
+	})
+	require.NoError(t, err)
+	require.Equal(t, VisibilityLevelShared, resp.Deck.Visibility)
+
+	resp, err = client.UpdateDeckVisibility(context.Background(), &UpdateDeckVisibilityRequest{DeckID: "deck-1"})
+	require.Nil(t, resp)
+	require.Error(t, err)
+}
+
+func TestClientGrantDeckAccess(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, http.MethodPost, r.Method)
+		require.Equal(t, "/v1/decks/permissions:grant", r.URL.Path)
+		require.Equal(t, "application/json", r.Header.Get("Content-Type"))
+
+		var payload struct {
+			DeckID     string         `json:"resourceId"`
+			SubjectID  string         `json:"subjectId"`
+			Permission DeckPermission `json:"permission"`
+		}
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&payload))
+		require.Equal(t, "deck-1", payload.DeckID)
+		require.Equal(t, "user-1", payload.SubjectID)
+		require.Equal(t, DeckPermissionReader, payload.Permission)
+
+		w.Header().Set("X-Request-Id", "req-grant")
+		_, _ = w.Write([]byte(`{}`))
+	}))
+	t.Cleanup(server.Close)
+
+	client := newTestClient(t, WithBaseURL(server.URL), WithHTTPClient(server.Client()))
+	resp, err := client.GrantDeckAccess(context.Background(), &GrantDeckAccessRequest{
+		DeckID:     "deck-1",
+		SubjectID:  "user-1",
+		Permission: DeckPermissionReader,
+	})
+	require.NoError(t, err)
+	require.Equal(t, "req-grant", resp.Metadata.RequestID)
+
+	resp, err = client.GrantDeckAccess(context.Background(), &GrantDeckAccessRequest{})
+	require.Nil(t, resp)
+	require.Error(t, err)
+}
+
+func TestClientRevokeDeckAccess(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, http.MethodPost, r.Method)
+		require.Equal(t, "/v1/decks/permissions:revoke", r.URL.Path)
+		require.Equal(t, "application/json", r.Header.Get("Content-Type"))
+
+		var payload struct {
+			DeckID     string         `json:"resourceId"`
+			SubjectID  string         `json:"subjectId"`
+			Permission DeckPermission `json:"permission"`
+		}
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&payload))
+		require.Equal(t, "deck-1", payload.DeckID)
+		require.Equal(t, "user-1", payload.SubjectID)
+		require.Equal(t, DeckPermissionWriter, payload.Permission)
+
+		w.Header().Set("X-Request-Id", "req-revoke")
+		_, _ = w.Write([]byte(`{}`))
+	}))
+	t.Cleanup(server.Close)
+
+	client := newTestClient(t, WithBaseURL(server.URL), WithHTTPClient(server.Client()))
+	resp, err := client.RevokeDeckAccess(context.Background(), &RevokeDeckAccessRequest{
+		DeckID:     "deck-1",
+		SubjectID:  "user-1",
+		Permission: DeckPermissionWriter,
+	})
+	require.NoError(t, err)
+	require.Equal(t, "req-revoke", resp.Metadata.RequestID)
+
+	resp, err = client.RevokeDeckAccess(context.Background(), &RevokeDeckAccessRequest{})
+	require.Nil(t, resp)
+	require.Error(t, err)
 }
 
 func TestClientStarAndUnstarDeck(t *testing.T) {

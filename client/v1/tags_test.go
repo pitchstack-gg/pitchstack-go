@@ -14,7 +14,7 @@ func TestClientListResourceTags(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		require.Equal(t, http.MethodGet, r.Method)
 		require.Equal(t, "/v1/tags/resource-1", r.URL.Path)
-		require.Equal(t, string(ResourceTypeDeck), r.URL.Query().Get("resource.type"))
+		require.Equal(t, string(ResourceTypeDeckVersion), r.URL.Query().Get("resource.type"))
 		require.Equal(t, "tok-1", r.URL.Query().Get("nextToken"))
 
 		require.NoError(t, json.NewEncoder(w).Encode(ListResourceTagsResponse{
@@ -27,7 +27,7 @@ func TestClientListResourceTags(t *testing.T) {
 	client := newTestClient(t, WithBaseURL(server.URL), WithHTTPClient(server.Client()))
 	resp, err := client.ListResourceTags(context.Background(), &ListResourceTagsRequest{
 		ResourceID:   "resource-1",
-		ResourceType: ResourceTypeDeck,
+		ResourceType: ResourceTypeDeckVersion,
 		NextToken:    "tok-1",
 	})
 	require.NoError(t, err)

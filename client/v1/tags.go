@@ -19,6 +19,7 @@ const (
 	ResourceTypeUserProfile    ResourceType = "RESOURCE_TYPE_USER_PROFILE"
 	ResourceTypeAdminPanel     ResourceType = "RESOURCE_TYPE_ADMIN_PANEL"
 	ResourceTypeCollectionItem ResourceType = "RESOURCE_TYPE_COLLECTION_ITEM"
+	ResourceTypeDeckVersion    ResourceType = "RESOURCE_TYPE_DECK_VERSION"
 )
 
 // MatchMode represents v1MatchMode.
