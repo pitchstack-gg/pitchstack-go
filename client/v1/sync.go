@@ -6,11 +6,12 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 )
 
-// SyncAction represents v1SyncAction.
+// SyncAction represents common.v1.SyncAction.
 type SyncAction string
 
 const (
@@ -19,7 +20,7 @@ const (
 	SyncActionDelete      SyncAction = "DELETE"
 )
 
-// SyncStatus represents v1SyncStatus.
+// SyncStatus represents common.v1.SyncStatus.
 type SyncStatus string
 
 const (
@@ -29,193 +30,239 @@ const (
 	SyncStatusError       SyncStatus = "ERROR"
 )
 
-// SubscriptionReason matches v1SubscriptionReason.
-type SubscriptionReason string
+// SyncEventKind enumerates sync.v1.SyncEventKind values.
+type SyncEventKind string
 
 const (
-	SubscriptionReasonUnspecified SubscriptionReason = "SUBSCRIPTION_REASON_UNSPECIFIED"
-	SubscriptionReasonOwner       SubscriptionReason = "OWNER"
-	SubscriptionReasonPinned      SubscriptionReason = "PINNED"
-	SubscriptionReasonPermission  SubscriptionReason = "PERMISSION"
+	SyncEventKindUnspecified       SyncEventKind = "SYNC_EVENT_KIND_UNSPECIFIED"
+	SyncEventKindCreated           SyncEventKind = "SYNC_EVENT_KIND_CREATED"
+	SyncEventKindUpdated           SyncEventKind = "SYNC_EVENT_KIND_UPDATED"
+	SyncEventKindDeleted           SyncEventKind = "SYNC_EVENT_KIND_DELETED"
+	SyncEventKindPermissionGranted SyncEventKind = "SYNC_EVENT_KIND_PERMISSION_GRANTED"
+	SyncEventKindPermissionRevoked SyncEventKind = "SYNC_EVENT_KIND_PERMISSION_REVOKED"
+	SyncEventKindTagged            SyncEventKind = "SYNC_EVENT_KIND_TAGGED"
+	SyncEventKindUntagged          SyncEventKind = "SYNC_EVENT_KIND_UNTAGGED"
+	SyncEventKindSocial            SyncEventKind = "SYNC_EVENT_KIND_SOCIAL"
 )
 
-// Cursor models v1Cursor.
-type Cursor struct {
-	Overall     string            `json:"overall,omitempty"`
-	PerResource map[string]string `json:"perResource,omitempty"`
+// TombstoneReason captures sync.v1.TombstoneReason values.
+type TombstoneReason string
+
+const (
+	TombstoneReasonUnspecified       TombstoneReason = "TOMBSTONE_REASON_UNSPECIFIED"
+	TombstoneReasonResourceDeleted   TombstoneReason = "TOMBSTONE_REASON_RESOURCE_DELETED"
+	TombstoneReasonPermissionRevoked TombstoneReason = "TOMBSTONE_REASON_PERMISSION_REVOKED"
+)
+
+// SubscriptionSource mirrors sync.v1.SubscriptionSource.
+type SubscriptionSource string
+
+const (
+	SubscriptionSourceUnspecified SubscriptionSource = "SUBSCRIPTION_SOURCE_UNSPECIFIED"
+	SubscriptionSourceOwned       SubscriptionSource = "SUBSCRIPTION_SOURCE_OWNED"
+	SubscriptionSourceManual      SubscriptionSource = "SUBSCRIPTION_SOURCE_MANUAL"
+	SubscriptionSourceShared      SubscriptionSource = "SUBSCRIPTION_SOURCE_SHARED"
+)
+
+// SubscriptionMutationType mirrors sync.v1.SubscriptionMutation.MutationType.
+type SubscriptionMutationType string
+
+const (
+	SubscriptionMutationTypeUnspecified SubscriptionMutationType = "MUTATION_TYPE_UNSPECIFIED"
+	SubscriptionMutationTypeSubscribe   SubscriptionMutationType = "MUTATION_TYPE_SUBSCRIBE"
+	SubscriptionMutationTypeUnsubscribe SubscriptionMutationType = "MUTATION_TYPE_UNSUBSCRIBE"
+)
+
+// ResourceDescriptor identifies a specific resource.
+type ResourceDescriptor struct {
+	Type ResourceType `json:"type,omitempty"`
+	ID   string       `json:"id,omitempty"`
 }
 
-// PullFilters represent v1PullFilters.
-type PullFilters struct {
-	ResourceTypes  []ResourceType `json:"resourceTypes,omitempty"`
-	PinnedOnly     bool           `json:"pinnedOnly,omitempty"`
-	IncludeDeletes bool           `json:"includeDeletes,omitempty"`
+// GetChangeSetRequest configures SyncService.GetChangeSet.
+type GetChangeSetRequest struct {
+	Cursor           string
+	PageSize         *int32
+	IncludeDocuments bool
 }
 
-// PullChangesRequest configures SyncService.PullChanges.
-type PullChangesRequest struct {
-	Cursor  *Cursor
-	Filters *PullFilters
-	Limit   *int32
+// SyncEvent mirrors sync.v1.SyncEvent.
+type SyncEvent struct {
+	EventID              string                      `json:"eventId,omitempty"`
+	Resource             *ResourceDescriptor         `json:"resource,omitempty"`
+	Kind                 SyncEventKind               `json:"kind,omitempty"`
+	OccurredAt           *time.Time                  `json:"occurredAt,omitempty"`
+	Version              string                      `json:"version,omitempty"`
+	ProducerService      string                      `json:"producerService,omitempty"`
+	Document             map[string]any              `json:"document,omitempty"`
+	Tombstone            *Tombstone                  `json:"tombstone,omitempty"`
+	PermissionRevocation *PermissionRevocationSignal `json:"permissionRevocation,omitempty"`
 }
 
-// Change mirrors v1Change.
-type Change struct {
-	EnvelopeID   string            `json:"envelopeId,omitempty"`
-	ResourceType ResourceType      `json:"resourceType,omitempty"`
-	ResourceID   string            `json:"resourceId,omitempty"`
-	Action       SyncAction        `json:"action,omitempty"`
-	Version      string            `json:"version,omitempty"`
-	Payload      map[string]any    `json:"payload,omitempty"`
-	EmittedAt    *time.Time        `json:"emittedAt,omitempty"`
-	RecordedAt   *time.Time        `json:"recordedAt,omitempty"`
-	Metadata     map[string]string `json:"metadata,omitempty"`
+// Tombstone represents sync.v1.Tombstone.
+type Tombstone struct {
+	Reason TombstoneReason `json:"reason,omitempty"`
 }
 
-// PullChangesResponse is returned from SyncService.PullChanges.
-type PullChangesResponse struct {
-	Changes    []Change         `json:"changes,omitempty"`
-	NextCursor *Cursor          `json:"nextCursor,omitempty"`
+// PermissionRevocationSignal mirrors sync.v1.PermissionRevocationSignal.
+type PermissionRevocationSignal struct {
+	RevokedByUserID    string `json:"revokedByUserId,omitempty"`
+	PreviousPermission string `json:"previousPermission,omitempty"`
+	SubscriptionID     string `json:"subscriptionId,omitempty"`
+}
+
+// GetChangeSetResponse is returned from SyncService.GetChangeSet.
+type GetChangeSetResponse struct {
+	Events     []SyncEvent      `json:"events,omitempty"`
+	NextCursor string           `json:"nextCursor,omitempty"`
 	HasMore    bool             `json:"hasMore,omitempty"`
 	Metadata   ResponseMetadata `json:"-"`
 }
 
-func (r *PullChangesResponse) setMetadata(metadata ResponseMetadata) {
+func (r *GetChangeSetResponse) setMetadata(metadata ResponseMetadata) {
 	r.Metadata = metadata
 }
 
-// Mutation mirrors v1Mutation.
-type Mutation struct {
-	LocalChangeID   string         `json:"localChangeId,omitempty"`
-	ResourceType    ResourceType   `json:"resourceType,omitempty"`
-	Action          SyncAction     `json:"action,omitempty"`
-	ResourceID      string         `json:"resourceId,omitempty"`
-	Payload         map[string]any `json:"payload,omitempty"`
-	BaseVersion     string         `json:"baseVersion,omitempty"`
-	ClientTimestamp *time.Time     `json:"clientTimestamp,omitempty"`
+// LocalChange mirrors sync.v1.LocalChange.
+type LocalChange struct {
+	ClientChangeID string              `json:"clientChangeId,omitempty"`
+	Resource       *ResourceDescriptor `json:"resource,omitempty"`
+	Action         SyncAction          `json:"action,omitempty"`
+	Document       map[string]any      `json:"document,omitempty"`
+	BaseVersion    string              `json:"baseVersion,omitempty"`
 }
 
-// BatchApplyMutationsRequest configures SyncService.BatchApplyMutations.
-type BatchApplyMutationsRequest struct {
-	ClientID  string     `json:"clientId,omitempty"`
-	Mutations []Mutation `json:"mutations,omitempty"`
+// BatchApplyChangesRequest configures SyncService.BatchApplyChanges.
+type BatchApplyChangesRequest struct {
+	Changes  []LocalChange `json:"changes,omitempty"`
+	DeviceID string        `json:"deviceId,omitempty"`
 }
 
-// ResourceSnapshot mirrors v1ResourceSnapshot.
-type ResourceSnapshot struct {
-	ResourceID   string         `json:"resourceId,omitempty"`
-	ResourceType ResourceType   `json:"resourceType,omitempty"`
-	Version      string         `json:"version,omitempty"`
-	Payload      map[string]any `json:"payload,omitempty"`
-	UpdatedAt    *time.Time     `json:"updatedAt,omitempty"`
+// AppliedChangeResult mirrors sync.v1.AppliedChangeResult.
+type AppliedChangeResult struct {
+	ClientChangeID    string     `json:"clientChangeId,omitempty"`
+	Status            SyncStatus `json:"status,omitempty"`
+	LatestServerEvent *SyncEvent `json:"latestServerEvent,omitempty"`
+	ErrorMessage      string     `json:"errorMessage,omitempty"`
 }
 
-// MutationResult mirrors v1MutationResult.
-type MutationResult struct {
-	LocalChangeID string            `json:"localChangeId,omitempty"`
-	Status        SyncStatus        `json:"status,omitempty"`
-	Message       string            `json:"message,omitempty"`
-	Snapshot      *ResourceSnapshot `json:"snapshot,omitempty"`
+// BatchApplyChangesResponse is returned from SyncService.BatchApplyChanges.
+type BatchApplyChangesResponse struct {
+	Results  []AppliedChangeResult `json:"results,omitempty"`
+	Metadata ResponseMetadata      `json:"-"`
 }
 
-// BatchApplyMutationsResponse is returned from SyncService.BatchApplyMutations.
-type BatchApplyMutationsResponse struct {
-	Results  []MutationResult `json:"results,omitempty"`
-	Metadata ResponseMetadata `json:"-"`
-}
-
-func (r *BatchApplyMutationsResponse) setMetadata(metadata ResponseMetadata) {
+func (r *BatchApplyChangesResponse) setMetadata(metadata ResponseMetadata) {
 	r.Metadata = metadata
 }
 
-// AddPinRequest registers a sync pin.
-type AddPinRequest struct {
-	ResourceID string
+// SubscriptionMutation updates manual subscriptions.
+type SubscriptionMutation struct {
+	Type     SubscriptionMutationType `json:"type,omitempty"`
+	Resource *ResourceDescriptor      `json:"resource,omitempty"`
 }
 
-// AddPinResponse captures metadata for pin operations.
-type AddPinResponse struct {
-	Metadata ResponseMetadata `json:"-"`
+// UpdateSubscriptionsRequest configures SyncService.UpdateSubscriptions.
+type UpdateSubscriptionsRequest struct {
+	Mutations []SubscriptionMutation `json:"mutations,omitempty"`
 }
 
-func (r *AddPinResponse) setMetadata(metadata ResponseMetadata) {
+// ResourceSubscription mirrors sync.v1.ResourceSubscription.
+type ResourceSubscription struct {
+	SubscriptionID string              `json:"subscriptionId,omitempty"`
+	Resource       *ResourceDescriptor `json:"resource,omitempty"`
+	Source         SubscriptionSource  `json:"source,omitempty"`
+	CreatedAt      *time.Time          `json:"createdAt,omitempty"`
+}
+
+// UpdateSubscriptionsResponse is returned from SyncService.UpdateSubscriptions.
+type UpdateSubscriptionsResponse struct {
+	Subscriptions []ResourceSubscription `json:"subscriptions,omitempty"`
+	Metadata      ResponseMetadata       `json:"-"`
+}
+
+func (r *UpdateSubscriptionsResponse) setMetadata(metadata ResponseMetadata) {
 	r.Metadata = metadata
-}
-
-// RemovePinRequest removes a sync pin.
-type RemovePinRequest struct {
-	ResourceID string
-}
-
-// RemovePinResponse captures metadata for pin removals.
-type RemovePinResponse struct {
-	Metadata ResponseMetadata `json:"-"`
-}
-
-func (r *RemovePinResponse) setMetadata(metadata ResponseMetadata) {
-	r.Metadata = metadata
-}
-
-// Subscription mirrors v1Subscription.
-type Subscription struct {
-	ResourceID   string             `json:"resourceId,omitempty"`
-	ResourceType ResourceType       `json:"resourceType,omitempty"`
-	Reason       SubscriptionReason `json:"reason,omitempty"`
-	GrantedAt    *time.Time         `json:"grantedAt,omitempty"`
 }
 
 // ListSubscriptionsResponse is returned from SyncService.ListSubscriptions.
 type ListSubscriptionsResponse struct {
-	Subscriptions []Subscription   `json:"subscriptions,omitempty"`
-	Metadata      ResponseMetadata `json:"-"`
+	Subscriptions []ResourceSubscription `json:"subscriptions,omitempty"`
+	Metadata      ResponseMetadata       `json:"-"`
 }
 
 func (r *ListSubscriptionsResponse) setMetadata(metadata ResponseMetadata) {
 	r.Metadata = metadata
 }
 
-// PullChanges retrieves changes since the supplied cursor for subscribed resources.
-func (c *Client) PullChanges(ctx context.Context, request *PullChangesRequest, opts ...RequestOpt) (*PullChangesResponse, error) {
+// GetChangeSet retrieves ordered events after the provided cursor.
+func (c *Client) GetChangeSet(ctx context.Context, request *GetChangeSetRequest, opts ...RequestOpt) (*GetChangeSetResponse, error) {
 	if request == nil {
 		return nil, errors.New("request must not be nil")
 	}
-	if err := validatePullFilters(request.Filters); err != nil {
-		return nil, fmt.Errorf("filters: %w", err)
+
+	values := url.Values{}
+	if cursor := strings.TrimSpace(request.Cursor); cursor != "" {
+		values.Set("cursor", cursor)
+	}
+	if request.PageSize != nil && *request.PageSize > 0 {
+		values.Set("pageSize", strconv.FormatInt(int64(*request.PageSize), 10))
+	}
+	if request.IncludeDocuments {
+		values.Set("includeDocuments", strconv.FormatBool(true))
 	}
 
-	payload := struct {
-		Cursor  *Cursor      `json:"cursor,omitempty"`
-		Filters *PullFilters `json:"filters,omitempty"`
-		Limit   *int32       `json:"limit,omitempty"`
-	}{
-		Cursor:  request.Cursor,
-		Filters: request.Filters,
+	path := "/v1/sync/changeSet"
+	if encoded := values.Encode(); encoded != "" {
+		path = fmt.Sprintf("%s?%s", path, encoded)
 	}
 
-	if request.Limit != nil && *request.Limit > 0 {
-		payload.Limit = request.Limit
-	}
-
-	body, err := jsonBody(payload)
-	if err != nil {
-		return nil, fmt.Errorf("encode body: %w", err)
-	}
-
-	req, err := c.newRequest(ctx, http.MethodPost, "/v1/sync/changes:pull", body)
+	req, err := c.newRequest(ctx, http.MethodGet, path, nil)
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("Content-Type", "application/json")
 
-	response := &PullChangesResponse{}
+	response := &GetChangeSetResponse{}
 	if err := c.do(req, response, opts...); err != nil {
 		return nil, err
 	}
 	return response, nil
 }
 
-// BatchApplyMutations applies mutations recorded locally to the authoritative services.
-func (c *Client) BatchApplyMutations(ctx context.Context, request *BatchApplyMutationsRequest, opts ...RequestOpt) (*BatchApplyMutationsResponse, error) {
+// BatchApplyChanges replays local changes on the server.
+func (c *Client) BatchApplyChanges(ctx context.Context, request *BatchApplyChangesRequest, opts ...RequestOpt) (*BatchApplyChangesResponse, error) {
+	if request == nil {
+		return nil, errors.New("request must not be nil")
+	}
+	if len(request.Changes) == 0 {
+		return nil, errors.New("changes must not be empty")
+	}
+	for i, change := range request.Changes {
+		if err := validateLocalChange(change); err != nil {
+			return nil, fmt.Errorf("changes[%d]: %w", i, err)
+		}
+	}
+
+	body, err := jsonBody(request)
+	if err != nil {
+		return nil, fmt.Errorf("encode body: %w", err)
+	}
+
+	req, err := c.newRequest(ctx, http.MethodPost, "/v1/sync:batchApply", body)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	response := &BatchApplyChangesResponse{}
+	if err := c.do(req, response, opts...); err != nil {
+		return nil, err
+	}
+	return response, nil
+}
+
+// UpdateSubscriptions mutates manual sync subscriptions.
+func (c *Client) UpdateSubscriptions(ctx context.Context, request *UpdateSubscriptionsRequest, opts ...RequestOpt) (*UpdateSubscriptionsResponse, error) {
 	if request == nil {
 		return nil, errors.New("request must not be nil")
 	}
@@ -223,7 +270,7 @@ func (c *Client) BatchApplyMutations(ctx context.Context, request *BatchApplyMut
 		return nil, errors.New("mutations must not be empty")
 	}
 	for i, mutation := range request.Mutations {
-		if err := validateMutation(mutation); err != nil {
+		if err := validateSubscriptionMutation(mutation); err != nil {
 			return nil, fmt.Errorf("mutations[%d]: %w", i, err)
 		}
 	}
@@ -233,68 +280,13 @@ func (c *Client) BatchApplyMutations(ctx context.Context, request *BatchApplyMut
 		return nil, fmt.Errorf("encode body: %w", err)
 	}
 
-	req, err := c.newRequest(ctx, http.MethodPost, "/v1/sync/mutations:batchApply", body)
+	req, err := c.newRequest(ctx, http.MethodPost, "/v1/sync/subscriptions:update", body)
 	if err != nil {
 		return nil, err
 	}
 	req.Header.Set("Content-Type", "application/json")
 
-	response := &BatchApplyMutationsResponse{}
-	if err := c.do(req, response, opts...); err != nil {
-		return nil, err
-	}
-	return response, nil
-}
-
-// AddPin registers a pin so resources always sync for the caller.
-func (c *Client) AddPin(ctx context.Context, request *AddPinRequest, opts ...RequestOpt) (*AddPinResponse, error) {
-	if request == nil {
-		return nil, errors.New("request must not be nil")
-	}
-	resourceID := strings.TrimSpace(request.ResourceID)
-	if resourceID == "" {
-		return nil, errors.New("resourceID must not be empty")
-	}
-
-	body, err := jsonBody(struct {
-		ResourceID string `json:"resourceId,omitempty"`
-	}{
-		ResourceID: resourceID,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("encode body: %w", err)
-	}
-
-	req, err := c.newRequest(ctx, http.MethodPost, "/v1/sync/pins", body)
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("Content-Type", "application/json")
-
-	response := &AddPinResponse{}
-	if err := c.do(req, response, opts...); err != nil {
-		return nil, err
-	}
-	return response, nil
-}
-
-// RemovePin deletes a previously registered pin.
-func (c *Client) RemovePin(ctx context.Context, request *RemovePinRequest, opts ...RequestOpt) (*RemovePinResponse, error) {
-	if request == nil {
-		return nil, errors.New("request must not be nil")
-	}
-	resourceID := strings.TrimSpace(request.ResourceID)
-	if resourceID == "" {
-		return nil, errors.New("resourceID must not be empty")
-	}
-
-	path := fmt.Sprintf("/v1/sync/pins/%s", url.PathEscape(resourceID))
-	req, err := c.newRequest(ctx, http.MethodDelete, path, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	response := &RemovePinResponse{}
+	response := &UpdateSubscriptionsResponse{}
 	if err := c.do(req, response, opts...); err != nil {
 		return nil, err
 	}
@@ -315,29 +307,46 @@ func (c *Client) ListSubscriptions(ctx context.Context, opts ...RequestOpt) (*Li
 	return response, nil
 }
 
-func validatePullFilters(filters *PullFilters) error {
-	if filters == nil {
-		return nil
+func validateLocalChange(change LocalChange) error {
+	if err := validateResourceDescriptor(change.Resource); err != nil {
+		return err
 	}
-	for i, resourceType := range filters.ResourceTypes {
-		if err := validateResourceType(resourceType); err != nil {
-			return fmt.Errorf("resourceTypes[%d]: %w", i, err)
-		}
+	if err := validateSyncAction(change.Action); err != nil {
+		return err
+	}
+	if change.Action == SyncActionUpsert && (change.Document == nil || len(change.Document) == 0) {
+		return errors.New("document must be provided for UPSERT changes")
 	}
 	return nil
 }
 
-func validateMutation(mutation Mutation) error {
-	if err := validateResourceType(mutation.ResourceType); err != nil {
-		return fmt.Errorf("resourceType: %w", err)
+func validateResourceDescriptor(resource *ResourceDescriptor) error {
+	if resource == nil {
+		return errors.New("resource must be provided")
 	}
-	if err := validateSyncAction(mutation.Action); err != nil {
-		return err
+	if err := validateResourceType(resource.Type); err != nil {
+		return fmt.Errorf("resource.type: %w", err)
 	}
-	if strings.TrimSpace(mutation.ResourceID) == "" {
-		return errors.New("resourceId must not be empty")
+	if strings.TrimSpace(resource.ID) == "" {
+		return errors.New("resource.id must not be empty")
 	}
 	return nil
+}
+
+func validateSubscriptionMutation(mutation SubscriptionMutation) error {
+	if err := validateSubscriptionMutationType(mutation.Type); err != nil {
+		return err
+	}
+	return validateResourceDescriptor(mutation.Resource)
+}
+
+func validateSubscriptionMutationType(t SubscriptionMutationType) error {
+	switch t {
+	case SubscriptionMutationTypeSubscribe, SubscriptionMutationTypeUnsubscribe:
+		return nil
+	default:
+		return errors.New("mutation type must be SUBSCRIBE or UNSUBSCRIBE")
+	}
 }
 
 func validateSyncAction(action SyncAction) error {
