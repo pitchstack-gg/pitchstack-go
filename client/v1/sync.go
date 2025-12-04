@@ -314,7 +314,7 @@ func validateLocalChange(change LocalChange) error {
 	if err := validateSyncAction(change.Action); err != nil {
 		return err
 	}
-	if change.Action == SyncActionUpsert && (change.Document == nil || len(change.Document) == 0) {
+	if change.Action == SyncActionUpsert && len(change.Document) == 0 {
 		return errors.New("document must be provided for UPSERT changes")
 	}
 	return nil
