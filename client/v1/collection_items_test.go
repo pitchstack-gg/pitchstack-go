@@ -87,6 +87,7 @@ func TestClientCreateCollectionItem(t *testing.T) {
 			require.Equal(t, ConditionNearMint, body.Condition)
 			require.NotNil(t, body.Value)
 			require.InEpsilon(t, 9.99, *body.Value, 1e-9)
+			require.Equal(t, "item-client-1", body.ItemID)
 
 			resp := CreateCollectionItemResponse{Item: &CollectionItem{ID: "item-1"}}
 			w.Header().Set("Content-Type", "application/json")
@@ -104,6 +105,7 @@ func TestClientCreateCollectionItem(t *testing.T) {
 			Quantity:     3,
 			Condition:    ConditionNearMint,
 			Value:        &value,
+			ItemID:       "item-client-1",
 		})
 		require.NoError(t, err)
 		require.Equal(t, "item-1", resp.Item.ID)

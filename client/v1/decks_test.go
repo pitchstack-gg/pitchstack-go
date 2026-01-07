@@ -58,6 +58,7 @@ func TestClientCreateDeck(t *testing.T) {
 		require.Equal(t, "hero-1", payload.HeroID)
 		require.Equal(t, "cc", payload.Format)
 		require.Equal(t, VisibilityLevelShared, payload.Visibility)
+		require.Equal(t, "deck-client-1", payload.DeckID)
 
 		require.NoError(t, json.NewEncoder(w).Encode(CreateDeckResponse{
 			Deck: &Deck{ID: "deck-1"},
@@ -71,6 +72,7 @@ func TestClientCreateDeck(t *testing.T) {
 		HeroID:     "hero-1",
 		Format:     "cc",
 		Visibility: VisibilityLevelShared,
+		DeckID:     "deck-client-1",
 	})
 	require.NoError(t, err)
 	require.Equal(t, "deck-1", resp.Deck.ID)

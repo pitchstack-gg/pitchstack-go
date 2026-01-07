@@ -91,6 +91,7 @@ func TestClientCreateCollection(t *testing.T) {
 			require.Equal(t, "A description", payload.Description)
 			require.Equal(t, CollectionTypeWantlist, payload.CollectionType)
 			require.Equal(t, VisibilityLevelPrivate, payload.Visibility)
+			require.Equal(t, "col-client-1", payload.CollectionID)
 
 			response := CreateCollectionResponse{
 				Collection: &Collection{ID: "col-1"},
@@ -110,6 +111,7 @@ func TestClientCreateCollection(t *testing.T) {
 			CollectionType: CollectionTypeWantlist,
 			Description:    "A description",
 			Visibility:     VisibilityLevelPrivate,
+			CollectionID:   "col-client-1",
 		})
 		require.NoError(t, err)
 		require.NotNil(t, resp.Collection)

@@ -30,7 +30,6 @@ func TestClientLogin(t *testing.T) {
 			w.Header().Set("X-Request-Id", "req-login")
 			require.NoError(t, json.NewEncoder(w).Encode(LoginResponse{
 				UserID:               "user-1",
-				Username:             "user",
 				AccessToken:          "access",
 				RefreshToken:         "refresh",
 				AccessTokenExpiresAt: &expectedExpiry,
@@ -122,8 +121,7 @@ func TestClientMe(t *testing.T) {
 		require.Equal(t, "/v1/me", r.URL.Path)
 		require.NoError(t, json.NewEncoder(w).Encode(MeResponse{
 			User: &User{
-				UserID:   "user-1",
-				Username: "tester",
+				UserID: "user-1",
 			},
 		}))
 	}))
@@ -161,13 +159,12 @@ func TestClientUpdateUser(t *testing.T) {
 		require.Equal(t, http.MethodPut, r.Method)
 		require.Equal(t, "/v1/users/user-1", r.URL.Path)
 
-		var payload struct {
-			Email string   `json:"email"`
-			Roles []string `json:"roles"`
-		}
+		var payload map[string]any
 		require.NoError(t, json.NewDecoder(r.Body).Decode(&payload))
-		require.Equal(t, "user@example.com", payload.Email)
-		require.Equal(t, []string{"admin"}, payload.Roles)
+		require.Equal(t, "user@example.com", payload["email"])
+		require.Equal(t, []any{"admin"}, payload["roles"])
+		_, hasUsername := payload["username"]
+		require.False(t, hasUsername)
 
 		require.NoError(t, json.NewEncoder(w).Encode(UpdateUserResponse{
 			User: &User{UserID: "user-1", Email: "user@example.com"},

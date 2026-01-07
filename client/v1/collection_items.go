@@ -82,6 +82,7 @@ type CreateCollectionItemRequest struct {
 	Quantity     int32     `json:"quantity,omitempty"`
 	Condition    Condition `json:"condition,omitempty"`
 	Value        *float64  `json:"value,omitempty"`
+	ItemID       string    `json:"itemId,omitempty"`
 }
 
 // CreateCollectionItemResponse returns the created item.

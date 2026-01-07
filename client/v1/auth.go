@@ -21,7 +21,6 @@ type LoginRequest struct {
 // LoginResponse contains tokens issued during authentication.
 type LoginResponse struct {
 	UserID               string           `json:"userId,omitempty"`
-	Username             string           `json:"username,omitempty"`
 	AccessToken          string           `json:"accessToken,omitempty"`
 	RefreshToken         string           `json:"refreshToken,omitempty"`
 	AccessTokenExpiresAt *time.Time       `json:"accessTokenExpiresAt,omitempty"`
@@ -92,7 +91,6 @@ func (r *GetUserResponse) setMetadata(metadata ResponseMetadata) {
 // UpdateUserRequest updates mutable fields for a user.
 type UpdateUserRequest struct {
 	UserID   string   `json:"-"`
-	Username *string  `json:"username,omitempty"`
 	Email    *string  `json:"email,omitempty"`
 	Roles    []string `json:"roles,omitempty"`
 }
@@ -225,7 +223,6 @@ func (r *ListGroupMembersResponse) setMetadata(metadata ResponseMetadata) {
 // User represents an account within Pitchstack.
 type User struct {
 	UserID           string     `json:"userId,omitempty"`
-	Username         string     `json:"username,omitempty"`
 	Email            string     `json:"email,omitempty"`
 	EmailVerified    bool       `json:"emailVerified,omitempty"`
 	Phone            string     `json:"phone,omitempty"`
@@ -397,11 +394,9 @@ func (c *Client) UpdateUser(ctx context.Context, request *UpdateUserRequest, opt
 	}
 
 	body, err := jsonBody(struct {
-		Username *string  `json:"username,omitempty"`
 		Email    *string  `json:"email,omitempty"`
 		Roles    []string `json:"roles,omitempty"`
 	}{
-		Username: request.Username,
 		Email:    request.Email,
 		Roles:    request.Roles,
 	})

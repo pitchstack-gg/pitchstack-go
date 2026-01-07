@@ -101,6 +101,7 @@ type CreateCollectionRequest struct {
 	CollectionType CollectionType  `json:"collectionType,omitempty"`
 	Description    string          `json:"description,omitempty"`
 	Visibility     VisibilityLevel `json:"visibility,omitempty"`
+	CollectionID   string          `json:"collectionId,omitempty"`
 }
 
 // CreateCollectionResponse contains the created collection.

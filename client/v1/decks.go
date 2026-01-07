@@ -106,6 +106,7 @@ type CreateDeckRequest struct {
 	HeroID     string          `json:"heroId,omitempty"`
 	Format     string          `json:"format,omitempty"`
 	Visibility VisibilityLevel `json:"visibility,omitempty"`
+	DeckID     string          `json:"deckId,omitempty"`
 }
 
 // CreateDeckResponse returns the created deck.
