@@ -23,7 +23,7 @@ const (
 	envCollectionItemID  = "PITCHSTACK_COLLECTION_ITEM_ID"
 	envNonexistentCardID = "PITCHSTACK_NONEXISTENT_CARD_ID"
 
-	defaultAPIBaseURL = "https://api-gamma.pitchstack.gg:8443"
+	defaultAPIBaseURL = "https://gamma-api.pitchstack.gg"
 )
 
 type testConfig struct {
@@ -76,8 +76,8 @@ func loadTestConfig() testConfig {
 		APIBaseURL:        getEnvOrDefault(envAPIBaseURL, defaultAPIBaseURL),
 		CardID:            getEnvOrDefault(envCardID, "sink-below-r"),
 		CardSearchTerm:    getEnvOrDefault(envCardSearchTerm, "sink"),
-		PrintingID:        getEnvOrDefault(envPrintingID, "FTTgbMdc7HPFD8bfLrQNK"),
-		ProductID:         getEnvOrDefault(envProductID, "prod_FTTgbMdc7HPFD8bfLrQNK"),
+		PrintingID:        getEnvOrDefault(envPrintingID, "WTR215"),
+		ProductID:         getEnvOrDefault(envProductID, "WTR215"),
 		NonexistentCardID: getEnvOrDefault(envNonexistentCardID, "hahalol"),
 	}
 }
