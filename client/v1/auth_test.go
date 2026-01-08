@@ -97,6 +97,164 @@ func TestClientRefreshToken(t *testing.T) {
 	})
 }
 
+func TestClientCreateCLILoginSession(t *testing.T) {
+	t.Run("when provided base url, then creates session", func(t *testing.T) {
+		expectedExpiry := time.Now().UTC().Truncate(time.Second)
+
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			require.Equal(t, http.MethodPost, r.Method)
+			require.Equal(t, "/v1/auth/cli/sessions", r.URL.Path)
+			require.Equal(t, "application/json", r.Header.Get("Content-Type"))
+
+			var payload CreateCLILoginSessionRequest
+			require.NoError(t, json.NewDecoder(r.Body).Decode(&payload))
+			require.Equal(t, "https://gateway.pitchstack.gg", payload.BaseURL)
+
+			w.Header().Set("Content-Type", "application/json")
+			w.Header().Set("X-Request-Id", "req-cli-session")
+			require.NoError(t, json.NewEncoder(w).Encode(CreateCLILoginSessionResponse{
+				SessionID:           "session-1",
+				SessionSecret:       "secret-1",
+				VerificationPath:    "/v1/auth/cli/sessions/session-1/login",
+				VerificationURL:     "https://gateway.pitchstack.gg/v1/auth/cli/sessions/session-1/login",
+				ExpiresAt:           &expectedExpiry,
+				PollIntervalSeconds: 2,
+			}))
+		}))
+		t.Cleanup(server.Close)
+
+		client := newTestClient(t, WithBaseURL(server.URL), WithHTTPClient(server.Client()))
+
+		resp, err := client.CreateCLILoginSession(context.Background(), &CreateCLILoginSessionRequest{
+			BaseURL: "https://gateway.pitchstack.gg",
+		})
+		require.NoError(t, err)
+		require.Equal(t, "session-1", resp.SessionID)
+		require.Equal(t, "secret-1", resp.SessionSecret)
+		require.Equal(t, "/v1/auth/cli/sessions/session-1/login", resp.VerificationPath)
+		require.Equal(t, "https://gateway.pitchstack.gg/v1/auth/cli/sessions/session-1/login", resp.VerificationURL)
+		require.Equal(t, expectedExpiry, *resp.ExpiresAt)
+		require.Equal(t, int32(2), resp.PollIntervalSeconds)
+		require.Equal(t, "req-cli-session", resp.Metadata.RequestID)
+	})
+
+	t.Run("when request missing, then returns error", func(t *testing.T) {
+		client := newTestClient(t)
+		resp, err := client.CreateCLILoginSession(context.Background(), nil)
+		require.Nil(t, resp)
+		require.Error(t, err)
+	})
+}
+
+func TestClientGetCLILoginSession(t *testing.T) {
+	expectedExpiry := time.Now().UTC().Truncate(time.Second)
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, http.MethodPost, r.Method)
+		require.Equal(t, "/v1/auth/cli/sessions/session-1:poll", r.URL.Path)
+		require.Equal(t, "application/json", r.Header.Get("Content-Type"))
+
+		var payload struct {
+			SessionSecret string `json:"sessionSecret"`
+		}
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&payload))
+		require.Equal(t, "secret-1", payload.SessionSecret)
+
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("X-Request-Id", "req-cli-poll")
+		require.NoError(t, json.NewEncoder(w).Encode(GetCLILoginSessionResponse{
+			Status: CLILoginSessionStatusComplete,
+			Login: &LoginResponse{
+				UserID:               "user-1",
+				AccessToken:          "access",
+				RefreshToken:         "refresh",
+				AccessTokenExpiresAt: &expectedExpiry,
+				Roles:                []string{"member"},
+			},
+		}))
+	}))
+	t.Cleanup(server.Close)
+
+	client := newTestClient(t, WithBaseURL(server.URL), WithHTTPClient(server.Client()))
+	resp, err := client.GetCLILoginSession(context.Background(), &GetCLILoginSessionRequest{
+		SessionID:     "session-1",
+		SessionSecret: "secret-1",
+	})
+	require.NoError(t, err)
+	require.Equal(t, CLILoginSessionStatusComplete, resp.Status)
+	require.NotNil(t, resp.Login)
+	require.Equal(t, "user-1", resp.Login.UserID)
+	require.Equal(t, "access", resp.Login.AccessToken)
+	require.Equal(t, "refresh", resp.Login.RefreshToken)
+	require.Equal(t, expectedExpiry, *resp.Login.AccessTokenExpiresAt)
+	require.Equal(t, "req-cli-poll", resp.Metadata.RequestID)
+
+	resp, err = client.GetCLILoginSession(context.Background(), &GetCLILoginSessionRequest{})
+	require.Nil(t, resp)
+	require.Error(t, err)
+}
+
+func TestClientCancelCLILoginSession(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, http.MethodPost, r.Method)
+		require.Equal(t, "/v1/auth/cli/sessions/session-1:cancel", r.URL.Path)
+		require.Equal(t, "application/json", r.Header.Get("Content-Type"))
+
+		var payload struct {
+			SessionSecret string `json:"sessionSecret"`
+		}
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&payload))
+		require.Equal(t, "secret-1", payload.SessionSecret)
+
+		w.Header().Set("X-Request-Id", "req-cli-cancel")
+		_, _ = w.Write([]byte(`{}`))
+	}))
+	t.Cleanup(server.Close)
+
+	client := newTestClient(t, WithBaseURL(server.URL), WithHTTPClient(server.Client()))
+
+	resp, err := client.CancelCLILoginSession(context.Background(), &CancelCLILoginSessionRequest{
+		SessionID:     "session-1",
+		SessionSecret: "secret-1",
+	})
+	require.NoError(t, err)
+	require.Equal(t, "req-cli-cancel", resp.Metadata.RequestID)
+}
+
+func TestClientCompleteOAuthForCLILoginSession(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, http.MethodPost, r.Method)
+		require.Equal(t, "/v1/auth/cli/sessions/session-1/oauth/google:complete", r.URL.Path)
+		require.Equal(t, "application/json", r.Header.Get("Content-Type"))
+
+		var payload struct {
+			Code        string `json:"code"`
+			State       string `json:"state"`
+			RedirectURI string `json:"redirectUri"`
+		}
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&payload))
+		require.Equal(t, "oauth-code", payload.Code)
+		require.Equal(t, "oauth-state", payload.State)
+		require.Equal(t, "https://gateway.pitchstack.gg/callback", payload.RedirectURI)
+
+		w.Header().Set("X-Request-Id", "req-cli-complete")
+		_, _ = w.Write([]byte(`{}`))
+	}))
+	t.Cleanup(server.Close)
+
+	client := newTestClient(t, WithBaseURL(server.URL), WithHTTPClient(server.Client()))
+
+	resp, err := client.CompleteOAuthForCLILoginSession(context.Background(), &CompleteOAuthForCLILoginSessionRequest{
+		SessionID:   "session-1",
+		Provider:    "google",
+		Code:        "oauth-code",
+		State:       "oauth-state",
+		RedirectURI: "https://gateway.pitchstack.gg/callback",
+	})
+	require.NoError(t, err)
+	require.Equal(t, "req-cli-complete", resp.Metadata.RequestID)
+}
+
 func TestClientLogout(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		require.Equal(t, http.MethodPost, r.Method)
