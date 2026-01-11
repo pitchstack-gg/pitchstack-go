@@ -226,6 +226,45 @@ func (r *RevokeCollectionAccessResponse) setMetadata(metadata ResponseMetadata) 
 	r.Metadata = metadata
 }
 
+// CollectionAccessGrant describes an explicit permission grant for a collection.
+type CollectionAccessGrant struct {
+	SubjectID  string               `json:"subjectId,omitempty"`
+	Permission CollectionPermission `json:"permission,omitempty"`
+}
+
+// GetCollectionAccessRequest identifies the collection access to retrieve.
+type GetCollectionAccessRequest struct {
+	CollectionID string `json:"-"`
+}
+
+// GetCollectionAccessResponse returns the caller's effective permission for a collection.
+type GetCollectionAccessResponse struct {
+	Permission CollectionPermission `json:"permission,omitempty"`
+	Metadata   ResponseMetadata     `json:"-"`
+}
+
+func (r *GetCollectionAccessResponse) setMetadata(metadata ResponseMetadata) {
+	r.Metadata = metadata
+}
+
+// ListCollectionAccessGrantsRequest lists subjects explicitly granted access to a collection.
+type ListCollectionAccessGrantsRequest struct {
+	CollectionID string `json:"-"`
+	PageSize     *int32
+	NextToken    string
+}
+
+// ListCollectionAccessGrantsResponse returns explicit access grants for a collection.
+type ListCollectionAccessGrantsResponse struct {
+	Grants    []CollectionAccessGrant `json:"grants,omitempty"`
+	NextToken string                  `json:"nextToken,omitempty"`
+	Metadata  ResponseMetadata        `json:"-"`
+}
+
+func (r *ListCollectionAccessGrantsResponse) setMetadata(metadata ResponseMetadata) {
+	r.Metadata = metadata
+}
+
 // GetCollectionValuationRequest identifies a collection valuation lookup.
 type GetCollectionValuationRequest struct {
 	CollectionID string `json:"-"`
@@ -482,6 +521,61 @@ func (c *Client) GetCollectionValuation(ctx context.Context, request *GetCollect
 	req.URL.RawQuery = query.Encode()
 
 	response := &GetCollectionValuationResponse{}
+	if err := c.do(req, response, opts...); err != nil {
+		return nil, err
+	}
+
+	return response, nil
+}
+
+// GetCollectionAccess returns the caller's effective permission for a collection.
+func (c *Client) GetCollectionAccess(ctx context.Context, request *GetCollectionAccessRequest, opts ...RequestOpt) (*GetCollectionAccessResponse, error) {
+	if request == nil {
+		return nil, errors.New("request must not be nil")
+	}
+	if strings.TrimSpace(request.CollectionID) == "" {
+		return nil, errors.New("collectionID must not be empty")
+	}
+
+	path := fmt.Sprintf("/v1/collections/%s/access", url.PathEscape(request.CollectionID))
+	req, err := c.newRequest(ctx, http.MethodGet, path, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetCollectionAccessResponse{}
+	if err := c.do(req, response, opts...); err != nil {
+		return nil, err
+	}
+
+	return response, nil
+}
+
+// ListCollectionAccessGrants lists subjects explicitly granted access to a collection.
+func (c *Client) ListCollectionAccessGrants(ctx context.Context, request *ListCollectionAccessGrantsRequest, opts ...RequestOpt) (*ListCollectionAccessGrantsResponse, error) {
+	if request == nil {
+		return nil, errors.New("request must not be nil")
+	}
+	if strings.TrimSpace(request.CollectionID) == "" {
+		return nil, errors.New("collectionID must not be empty")
+	}
+
+	path := fmt.Sprintf("/v1/collections/%s/permissions", url.PathEscape(request.CollectionID))
+	req, err := c.newRequest(ctx, http.MethodGet, path, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	query := req.URL.Query()
+	if request.PageSize != nil && *request.PageSize > 0 {
+		query.Set("pageSize", strconv.Itoa(int(*request.PageSize)))
+	}
+	if token := strings.TrimSpace(request.NextToken); token != "" {
+		query.Set("nextToken", token)
+	}
+	req.URL.RawQuery = query.Encode()
+
+	response := &ListCollectionAccessGrantsResponse{}
 	if err := c.do(req, response, opts...); err != nil {
 		return nil, err
 	}

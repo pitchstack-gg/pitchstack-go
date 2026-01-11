@@ -439,3 +439,67 @@ func TestClientRevokeCollectionAccess(t *testing.T) {
 		require.Nil(t, resp)
 	})
 }
+
+func TestClientGetCollectionAccess(t *testing.T) {
+	t.Run("when id provided, then access is returned", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			require.Equal(t, http.MethodGet, r.Method)
+			require.Equal(t, "/v1/collections/col-1/access", r.URL.Path)
+			require.NoError(t, json.NewEncoder(w).Encode(GetCollectionAccessResponse{
+				Permission: CollectionPermissionReader,
+			}))
+		}))
+		t.Cleanup(server.Close)
+
+		client := newTestClient(t, WithBaseURL(server.URL), WithHTTPClient(server.Client()))
+		resp, err := client.GetCollectionAccess(context.Background(), &GetCollectionAccessRequest{CollectionID: "col-1"})
+		require.NoError(t, err)
+		require.Equal(t, CollectionPermissionReader, resp.Permission)
+	})
+
+	t.Run("when id missing, then returns error", func(t *testing.T) {
+		client := newTestClient(t)
+		resp, err := client.GetCollectionAccess(context.Background(), &GetCollectionAccessRequest{})
+		require.Error(t, err)
+		require.Nil(t, resp)
+	})
+}
+
+func TestClientListCollectionAccessGrants(t *testing.T) {
+	t.Run("when request includes pagination, then query and grants are returned", func(t *testing.T) {
+		pageSize := int32(10)
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			require.Equal(t, http.MethodGet, r.Method)
+			require.Equal(t, "/v1/collections/col-1/permissions", r.URL.Path)
+			require.Equal(t, "10", r.URL.Query().Get("pageSize"))
+			require.Equal(t, "token", r.URL.Query().Get("nextToken"))
+
+			require.NoError(t, json.NewEncoder(w).Encode(ListCollectionAccessGrantsResponse{
+				Grants: []CollectionAccessGrant{
+					{SubjectID: "user-1", Permission: CollectionPermissionWriter},
+				},
+				NextToken: "next",
+			}))
+		}))
+		t.Cleanup(server.Close)
+
+		client := newTestClient(t, WithBaseURL(server.URL), WithHTTPClient(server.Client()))
+		resp, err := client.ListCollectionAccessGrants(context.Background(), &ListCollectionAccessGrantsRequest{
+			CollectionID: "col-1",
+			PageSize:     &pageSize,
+			NextToken:    "token",
+		})
+		require.NoError(t, err)
+		require.Len(t, resp.Grants, 1)
+		require.Equal(t, "user-1", resp.Grants[0].SubjectID)
+		require.Equal(t, CollectionPermissionWriter, resp.Grants[0].Permission)
+		require.Equal(t, "next", resp.NextToken)
+	})
+
+	t.Run("when request missing id, then returns error", func(t *testing.T) {
+		client := newTestClient(t)
+		resp, err := client.ListCollectionAccessGrants(context.Background(), &ListCollectionAccessGrantsRequest{})
+		require.Error(t, err)
+		require.Nil(t, resp)
+	})
+}

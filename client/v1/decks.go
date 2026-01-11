@@ -232,6 +232,45 @@ func (r *RevokeDeckAccessResponse) setMetadata(metadata ResponseMetadata) {
 	r.Metadata = metadata
 }
 
+// DeckAccessGrant describes an explicit permission grant for a deck.
+type DeckAccessGrant struct {
+	SubjectID  string         `json:"subjectId,omitempty"`
+	Permission DeckPermission `json:"permission,omitempty"`
+}
+
+// GetDeckAccessRequest identifies the deck access to retrieve.
+type GetDeckAccessRequest struct {
+	DeckID string `json:"-"`
+}
+
+// GetDeckAccessResponse returns the caller's effective permission for a deck.
+type GetDeckAccessResponse struct {
+	Permission DeckPermission  `json:"permission,omitempty"`
+	Metadata   ResponseMetadata `json:"-"`
+}
+
+func (r *GetDeckAccessResponse) setMetadata(metadata ResponseMetadata) {
+	r.Metadata = metadata
+}
+
+// ListDeckAccessGrantsRequest lists subjects explicitly granted access to a deck.
+type ListDeckAccessGrantsRequest struct {
+	DeckID    string `json:"-"`
+	PageSize  *int32
+	NextToken string
+}
+
+// ListDeckAccessGrantsResponse returns explicit access grants for a deck.
+type ListDeckAccessGrantsResponse struct {
+	Grants    []DeckAccessGrant `json:"grants,omitempty"`
+	NextToken string            `json:"nextToken,omitempty"`
+	Metadata  ResponseMetadata  `json:"-"`
+}
+
+func (r *ListDeckAccessGrantsResponse) setMetadata(metadata ResponseMetadata) {
+	r.Metadata = metadata
+}
+
 // StarDeckRequest marks a deck as starred.
 type StarDeckRequest struct {
 	DeckID string `json:"-"`
@@ -592,6 +631,65 @@ func (c *Client) GetDeck(ctx context.Context, request *GetDeckRequest, opts ...R
 	}
 
 	response := &GetDeckResponse{}
+	if err := c.do(req, response, opts...); err != nil {
+		return nil, err
+	}
+
+	return response, nil
+}
+
+// GetDeckAccess returns the caller's effective permission for a deck.
+func (c *Client) GetDeckAccess(ctx context.Context, request *GetDeckAccessRequest, opts ...RequestOpt) (*GetDeckAccessResponse, error) {
+	if request == nil {
+		return nil, errors.New("request must not be nil")
+	}
+
+	deckID := strings.TrimSpace(request.DeckID)
+	if deckID == "" {
+		return nil, errors.New("deckID must not be empty")
+	}
+
+	path := fmt.Sprintf("/v1/decks/%s/access", url.PathEscape(deckID))
+	req, err := c.newRequest(ctx, http.MethodGet, path, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetDeckAccessResponse{}
+	if err := c.do(req, response, opts...); err != nil {
+		return nil, err
+	}
+
+	return response, nil
+}
+
+// ListDeckAccessGrants lists subjects explicitly granted access to a deck.
+func (c *Client) ListDeckAccessGrants(ctx context.Context, request *ListDeckAccessGrantsRequest, opts ...RequestOpt) (*ListDeckAccessGrantsResponse, error) {
+	if request == nil {
+		return nil, errors.New("request must not be nil")
+	}
+
+	deckID := strings.TrimSpace(request.DeckID)
+	if deckID == "" {
+		return nil, errors.New("deckID must not be empty")
+	}
+
+	path := fmt.Sprintf("/v1/decks/%s/permissions", url.PathEscape(deckID))
+	req, err := c.newRequest(ctx, http.MethodGet, path, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	query := req.URL.Query()
+	if request.PageSize != nil && *request.PageSize > 0 {
+		query.Set("pageSize", strconv.Itoa(int(*request.PageSize)))
+	}
+	if token := strings.TrimSpace(request.NextToken); token != "" {
+		query.Set("nextToken", token)
+	}
+	req.URL.RawQuery = query.Encode()
+
+	response := &ListDeckAccessGrantsResponse{}
 	if err := c.do(req, response, opts...); err != nil {
 		return nil, err
 	}

@@ -128,6 +128,56 @@ func TestClientGetDeck(t *testing.T) {
 	require.Error(t, err)
 }
 
+func TestClientGetDeckAccess(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, http.MethodGet, r.Method)
+		require.Equal(t, "/v1/decks/deck-1/access", r.URL.Path)
+		require.NoError(t, json.NewEncoder(w).Encode(GetDeckAccessResponse{
+			Permission: DeckPermissionReader,
+		}))
+	}))
+	t.Cleanup(server.Close)
+
+	client := newTestClient(t, WithBaseURL(server.URL), WithHTTPClient(server.Client()))
+	resp, err := client.GetDeckAccess(context.Background(), &GetDeckAccessRequest{DeckID: "deck-1"})
+	require.NoError(t, err)
+	require.Equal(t, DeckPermissionReader, resp.Permission)
+
+	resp, err = client.GetDeckAccess(context.Background(), &GetDeckAccessRequest{})
+	require.Nil(t, resp)
+	require.Error(t, err)
+}
+
+func TestClientListDeckAccessGrants(t *testing.T) {
+	pageSize := int32(5)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, http.MethodGet, r.Method)
+		require.Equal(t, "/v1/decks/deck-1/permissions", r.URL.Path)
+		require.Equal(t, "5", r.URL.Query().Get("pageSize"))
+		require.Equal(t, "token", r.URL.Query().Get("nextToken"))
+
+		require.NoError(t, json.NewEncoder(w).Encode(ListDeckAccessGrantsResponse{
+			Grants: []DeckAccessGrant{{SubjectID: "user-1", Permission: DeckPermissionWriter}},
+		}))
+	}))
+	t.Cleanup(server.Close)
+
+	client := newTestClient(t, WithBaseURL(server.URL), WithHTTPClient(server.Client()))
+	resp, err := client.ListDeckAccessGrants(context.Background(), &ListDeckAccessGrantsRequest{
+		DeckID:    "deck-1",
+		PageSize:  &pageSize,
+		NextToken: "token",
+	})
+	require.NoError(t, err)
+	require.Len(t, resp.Grants, 1)
+	require.Equal(t, "user-1", resp.Grants[0].SubjectID)
+	require.Equal(t, DeckPermissionWriter, resp.Grants[0].Permission)
+
+	resp, err = client.ListDeckAccessGrants(context.Background(), &ListDeckAccessGrantsRequest{})
+	require.Nil(t, resp)
+	require.Error(t, err)
+}
+
 func TestClientDeleteDeck(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		require.Equal(t, http.MethodDelete, r.Method)
