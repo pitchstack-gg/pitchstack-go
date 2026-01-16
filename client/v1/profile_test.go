@@ -36,6 +36,62 @@ func TestClientSetAvatarURL(t *testing.T) {
 	require.Error(t, err)
 }
 
+func TestClientGetMyProfile(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, http.MethodGet, r.Method)
+		require.Equal(t, "/v1/me/profile", r.URL.Path)
+		require.NoError(t, json.NewEncoder(w).Encode(GetProfileResponse{
+			Profile: &UserProfile{Username: "me"},
+		}))
+	}))
+	t.Cleanup(server.Close)
+
+	client := newTestClient(t, WithBaseURL(server.URL), WithHTTPClient(server.Client()))
+	resp, err := client.GetMyProfile(context.Background())
+	require.NoError(t, err)
+	require.Equal(t, "me", resp.Profile.Username)
+}
+
+func TestClientAvatarUploadFlow(t *testing.T) {
+	var sawBegin, sawComplete bool
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/v1/me/avatar:beginUpload":
+			sawBegin = true
+			require.Equal(t, http.MethodPost, r.Method)
+			var payload BeginAvatarUploadRequest
+			require.NoError(t, json.NewDecoder(r.Body).Decode(&payload))
+			require.Equal(t, "image/png", payload.ContentType)
+			require.NoError(t, json.NewEncoder(w).Encode(BeginAvatarUploadResponse{
+				UploadID:  "up-1",
+				UploadURL: "https://upload",
+				MaxBytes:  1024,
+			}))
+		case "/v1/me/avatar:completeUpload":
+			sawComplete = true
+			require.Equal(t, http.MethodPost, r.Method)
+			var payload CompleteAvatarUploadRequest
+			require.NoError(t, json.NewDecoder(r.Body).Decode(&payload))
+			require.Equal(t, "up-1", payload.UploadID)
+			require.NoError(t, json.NewEncoder(w).Encode(CompleteAvatarUploadResponse{
+				Profile: &UserProfile{AvatarURL: "https://cdn/avatar.png"},
+			}))
+		default:
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+	}))
+	t.Cleanup(server.Close)
+
+	client := newTestClient(t, WithBaseURL(server.URL), WithHTTPClient(server.Client()))
+	_, err := client.BeginAvatarUpload(context.Background(), &BeginAvatarUploadRequest{ContentType: "image/png"})
+	require.NoError(t, err)
+	resp, err := client.CompleteAvatarUpload(context.Background(), &CompleteAvatarUploadRequest{UploadID: "up-1"})
+	require.NoError(t, err)
+	require.Equal(t, "https://cdn/avatar.png", resp.Profile.AvatarURL)
+	require.True(t, sawBegin)
+	require.True(t, sawComplete)
+}
+
 func TestClientUpdateProfile(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		require.Equal(t, http.MethodPatch, r.Method)

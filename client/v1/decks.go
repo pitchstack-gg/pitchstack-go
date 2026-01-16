@@ -245,7 +245,7 @@ type GetDeckAccessRequest struct {
 
 // GetDeckAccessResponse returns the caller's effective permission for a deck.
 type GetDeckAccessResponse struct {
-	Permission DeckPermission  `json:"permission,omitempty"`
+	Permission DeckPermission   `json:"permission,omitempty"`
 	Metadata   ResponseMetadata `json:"-"`
 }
 

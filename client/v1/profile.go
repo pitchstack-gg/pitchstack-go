@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 )
 
 // ProfileVisibilityLevel models profilev1VisibilityLevel.
@@ -55,6 +56,41 @@ type SetAvatarURLResponse struct {
 }
 
 func (r *SetAvatarURLResponse) setMetadata(metadata ResponseMetadata) {
+	r.Metadata = metadata
+}
+
+// BeginAvatarUploadRequest starts a server-controlled avatar upload.
+type BeginAvatarUploadRequest struct {
+	ContentType   string `json:"contentType,omitempty"`
+	ContentLength *int64 `json:"contentLength,omitempty,string"`
+}
+
+// BeginAvatarUploadResponse returns upload instructions.
+type BeginAvatarUploadResponse struct {
+	UploadID        string            `json:"uploadId,omitempty"`
+	UploadURL       string            `json:"uploadUrl,omitempty"`
+	RequiredHeaders map[string]string `json:"requiredHeaders,omitempty"`
+	MaxBytes        int64             `json:"maxBytes,omitempty,string"`
+	ExpiresAt       *time.Time        `json:"expiresAt,omitempty"`
+	Metadata        ResponseMetadata  `json:"-"`
+}
+
+func (r *BeginAvatarUploadResponse) setMetadata(metadata ResponseMetadata) {
+	r.Metadata = metadata
+}
+
+// CompleteAvatarUploadRequest completes an avatar upload.
+type CompleteAvatarUploadRequest struct {
+	UploadID string `json:"uploadId,omitempty"`
+}
+
+// CompleteAvatarUploadResponse returns the updated profile after applying the avatar.
+type CompleteAvatarUploadResponse struct {
+	Profile  *UserProfile     `json:"profile,omitempty"`
+	Metadata ResponseMetadata `json:"-"`
+}
+
+func (r *CompleteAvatarUploadResponse) setMetadata(metadata ResponseMetadata) {
 	r.Metadata = metadata
 }
 
@@ -166,6 +202,20 @@ func (r *GetSocialProfilesResponse) setMetadata(metadata ResponseMetadata) {
 	r.Metadata = metadata
 }
 
+// GetMyProfile reads the authenticated user's profile.
+func (c *Client) GetMyProfile(ctx context.Context, opts ...RequestOpt) (*GetProfileResponse, error) {
+	req, err := c.newRequest(ctx, http.MethodGet, "/v1/me/profile", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetProfileResponse{}
+	if err := c.do(req, response, opts...); err != nil {
+		return nil, err
+	}
+	return response, nil
+}
+
 // SetAvatarURL updates the authenticated user's avatar URL.
 func (c *Client) SetAvatarURL(ctx context.Context, request *SetAvatarURLRequest, opts ...RequestOpt) (*SetAvatarURLResponse, error) {
 	if request == nil {
@@ -192,6 +242,65 @@ func (c *Client) SetAvatarURL(ctx context.Context, request *SetAvatarURLRequest,
 	req.Header.Set("Content-Type", "application/json")
 
 	response := &SetAvatarURLResponse{}
+	if err := c.do(req, response, opts...); err != nil {
+		return nil, err
+	}
+	return response, nil
+}
+
+// SetAvatarUrl is an alias for SetAvatarURL.
+func (c *Client) SetAvatarUrl(ctx context.Context, request *SetAvatarURLRequest, opts ...RequestOpt) (*SetAvatarURLResponse, error) {
+	return c.SetAvatarURL(ctx, request, opts...)
+}
+
+// BeginAvatarUpload starts a server-controlled avatar upload session.
+func (c *Client) BeginAvatarUpload(ctx context.Context, request *BeginAvatarUploadRequest, opts ...RequestOpt) (*BeginAvatarUploadResponse, error) {
+	if request == nil {
+		return nil, errors.New("request must not be nil")
+	}
+	if strings.TrimSpace(request.ContentType) == "" {
+		return nil, errors.New("contentType must not be empty")
+	}
+
+	body, err := jsonBody(request)
+	if err != nil {
+		return nil, fmt.Errorf("encode body: %w", err)
+	}
+
+	req, err := c.newRequest(ctx, http.MethodPost, "/v1/me/avatar:beginUpload", body)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	response := &BeginAvatarUploadResponse{}
+	if err := c.do(req, response, opts...); err != nil {
+		return nil, err
+	}
+	return response, nil
+}
+
+// CompleteAvatarUpload completes an avatar upload session and applies it to the current user.
+func (c *Client) CompleteAvatarUpload(ctx context.Context, request *CompleteAvatarUploadRequest, opts ...RequestOpt) (*CompleteAvatarUploadResponse, error) {
+	if request == nil {
+		return nil, errors.New("request must not be nil")
+	}
+	if strings.TrimSpace(request.UploadID) == "" {
+		return nil, errors.New("uploadID must not be empty")
+	}
+
+	body, err := jsonBody(request)
+	if err != nil {
+		return nil, fmt.Errorf("encode body: %w", err)
+	}
+
+	req, err := c.newRequest(ctx, http.MethodPost, "/v1/me/avatar:completeUpload", body)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	response := &CompleteAvatarUploadResponse{}
 	if err := c.do(req, response, opts...); err != nil {
 		return nil, err
 	}
