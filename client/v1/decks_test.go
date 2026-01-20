@@ -24,6 +24,7 @@ func TestClientListDecks(t *testing.T) {
 		require.Equal(t, "aggro", query.Get("name"))
 		require.Equal(t, "25", query.Get("pageSize"))
 		require.Equal(t, "token", query.Get("nextToken"))
+		require.Equal(t, "subject-1", query.Get("subjectId"))
 
 		require.NoError(t, json.NewEncoder(w).Encode(ListDecksResponse{
 			Decks: []Deck{{ID: "deck-1"}},
@@ -41,6 +42,7 @@ func TestClientListDecks(t *testing.T) {
 		Name:      "aggro",
 		PageSize:  &pageSize,
 		NextToken: "token",
+		SubjectID: "subject-1",
 	})
 	require.NoError(t, err)
 	require.Len(t, resp.Decks, 1)
@@ -57,8 +59,15 @@ func TestClientCreateDeck(t *testing.T) {
 		require.Equal(t, "Aggro", payload.Name)
 		require.Equal(t, "hero-1", payload.HeroID)
 		require.Equal(t, "cc", payload.Format)
+		require.Equal(t, "desc", payload.Description)
+		require.Equal(t, "author", payload.Author)
 		require.Equal(t, VisibilityLevelShared, payload.Visibility)
 		require.Equal(t, "deck-client-1", payload.DeckID)
+		require.NotNil(t, payload.CreateInitialVersion)
+		require.True(t, *payload.CreateInitialVersion)
+		require.NotNil(t, payload.InitialVersion)
+		require.Equal(t, "v1", payload.InitialVersion.Name)
+		require.Equal(t, "dv-1", payload.InitialVersion.DeckVersionID)
 
 		require.NoError(t, json.NewEncoder(w).Encode(CreateDeckResponse{
 			Deck: &Deck{ID: "deck-1"},
@@ -67,12 +76,20 @@ func TestClientCreateDeck(t *testing.T) {
 	t.Cleanup(server.Close)
 
 	client := newTestClient(t, WithBaseURL(server.URL), WithHTTPClient(server.Client()))
+	createInitial := true
 	resp, err := client.CreateDeck(context.Background(), &CreateDeckRequest{
-		Name:       "Aggro",
-		HeroID:     "hero-1",
-		Format:     "cc",
-		Visibility: VisibilityLevelShared,
-		DeckID:     "deck-client-1",
+		Name:                 "Aggro",
+		HeroID:               "hero-1",
+		Format:               "cc",
+		Description:          "desc",
+		Author:               "author",
+		Visibility:           VisibilityLevelShared,
+		DeckID:               "deck-client-1",
+		CreateInitialVersion: &createInitial,
+		InitialVersion: &CreateDeckInitialVersion{
+			Name:          "v1",
+			DeckVersionID: "dv-1",
+		},
 	})
 	require.NoError(t, err)
 	require.Equal(t, "deck-1", resp.Deck.ID)
@@ -199,22 +216,31 @@ func TestClientUpdateDeck(t *testing.T) {
 		require.Equal(t, "/v1/decks/deck-1", r.URL.Path)
 
 		var payload struct {
-			Name string `json:"name"`
+			Name        string `json:"name"`
+			Description string `json:"description"`
+			Author      string `json:"author"`
 		}
 		require.NoError(t, json.NewDecoder(r.Body).Decode(&payload))
 		require.Equal(t, "Updated", payload.Name)
+		require.Equal(t, "New desc", payload.Description)
+		require.Equal(t, "New author", payload.Author)
 
 		require.NoError(t, json.NewEncoder(w).Encode(UpdateDeckResponse{
 			Deck: &Deck{ID: "deck-1", Name: "Updated"},
 		}))
+
 	}))
 	t.Cleanup(server.Close)
 
 	client := newTestClient(t, WithBaseURL(server.URL), WithHTTPClient(server.Client()))
 	name := "Updated"
+	description := "New desc"
+	author := "New author"
 	resp, err := client.UpdateDeck(context.Background(), &UpdateDeckRequest{
-		DeckID: "deck-1",
-		Name:   &name,
+		DeckID:      "deck-1",
+		Name:        &name,
+		Description: &description,
+		Author:      &author,
 	})
 	require.NoError(t, err)
 	require.Equal(t, "Updated", resp.Deck.Name)
@@ -362,7 +388,7 @@ func TestClientListDeckVersions(t *testing.T) {
 		require.Equal(t, "token", query.Get("nextToken"))
 
 		require.NoError(t, json.NewEncoder(w).Encode(ListDeckVersionsResponse{
-			Versions: []string{"v1"},
+			DeckVersions: []DeckVersion{{ID: "dv-1", Name: "v1"}},
 		}))
 	}))
 	t.Cleanup(server.Close)
@@ -375,7 +401,7 @@ func TestClientListDeckVersions(t *testing.T) {
 		NextToken: "token",
 	})
 	require.NoError(t, err)
-	require.Equal(t, []string{"v1"}, resp.Versions)
+	require.Equal(t, []DeckVersion{{ID: "dv-1", Name: "v1"}}, resp.DeckVersions)
 }
 
 func TestClientCreateDeckVersion(t *testing.T) {
@@ -384,54 +410,57 @@ func TestClientCreateDeckVersion(t *testing.T) {
 		require.Equal(t, "/v1/decks/deck-1/versions", r.URL.Path)
 
 		var payload struct {
-			Version     string `json:"version"`
-			ImageURL    string `json:"imageUrl"`
-			Description string `json:"description"`
+			Name                string `json:"name"`
+			ImageURL            string `json:"imageUrl"`
+			Description         string `json:"description"`
+			DeckVersionID       string `json:"deckVersionId"`
+			SourceDeckVersionID string `json:"sourceDeckVersionId"`
 		}
 		require.NoError(t, json.NewDecoder(r.Body).Decode(&payload))
-		require.Equal(t, "v2", payload.Version)
+		require.Equal(t, "v2", payload.Name)
 		require.Equal(t, "https://image", payload.ImageURL)
 		require.Equal(t, "desc", payload.Description)
+		require.Equal(t, "dv-2", payload.DeckVersionID)
+		require.Equal(t, "dv-source", payload.SourceDeckVersionID)
 
 		require.NoError(t, json.NewEncoder(w).Encode(CreateDeckVersionResponse{
-			DeckVersion: &DeckVersion{Version: "v2"},
+			DeckVersion: &DeckVersion{ID: "dv-2", Name: "v2"},
 		}))
 	}))
 	t.Cleanup(server.Close)
 
 	client := newTestClient(t, WithBaseURL(server.URL), WithHTTPClient(server.Client()))
 	resp, err := client.CreateDeckVersion(context.Background(), &CreateDeckVersionRequest{
-		DeckID:      "deck-1",
-		Version:     "v2",
-		ImageURL:    "https://image",
-		Description: "desc",
+		DeckID:              "deck-1",
+		Name:                "v2",
+		ImageURL:            "https://image",
+		Description:         "desc",
+		DeckVersionID:       "dv-2",
+		SourceDeckVersionID: "dv-source",
 	})
 	require.NoError(t, err)
-	require.Equal(t, "v2", resp.DeckVersion.Version)
+	require.Equal(t, "v2", resp.DeckVersion.Name)
 }
 
 func TestClientGetDeckVersion(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		require.Equal(t, http.MethodGet, r.Method)
-		require.Equal(t, "/v1/decks/deck-1/versions/v1", r.URL.Path)
-		require.Equal(t, "token", r.URL.Query().Get("nextToken"))
+		require.Equal(t, "/v1/deck_versions/dv-1", r.URL.Path)
 
 		require.NoError(t, json.NewEncoder(w).Encode(GetDeckVersionResponse{
-			DeckVersion: &DeckVersion{Version: "v1"},
+			DeckVersion: &DeckVersion{ID: "dv-1", Name: "v1"},
 		}))
 	}))
 	t.Cleanup(server.Close)
 
 	client := newTestClient(t, WithBaseURL(server.URL), WithHTTPClient(server.Client()))
 	resp, err := client.GetDeckVersion(context.Background(), &GetDeckVersionRequest{
-		DeckID:    "deck-1",
-		Version:   "v1",
-		NextToken: "token",
+		DeckVersionID: "dv-1",
 	})
 	require.NoError(t, err)
-	require.Equal(t, "v1", resp.DeckVersion.Version)
+	require.Equal(t, "v1", resp.DeckVersion.Name)
 
-	resp, err = client.GetDeckVersion(context.Background(), &GetDeckVersionRequest{DeckID: "deck-1"})
+	resp, err = client.GetDeckVersion(context.Background(), &GetDeckVersionRequest{})
 	require.Nil(t, resp)
 	require.Error(t, err)
 }
@@ -439,7 +468,7 @@ func TestClientGetDeckVersion(t *testing.T) {
 func TestClientDeleteDeckVersion(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		require.Equal(t, http.MethodDelete, r.Method)
-		require.Equal(t, "/v1/decks/deck-1/versions/v1", r.URL.Path)
+		require.Equal(t, "/v1/deck_versions/dv-1", r.URL.Path)
 		w.Header().Set("X-Request-Id", "req-delete-version")
 		_, _ = w.Write([]byte(`{}`))
 	}))
@@ -447,9 +476,9 @@ func TestClientDeleteDeckVersion(t *testing.T) {
 
 	client := newTestClient(t, WithBaseURL(server.URL), WithHTTPClient(server.Client()))
 	resp, err := client.DeleteDeckVersion(context.Background(), &DeleteDeckVersionRequest{
-		DeckID:  "deck-1",
-		Version: "v1",
+		DeckVersionID: "dv-1",
 	})
+
 	require.NoError(t, err)
 	require.Equal(t, "req-delete-version", resp.Metadata.RequestID)
 }
@@ -457,7 +486,7 @@ func TestClientDeleteDeckVersion(t *testing.T) {
 func TestClientUpdateDeckVersion(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		require.Equal(t, http.MethodPut, r.Method)
-		require.Equal(t, "/v1/decks/deck-1/versions/v1", r.URL.Path)
+		require.Equal(t, "/v1/deck_versions/dv-1", r.URL.Path)
 
 		var payload struct {
 			ImageURL    string `json:"imageUrl"`
@@ -470,6 +499,7 @@ func TestClientUpdateDeckVersion(t *testing.T) {
 		require.NoError(t, json.NewEncoder(w).Encode(UpdateDeckVersionResponse{
 			DeckVersion: &DeckVersion{ImageURL: "https://image"},
 		}))
+
 	}))
 	t.Cleanup(server.Close)
 
@@ -477,10 +507,9 @@ func TestClientUpdateDeckVersion(t *testing.T) {
 	imageURL := "https://image"
 	desc := "desc"
 	resp, err := client.UpdateDeckVersion(context.Background(), &UpdateDeckVersionRequest{
-		DeckID:      "deck-1",
-		Version:     "v1",
-		ImageURL:    &imageURL,
-		Description: &desc,
+		DeckVersionID: "dv-1",
+		ImageURL:      &imageURL,
+		Description:   &desc,
 	})
 	require.NoError(t, err)
 	require.Equal(t, "https://image", resp.DeckVersion.ImageURL)
@@ -489,20 +518,20 @@ func TestClientUpdateDeckVersion(t *testing.T) {
 func TestClientListDeckVersionCards(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		require.Equal(t, http.MethodGet, r.Method)
-		require.Equal(t, "/v1/decks/deck-1/versions/v1/cards", r.URL.Path)
+		require.Equal(t, "/v1/deck_versions/dv-1/cards", r.URL.Path)
 
 		require.NoError(t, json.NewEncoder(w).Encode(ListDeckVersionCardsResponse{
 			MainboardCards:  []DeckCard{{CardID: "card-1", Quantity: 3}},
 			SideboardCards:  []DeckCard{{CardID: "card-2", Quantity: 2}},
 			MaybeboardCards: []DeckCard{{CardID: "card-3", Quantity: 1}},
 		}))
+
 	}))
 	t.Cleanup(server.Close)
 
 	client := newTestClient(t, WithBaseURL(server.URL), WithHTTPClient(server.Client()))
 	resp, err := client.ListDeckVersionCards(context.Background(), &ListDeckVersionCardsRequest{
-		DeckID:  "deck-1",
-		Version: "v1",
+		DeckVersionID: "dv-1",
 	})
 	require.NoError(t, err)
 	require.Len(t, resp.MainboardCards, 1)
@@ -513,7 +542,7 @@ func TestClientListDeckVersionCards(t *testing.T) {
 func TestClientModifyDeckVersionCard(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		require.Equal(t, http.MethodPost, r.Method)
-		require.Equal(t, "/v1/decks/deck-1/versions/v1/cards", r.URL.Path)
+		require.Equal(t, "/v1/deck_versions/dv-1/cards", r.URL.Path)
 		require.Equal(t, "application/json", r.Header.Get("Content-Type"))
 
 		var payload struct {
@@ -535,18 +564,16 @@ func TestClientModifyDeckVersionCard(t *testing.T) {
 
 	client := newTestClient(t, WithBaseURL(server.URL), WithHTTPClient(server.Client()))
 	resp, err := client.ModifyDeckVersionCard(context.Background(), &ModifyDeckVersionCardRequest{
-		DeckID:   "deck-1",
-		Version:  "v1",
-		CardID:   "card-1",
-		Board:    BoardTypeMainboard,
-		Quantity: 3,
+		DeckVersionID: "dv-1",
+		CardID:        "card-1",
+		Board:         BoardTypeMainboard,
+		Quantity:      3,
 	})
 	require.NoError(t, err)
 	require.Equal(t, "card-1", resp.Card.CardID)
 
 	resp, err = client.ModifyDeckVersionCard(context.Background(), &ModifyDeckVersionCardRequest{
-		DeckID:  "deck-1",
-		Version: "v1",
+		DeckVersionID: "dv-1",
 	})
 	require.Nil(t, resp)
 	require.Error(t, err)
@@ -556,18 +583,18 @@ func TestClientGetDeckVersionHistory(t *testing.T) {
 	ts := time.Now().UTC()
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		require.Equal(t, http.MethodGet, r.Method)
-		require.Equal(t, "/v1/decks/deck-1/versions/v1/history", r.URL.Path)
+		require.Equal(t, "/v1/deck_versions/dv-1/history", r.URL.Path)
 
 		require.NoError(t, json.NewEncoder(w).Encode(GetDeckVersionHistoryResponse{
-			Changes: []DeckVersionChange{{Version: "v1", Timestamp: &ts}},
+			Changes: []DeckVersionChange{{Name: "v1", Timestamp: &ts}},
 		}))
+
 	}))
 	t.Cleanup(server.Close)
 
 	client := newTestClient(t, WithBaseURL(server.URL), WithHTTPClient(server.Client()))
 	resp, err := client.GetDeckVersionHistory(context.Background(), &GetDeckVersionHistoryRequest{
-		DeckID:  "deck-1",
-		Version: "v1",
+		DeckVersionID: "dv-1",
 	})
 	require.NoError(t, err)
 	require.Len(t, resp.Changes, 1)
@@ -577,12 +604,12 @@ func TestClientGetAndUpdateDeckVersionNotes(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodGet:
-			require.Equal(t, "/v1/decks/deck-1/versions/v1/notes", r.URL.Path)
+			require.Equal(t, "/v1/deck_versions/dv-1/notes", r.URL.Path)
 			require.NoError(t, json.NewEncoder(w).Encode(GetDeckVersionNotesResponse{
 				Notes: "Initial",
 			}))
 		case http.MethodPut:
-			require.Equal(t, "/v1/decks/deck-1/versions/v1/notes", r.URL.Path)
+			require.Equal(t, "/v1/deck_versions/dv-1/notes", r.URL.Path)
 			var payload struct {
 				Notes string `json:"notes"`
 			}
@@ -599,16 +626,14 @@ func TestClientGetAndUpdateDeckVersionNotes(t *testing.T) {
 
 	client := newTestClient(t, WithBaseURL(server.URL), WithHTTPClient(server.Client()))
 	getResp, err := client.GetDeckVersionNotes(context.Background(), &GetDeckVersionNotesRequest{
-		DeckID:  "deck-1",
-		Version: "v1",
+		DeckVersionID: "dv-1",
 	})
 	require.NoError(t, err)
 	require.Equal(t, "Initial", getResp.Notes)
 
 	updateResp, err := client.UpdateDeckVersionNotes(context.Background(), &UpdateDeckVersionNotesRequest{
-		DeckID:  "deck-1",
-		Version: "v1",
-		Notes:   "Updated",
+		DeckVersionID: "dv-1",
+		Notes:         "Updated",
 	})
 	require.NoError(t, err)
 	require.Equal(t, "Updated", updateResp.Notes)

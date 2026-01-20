@@ -130,6 +130,7 @@ func TestClientUpdateCollectionItem(t *testing.T) {
 			require.EqualValues(t, 5, body["quantity"])
 			require.Equal(t, string(ConditionLightlyPlayed), body["condition"])
 			require.EqualValues(t, 12.5, body["value"])
+			require.Equal(t, true, body["pinned"])
 
 			resp := UpdateCollectionItemResponse{Item: &CollectionItem{ID: "item-1", Quantity: 5, Value: 12.5}}
 			w.Header().Set("Content-Type", "application/json")
@@ -144,11 +145,13 @@ func TestClientUpdateCollectionItem(t *testing.T) {
 		value := 12.5
 
 		client := newTestClient(t, WithBaseURL(server.URL), WithHTTPClient(server.Client()))
+		pinned := true
 		resp, err := client.UpdateCollectionItem(context.Background(), &UpdateCollectionItemRequest{
 			ItemID:    "item-1",
 			Quantity:  &quantity,
 			Condition: &condition,
 			Value:     &value,
+			Pinned:    &pinned,
 		})
 		require.NoError(t, err)
 		require.Equal(t, int32(5), resp.Item.Quantity)

@@ -42,32 +42,40 @@ const (
 
 // Deck models v1Deck.
 type Deck struct {
-	ID          string          `json:"id,omitempty"`
-	UserID      string          `json:"userId,omitempty"`
-	Name        string          `json:"name,omitempty"`
-	Description string          `json:"description,omitempty"`
-	HeroID      string          `json:"heroId,omitempty"`
-	Format      string          `json:"format,omitempty"`
-	Versions    []string        `json:"versions,omitempty"`
-	Visibility  VisibilityLevel `json:"visibility,omitempty"`
-	CreatedAt   *time.Time      `json:"createdAt,omitempty"`
-	UpdatedAt   *time.Time      `json:"updatedAt,omitempty"`
+	ID           string               `json:"id,omitempty"`
+	UserID       string               `json:"userId,omitempty"`
+	Name         string               `json:"name,omitempty"`
+	Description  string               `json:"description,omitempty"`
+	Author       string               `json:"author,omitempty"`
+	HeroID       string               `json:"heroId,omitempty"`
+	Format       string               `json:"format,omitempty"`
+	Visibility   VisibilityLevel      `json:"visibility,omitempty"`
+	DeckVersions []DeckVersionSummary `json:"deckVersions,omitempty"`
+	CreatedAt    *time.Time           `json:"createdAt,omitempty"`
+	UpdatedAt    *time.Time           `json:"updatedAt,omitempty"`
+}
+
+// DeckVersionSummary represents v1DeckVersionSummary.
+type DeckVersionSummary struct {
+	ID   string `json:"id,omitempty"`
+	Name string `json:"name,omitempty"`
 }
 
 // DeckVersion represents v1DeckVersion.
 type DeckVersion struct {
 	DeckID      string     `json:"deckId,omitempty"`
-	Version     string     `json:"version,omitempty"`
+	Name        string     `json:"name,omitempty"`
 	ImageURL    string     `json:"imageUrl,omitempty"`
 	Description string     `json:"description,omitempty"`
 	CreatedAt   *time.Time `json:"createdAt,omitempty"`
 	UpdatedAt   *time.Time `json:"updatedAt,omitempty"`
+	ID          string     `json:"id,omitempty"`
 }
 
 // DeckVersionChange mirrors v1DeckVersionChange.
 type DeckVersionChange struct {
 	DeckID      string     `json:"deckId,omitempty"`
-	Version     string     `json:"version,omitempty"`
+	Name        string     `json:"name,omitempty"`
 	Description string     `json:"description,omitempty"`
 	Timestamp   *time.Time `json:"timestamp,omitempty"`
 }
@@ -87,6 +95,7 @@ type ListDecksRequest struct {
 	Name      string
 	PageSize  *int32
 	NextToken string
+	SubjectID string
 }
 
 // ListDecksResponse contains decks visible to the caller.
@@ -102,17 +111,28 @@ func (r *ListDecksResponse) setMetadata(metadata ResponseMetadata) {
 
 // CreateDeckRequest captures payload fields for deck creation.
 type CreateDeckRequest struct {
-	Name       string          `json:"name,omitempty"`
-	HeroID     string          `json:"heroId,omitempty"`
-	Format     string          `json:"format,omitempty"`
-	Visibility VisibilityLevel `json:"visibility,omitempty"`
-	DeckID     string          `json:"deckId,omitempty"`
+	Name                 string                    `json:"name,omitempty"`
+	HeroID               string                    `json:"heroId,omitempty"`
+	Format               string                    `json:"format,omitempty"`
+	Description          string                    `json:"description,omitempty"`
+	Author               string                    `json:"author,omitempty"`
+	Visibility           VisibilityLevel           `json:"visibility,omitempty"`
+	DeckID               string                    `json:"deckId,omitempty"`
+	CreateInitialVersion *bool                     `json:"createInitialVersion,omitempty"`
+	InitialVersion       *CreateDeckInitialVersion `json:"initialVersion,omitempty"`
+}
+
+// CreateDeckInitialVersion configures the initial deck version.
+type CreateDeckInitialVersion struct {
+	Name          string `json:"name,omitempty"`
+	DeckVersionID string `json:"deckVersionId,omitempty"`
 }
 
 // CreateDeckResponse returns the created deck.
 type CreateDeckResponse struct {
-	Deck     *Deck            `json:"deck,omitempty"`
-	Metadata ResponseMetadata `json:"-"`
+	Deck           *Deck            `json:"deck,omitempty"`
+	InitialVersion *DeckVersion     `json:"initialVersion,omitempty"`
+	Metadata       ResponseMetadata `json:"-"`
 }
 
 func (r *CreateDeckResponse) setMetadata(metadata ResponseMetadata) {
@@ -170,8 +190,10 @@ func (r *DeleteDeckResponse) setMetadata(metadata ResponseMetadata) {
 
 // UpdateDeckRequest applies changes to a deck.
 type UpdateDeckRequest struct {
-	DeckID string  `json:"-"`
-	Name   *string `json:"name,omitempty"`
+	DeckID      string  `json:"-"`
+	Name        *string `json:"name,omitempty"`
+	Description *string `json:"description,omitempty"`
+	Author      *string `json:"author,omitempty"`
 }
 
 // UpdateDeckResponse contains the updated deck.
@@ -308,9 +330,9 @@ type ListDeckVersionsRequest struct {
 
 // ListDeckVersionsResponse lists deck versions.
 type ListDeckVersionsResponse struct {
-	Versions  []string         `json:"versions,omitempty"`
-	NextToken string           `json:"nextToken,omitempty"`
-	Metadata  ResponseMetadata `json:"-"`
+	DeckVersions []DeckVersion    `json:"deckVersions,omitempty"`
+	NextToken    string           `json:"nextToken,omitempty"`
+	Metadata     ResponseMetadata `json:"-"`
 }
 
 func (r *ListDeckVersionsResponse) setMetadata(metadata ResponseMetadata) {
@@ -319,10 +341,12 @@ func (r *ListDeckVersionsResponse) setMetadata(metadata ResponseMetadata) {
 
 // CreateDeckVersionRequest provisions a deck version.
 type CreateDeckVersionRequest struct {
-	DeckID      string `json:"-"`
-	Version     string `json:"version,omitempty"`
-	ImageURL    string `json:"imageUrl,omitempty"`
-	Description string `json:"description,omitempty"`
+	DeckID              string `json:"-"`
+	Name                string `json:"name,omitempty"`
+	ImageURL            string `json:"imageUrl,omitempty"`
+	Description         string `json:"description,omitempty"`
+	DeckVersionID       string `json:"deckVersionId,omitempty"`
+	SourceDeckVersionID string `json:"sourceDeckVersionId,omitempty"`
 }
 
 // CreateDeckVersionResponse includes the created version.
@@ -337,9 +361,7 @@ func (r *CreateDeckVersionResponse) setMetadata(metadata ResponseMetadata) {
 
 // GetDeckVersionRequest identifies a deck version to retrieve.
 type GetDeckVersionRequest struct {
-	DeckID    string `json:"-"`
-	Version   string `json:"-"`
-	NextToken string
+	DeckVersionID string `json:"-"`
 }
 
 // GetDeckVersionResponse returns a deck version.
@@ -355,8 +377,7 @@ func (r *GetDeckVersionResponse) setMetadata(metadata ResponseMetadata) {
 
 // DeleteDeckVersionRequest removes a deck version.
 type DeleteDeckVersionRequest struct {
-	DeckID  string `json:"-"`
-	Version string `json:"-"`
+	DeckVersionID string `json:"-"`
 }
 
 // DeleteDeckVersionResponse captures metadata for deletions.
@@ -370,10 +391,9 @@ func (r *DeleteDeckVersionResponse) setMetadata(metadata ResponseMetadata) {
 
 // UpdateDeckVersionRequest updates attributes on a deck version.
 type UpdateDeckVersionRequest struct {
-	DeckID      string  `json:"-"`
-	Version     string  `json:"-"`
-	ImageURL    *string `json:"imageUrl,omitempty"`
-	Description *string `json:"description,omitempty"`
+	DeckVersionID string  `json:"-"`
+	ImageURL      *string `json:"imageUrl,omitempty"`
+	Description   *string `json:"description,omitempty"`
 }
 
 // UpdateDeckVersionResponse returns the updated version.
@@ -388,8 +408,7 @@ func (r *UpdateDeckVersionResponse) setMetadata(metadata ResponseMetadata) {
 
 // ListDeckVersionCardsRequest lists cards within a deck version.
 type ListDeckVersionCardsRequest struct {
-	DeckID  string
-	Version string
+	DeckVersionID string
 }
 
 // ListDeckVersionCardsResponse enumerates cards within a deck version.
@@ -406,11 +425,10 @@ func (r *ListDeckVersionCardsResponse) setMetadata(metadata ResponseMetadata) {
 
 // ModifyDeckVersionCardRequest adjusts a card within a deck version.
 type ModifyDeckVersionCardRequest struct {
-	DeckID   string    `json:"-"`
-	Version  string    `json:"-"`
-	CardID   string    `json:"cardId,omitempty"`
-	Board    BoardType `json:"boardType,omitempty"`
-	Quantity int32     `json:"quantity,omitempty"`
+	DeckVersionID string    `json:"-"`
+	CardID        string    `json:"cardId,omitempty"`
+	Board         BoardType `json:"boardType,omitempty"`
+	Quantity      int32     `json:"quantity,omitempty"`
 }
 
 // ModifyDeckVersionCardResponse returns the affected card.
@@ -426,8 +444,7 @@ func (r *ModifyDeckVersionCardResponse) setMetadata(metadata ResponseMetadata) {
 
 // GetDeckVersionHistoryRequest retrieves version history for a deck.
 type GetDeckVersionHistoryRequest struct {
-	DeckID  string
-	Version string
+	DeckVersionID string
 }
 
 // GetDeckVersionHistoryResponse contains version changes.
@@ -442,8 +459,7 @@ func (r *GetDeckVersionHistoryResponse) setMetadata(metadata ResponseMetadata) {
 
 // GetDeckVersionNotesRequest fetches notes for a deck version.
 type GetDeckVersionNotesRequest struct {
-	DeckID  string
-	Version string
+	DeckVersionID string
 }
 
 // GetDeckVersionNotesResponse returns notes text.
@@ -458,9 +474,8 @@ func (r *GetDeckVersionNotesResponse) setMetadata(metadata ResponseMetadata) {
 
 // UpdateDeckVersionNotesRequest updates notes for a deck version.
 type UpdateDeckVersionNotesRequest struct {
-	DeckID  string
-	Version string
-	Notes   string
+	DeckVersionID string
+	Notes         string
 }
 
 // UpdateDeckVersionNotesResponse returns updated notes.
@@ -538,6 +553,9 @@ func (c *Client) ListDecks(ctx context.Context, request *ListDecksRequest, opts 
 	}
 	if token := strings.TrimSpace(request.NextToken); token != "" {
 		query.Set("nextToken", token)
+	}
+	if subjectID := strings.TrimSpace(request.SubjectID); subjectID != "" {
+		query.Set("subjectId", subjectID)
 	}
 	req.URL.RawQuery = query.Encode()
 
@@ -732,14 +750,17 @@ func (c *Client) UpdateDeck(ctx context.Context, request *UpdateDeckRequest, opt
 	if deckID == "" {
 		return nil, errors.New("deckID must not be empty")
 	}
-	if request.Name == nil {
-		return nil, errors.New("name must not be nil")
+	if request.Name == nil && request.Description == nil && request.Author == nil {
+		return nil, errors.New("at least one field must be set")
 	}
-
 	body, err := jsonBody(struct {
-		Name *string `json:"name,omitempty"`
+		Name        *string `json:"name,omitempty"`
+		Description *string `json:"description,omitempty"`
+		Author      *string `json:"author,omitempty"`
 	}{
-		Name: request.Name,
+		Name:        request.Name,
+		Description: request.Description,
+		Author:      request.Author,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("encode body: %w", err)
@@ -994,13 +1015,17 @@ func (c *Client) CreateDeckVersion(ctx context.Context, request *CreateDeckVersi
 	}
 
 	body, err := jsonBody(struct {
-		Version     string `json:"version,omitempty"`
-		ImageURL    string `json:"imageUrl,omitempty"`
-		Description string `json:"description,omitempty"`
+		Name                string `json:"name,omitempty"`
+		ImageURL            string `json:"imageUrl,omitempty"`
+		Description         string `json:"description,omitempty"`
+		DeckVersionID       string `json:"deckVersionId,omitempty"`
+		SourceDeckVersionID string `json:"sourceDeckVersionId,omitempty"`
 	}{
-		Version:     strings.TrimSpace(request.Version),
-		ImageURL:    strings.TrimSpace(request.ImageURL),
-		Description: strings.TrimSpace(request.Description),
+		Name:                strings.TrimSpace(request.Name),
+		ImageURL:            strings.TrimSpace(request.ImageURL),
+		Description:         strings.TrimSpace(request.Description),
+		DeckVersionID:       strings.TrimSpace(request.DeckVersionID),
+		SourceDeckVersionID: strings.TrimSpace(request.SourceDeckVersionID),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("encode body: %w", err)
@@ -1029,25 +1054,15 @@ func (c *Client) GetDeckVersion(ctx context.Context, request *GetDeckVersionRequ
 		return nil, errors.New("request must not be nil")
 	}
 
-	deckID := strings.TrimSpace(request.DeckID)
-	version := strings.TrimSpace(request.Version)
-	if deckID == "" {
-		return nil, errors.New("deckID must not be empty")
-	}
-	if version == "" {
-		return nil, errors.New("version must not be empty")
+	deckVersionID := strings.TrimSpace(request.DeckVersionID)
+	if deckVersionID == "" {
+		return nil, errors.New("deckVersionID must not be empty")
 	}
 
-	path := fmt.Sprintf("/v1/decks/%s/versions/%s", url.PathEscape(deckID), url.PathEscape(version))
+	path := fmt.Sprintf("/v1/deck_versions/%s", url.PathEscape(deckVersionID))
 	req, err := c.newRequest(ctx, http.MethodGet, path, nil)
 	if err != nil {
 		return nil, err
-	}
-
-	if token := strings.TrimSpace(request.NextToken); token != "" {
-		query := req.URL.Query()
-		query.Set("nextToken", token)
-		req.URL.RawQuery = query.Encode()
 	}
 
 	response := &GetDeckVersionResponse{}
@@ -1064,16 +1079,12 @@ func (c *Client) DeleteDeckVersion(ctx context.Context, request *DeleteDeckVersi
 		return nil, errors.New("request must not be nil")
 	}
 
-	deckID := strings.TrimSpace(request.DeckID)
-	version := strings.TrimSpace(request.Version)
-	if deckID == "" {
-		return nil, errors.New("deckID must not be empty")
-	}
-	if version == "" {
-		return nil, errors.New("version must not be empty")
+	deckVersionID := strings.TrimSpace(request.DeckVersionID)
+	if deckVersionID == "" {
+		return nil, errors.New("deckVersionID must not be empty")
 	}
 
-	path := fmt.Sprintf("/v1/decks/%s/versions/%s", url.PathEscape(deckID), url.PathEscape(version))
+	path := fmt.Sprintf("/v1/deck_versions/%s", url.PathEscape(deckVersionID))
 	req, err := c.newRequest(ctx, http.MethodDelete, path, nil)
 	if err != nil {
 		return nil, err
@@ -1093,13 +1104,9 @@ func (c *Client) UpdateDeckVersion(ctx context.Context, request *UpdateDeckVersi
 		return nil, errors.New("request must not be nil")
 	}
 
-	deckID := strings.TrimSpace(request.DeckID)
-	version := strings.TrimSpace(request.Version)
-	if deckID == "" {
-		return nil, errors.New("deckID must not be empty")
-	}
-	if version == "" {
-		return nil, errors.New("version must not be empty")
+	deckVersionID := strings.TrimSpace(request.DeckVersionID)
+	if deckVersionID == "" {
+		return nil, errors.New("deckVersionID must not be empty")
 	}
 
 	body, err := jsonBody(struct {
@@ -1113,7 +1120,7 @@ func (c *Client) UpdateDeckVersion(ctx context.Context, request *UpdateDeckVersi
 		return nil, fmt.Errorf("encode body: %w", err)
 	}
 
-	path := fmt.Sprintf("/v1/decks/%s/versions/%s", url.PathEscape(deckID), url.PathEscape(version))
+	path := fmt.Sprintf("/v1/deck_versions/%s", url.PathEscape(deckVersionID))
 	req, err := c.newRequest(ctx, http.MethodPut, path, body)
 	if err != nil {
 		return nil, err
@@ -1136,16 +1143,12 @@ func (c *Client) ListDeckVersionCards(ctx context.Context, request *ListDeckVers
 		return nil, errors.New("request must not be nil")
 	}
 
-	deckID := strings.TrimSpace(request.DeckID)
-	version := strings.TrimSpace(request.Version)
-	if deckID == "" {
-		return nil, errors.New("deckID must not be empty")
-	}
-	if version == "" {
-		return nil, errors.New("version must not be empty")
+	deckVersionID := strings.TrimSpace(request.DeckVersionID)
+	if deckVersionID == "" {
+		return nil, errors.New("deckVersionID must not be empty")
 	}
 
-	path := fmt.Sprintf("/v1/decks/%s/versions/%s/cards", url.PathEscape(deckID), url.PathEscape(version))
+	path := fmt.Sprintf("/v1/deck_versions/%s/cards", url.PathEscape(deckVersionID))
 	req, err := c.newRequest(ctx, http.MethodGet, path, nil)
 	if err != nil {
 		return nil, err
@@ -1165,15 +1168,11 @@ func (c *Client) ModifyDeckVersionCard(ctx context.Context, request *ModifyDeckV
 		return nil, errors.New("request must not be nil")
 	}
 
-	deckID := strings.TrimSpace(request.DeckID)
-	version := strings.TrimSpace(request.Version)
+	deckVersionID := strings.TrimSpace(request.DeckVersionID)
 	cardID := strings.TrimSpace(request.CardID)
 	board := strings.TrimSpace(string(request.Board))
-	if deckID == "" {
-		return nil, errors.New("deckID must not be empty")
-	}
-	if version == "" {
-		return nil, errors.New("version must not be empty")
+	if deckVersionID == "" {
+		return nil, errors.New("deckVersionID must not be empty")
 	}
 	if cardID == "" {
 		return nil, errors.New("cardID must not be empty")
@@ -1195,7 +1194,7 @@ func (c *Client) ModifyDeckVersionCard(ctx context.Context, request *ModifyDeckV
 		return nil, fmt.Errorf("encode body: %w", err)
 	}
 
-	path := fmt.Sprintf("/v1/decks/%s/versions/%s/cards", url.PathEscape(deckID), url.PathEscape(version))
+	path := fmt.Sprintf("/v1/deck_versions/%s/cards", url.PathEscape(deckVersionID))
 	req, err := c.newRequest(ctx, http.MethodPost, path, body)
 	if err != nil {
 		return nil, err
@@ -1218,16 +1217,12 @@ func (c *Client) GetDeckVersionHistory(ctx context.Context, request *GetDeckVers
 		return nil, errors.New("request must not be nil")
 	}
 
-	deckID := strings.TrimSpace(request.DeckID)
-	version := strings.TrimSpace(request.Version)
-	if deckID == "" {
-		return nil, errors.New("deckID must not be empty")
-	}
-	if version == "" {
-		return nil, errors.New("version must not be empty")
+	deckVersionID := strings.TrimSpace(request.DeckVersionID)
+	if deckVersionID == "" {
+		return nil, errors.New("deckVersionID must not be empty")
 	}
 
-	path := fmt.Sprintf("/v1/decks/%s/versions/%s/history", url.PathEscape(deckID), url.PathEscape(version))
+	path := fmt.Sprintf("/v1/deck_versions/%s/history", url.PathEscape(deckVersionID))
 	req, err := c.newRequest(ctx, http.MethodGet, path, nil)
 	if err != nil {
 		return nil, err
@@ -1247,16 +1242,12 @@ func (c *Client) GetDeckVersionNotes(ctx context.Context, request *GetDeckVersio
 		return nil, errors.New("request must not be nil")
 	}
 
-	deckID := strings.TrimSpace(request.DeckID)
-	version := strings.TrimSpace(request.Version)
-	if deckID == "" {
-		return nil, errors.New("deckID must not be empty")
-	}
-	if version == "" {
-		return nil, errors.New("version must not be empty")
+	deckVersionID := strings.TrimSpace(request.DeckVersionID)
+	if deckVersionID == "" {
+		return nil, errors.New("deckVersionID must not be empty")
 	}
 
-	path := fmt.Sprintf("/v1/decks/%s/versions/%s/notes", url.PathEscape(deckID), url.PathEscape(version))
+	path := fmt.Sprintf("/v1/deck_versions/%s/notes", url.PathEscape(deckVersionID))
 	req, err := c.newRequest(ctx, http.MethodGet, path, nil)
 	if err != nil {
 		return nil, err
@@ -1276,13 +1267,9 @@ func (c *Client) UpdateDeckVersionNotes(ctx context.Context, request *UpdateDeck
 		return nil, errors.New("request must not be nil")
 	}
 
-	deckID := strings.TrimSpace(request.DeckID)
-	version := strings.TrimSpace(request.Version)
-	if deckID == "" {
-		return nil, errors.New("deckID must not be empty")
-	}
-	if version == "" {
-		return nil, errors.New("version must not be empty")
+	deckVersionID := strings.TrimSpace(request.DeckVersionID)
+	if deckVersionID == "" {
+		return nil, errors.New("deckVersionID must not be empty")
 	}
 
 	body, err := jsonBody(struct {
@@ -1294,7 +1281,7 @@ func (c *Client) UpdateDeckVersionNotes(ctx context.Context, request *UpdateDeck
 		return nil, fmt.Errorf("encode body: %w", err)
 	}
 
-	path := fmt.Sprintf("/v1/decks/%s/versions/%s/notes", url.PathEscape(deckID), url.PathEscape(version))
+	path := fmt.Sprintf("/v1/deck_versions/%s/notes", url.PathEscape(deckVersionID))
 	req, err := c.newRequest(ctx, http.MethodPut, path, body)
 	if err != nil {
 		return nil, err

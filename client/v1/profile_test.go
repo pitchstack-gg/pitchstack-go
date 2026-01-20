@@ -149,6 +149,59 @@ func TestClientGetProfile(t *testing.T) {
 	require.Error(t, err)
 }
 
+func TestClientPinnedResources(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			require.Equal(t, "/v1/users/user-1/pins", r.URL.Path)
+			require.NoError(t, json.NewEncoder(w).Encode(GetPinnedResourcesResponse{
+				PinnedCollections: []PinnedCollection{{CollectionID: "col-1"}},
+				PinnedDecks:       []PinnedDeck{{DeckID: "deck-1"}},
+			}))
+		case http.MethodPost:
+			switch r.URL.Path {
+			case "/v1/me/pins/collections":
+				var payload PinCollectionRequest
+				require.NoError(t, json.NewDecoder(r.Body).Decode(&payload))
+				require.Equal(t, "col-1", payload.CollectionID)
+			case "/v1/me/pins/decks":
+				var payload PinDeckRequest
+				require.NoError(t, json.NewDecoder(r.Body).Decode(&payload))
+				require.Equal(t, "deck-1", payload.DeckID)
+			default:
+				t.Fatalf("unexpected path: %s", r.URL.Path)
+			}
+			w.WriteHeader(http.StatusOK)
+		case http.MethodDelete:
+			switch r.URL.Path {
+			case "/v1/me/pins/collections/col-1":
+			case "/v1/me/pins/decks/deck-1":
+			default:
+				t.Fatalf("unexpected path: %s", r.URL.Path)
+			}
+			w.WriteHeader(http.StatusOK)
+		default:
+			t.Fatalf("unexpected method: %s", r.Method)
+		}
+	}))
+	t.Cleanup(server.Close)
+
+	client := newTestClient(t, WithBaseURL(server.URL), WithHTTPClient(server.Client()))
+	resp, err := client.GetPinnedResources(context.Background(), &GetPinnedResourcesRequest{UserID: "user-1"})
+	require.NoError(t, err)
+	require.Len(t, resp.PinnedCollections, 1)
+	require.Len(t, resp.PinnedDecks, 1)
+
+	_, err = client.PinCollection(context.Background(), &PinCollectionRequest{CollectionID: "col-1"})
+	require.NoError(t, err)
+	_, err = client.UnpinCollection(context.Background(), &UnpinCollectionRequest{CollectionID: "col-1"})
+	require.NoError(t, err)
+	_, err = client.PinDeck(context.Background(), &PinDeckRequest{DeckID: "deck-1"})
+	require.NoError(t, err)
+	_, err = client.UnpinDeck(context.Background(), &UnpinDeckRequest{DeckID: "deck-1"})
+	require.NoError(t, err)
+}
+
 func TestClientGetProfileSettings(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		require.Equal(t, http.MethodGet, r.Method)

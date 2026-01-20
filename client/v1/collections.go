@@ -82,6 +82,7 @@ type ListCollectionsRequest struct {
 	UserID    string
 	PageSize  *int32
 	NextToken string
+	SubjectID string
 }
 
 // ListCollectionsResponse is returned from ListCollections calls.
@@ -312,6 +313,9 @@ func (c *Client) ListCollections(ctx context.Context, request *ListCollectionsRe
 	}
 	if token := strings.TrimSpace(request.NextToken); token != "" {
 		query.Set("nextToken", token)
+	}
+	if subjectID := strings.TrimSpace(request.SubjectID); subjectID != "" {
+		query.Set("subjectId", subjectID)
 	}
 
 	req.URL.RawQuery = query.Encode()

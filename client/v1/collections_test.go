@@ -20,6 +20,7 @@ func TestClientListCollections(t *testing.T) {
 			require.Equal(t, "user-123", r.URL.Query().Get("userId"))
 			require.Equal(t, "50", r.URL.Query().Get("pageSize"))
 			require.Equal(t, "token-abc", r.URL.Query().Get("nextToken"))
+			require.Equal(t, "subject-1", r.URL.Query().Get("subjectId"))
 
 			payload := ListCollectionsResponse{
 				Collections: []Collection{
@@ -49,6 +50,7 @@ func TestClientListCollections(t *testing.T) {
 			UserID:    "user-123",
 			PageSize:  &pageSize,
 			NextToken: "token-abc",
+			SubjectID: "subject-1",
 		})
 		require.NoError(t, err)
 		require.Len(t, resp.Collections, 1)

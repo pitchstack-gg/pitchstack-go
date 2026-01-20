@@ -30,6 +30,7 @@ type CollectionItem struct {
 	ProductID      string     `json:"productId,omitempty"`
 	Quantity       int32      `json:"quantity,omitempty"`
 	Condition      Condition  `json:"condition,omitempty"`
+	PinnedAt       *time.Time `json:"pinnedAt,omitempty"`
 	Value          float64    `json:"value,omitempty"`
 	CreatedAt      *time.Time `json:"createdAt,omitempty"`
 	UpdatedAt      *time.Time `json:"updatedAt,omitempty"`
@@ -101,6 +102,7 @@ type UpdateCollectionItemRequest struct {
 	Quantity  *int32     `json:"quantity,omitempty"`
 	Condition *Condition `json:"condition,omitempty"`
 	Value     *float64   `json:"value,omitempty"`
+	Pinned    *bool      `json:"pinned,omitempty"`
 }
 
 // UpdateCollectionItemResponse returns the updated item.
@@ -247,10 +249,12 @@ func (c *Client) UpdateCollectionItem(ctx context.Context, request *UpdateCollec
 		Quantity  *int32     `json:"quantity,omitempty"`
 		Condition *Condition `json:"condition,omitempty"`
 		Value     *float64   `json:"value,omitempty"`
+		Pinned    *bool      `json:"pinned,omitempty"`
 	}{
 		Quantity:  request.Quantity,
 		Condition: request.Condition,
 		Value:     request.Value,
+		Pinned:    request.Pinned,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("encode body: %w", err)

@@ -187,6 +187,90 @@ func (r *RemoveSocialProfileResponse) setMetadata(metadata ResponseMetadata) {
 	r.Metadata = metadata
 }
 
+// PinCollectionRequest pins a collection for the current user.
+type PinCollectionRequest struct {
+	CollectionID string `json:"collectionId,omitempty"`
+}
+
+// PinCollectionResponse captures metadata for pin operations.
+type PinCollectionResponse struct {
+	Metadata ResponseMetadata `json:"-"`
+}
+
+func (r *PinCollectionResponse) setMetadata(metadata ResponseMetadata) {
+	r.Metadata = metadata
+}
+
+// UnpinCollectionRequest removes a pinned collection for the current user.
+type UnpinCollectionRequest struct {
+	CollectionID string `json:"-"`
+}
+
+// UnpinCollectionResponse captures metadata for unpin operations.
+type UnpinCollectionResponse struct {
+	Metadata ResponseMetadata `json:"-"`
+}
+
+func (r *UnpinCollectionResponse) setMetadata(metadata ResponseMetadata) {
+	r.Metadata = metadata
+}
+
+// PinDeckRequest pins a deck for the current user.
+type PinDeckRequest struct {
+	DeckID string `json:"deckId,omitempty"`
+}
+
+// PinDeckResponse captures metadata for pin operations.
+type PinDeckResponse struct {
+	Metadata ResponseMetadata `json:"-"`
+}
+
+func (r *PinDeckResponse) setMetadata(metadata ResponseMetadata) {
+	r.Metadata = metadata
+}
+
+// UnpinDeckRequest removes a pinned deck for the current user.
+type UnpinDeckRequest struct {
+	DeckID string `json:"-"`
+}
+
+// UnpinDeckResponse captures metadata for unpin operations.
+type UnpinDeckResponse struct {
+	Metadata ResponseMetadata `json:"-"`
+}
+
+func (r *UnpinDeckResponse) setMetadata(metadata ResponseMetadata) {
+	r.Metadata = metadata
+}
+
+// PinnedCollection captures pinned collection metadata.
+type PinnedCollection struct {
+	CollectionID string     `json:"collectionId,omitempty"`
+	PinnedAt     *time.Time `json:"pinnedAt,omitempty"`
+}
+
+// PinnedDeck captures pinned deck metadata.
+type PinnedDeck struct {
+	DeckID   string     `json:"deckId,omitempty"`
+	PinnedAt *time.Time `json:"pinnedAt,omitempty"`
+}
+
+// GetPinnedResourcesRequest retrieves pinned collections and decks for a user.
+type GetPinnedResourcesRequest struct {
+	UserID string
+}
+
+// GetPinnedResourcesResponse returns pinned collections and decks for a user.
+type GetPinnedResourcesResponse struct {
+	PinnedCollections []PinnedCollection `json:"pinnedCollections,omitempty"`
+	PinnedDecks       []PinnedDeck       `json:"pinnedDecks,omitempty"`
+	Metadata          ResponseMetadata   `json:"-"`
+}
+
+func (r *GetPinnedResourcesResponse) setMetadata(metadata ResponseMetadata) {
+	r.Metadata = metadata
+}
+
 // GetSocialProfilesRequest retrieves social profiles for a user.
 type GetSocialProfilesRequest struct {
 	UserID string
@@ -200,6 +284,143 @@ type GetSocialProfilesResponse struct {
 
 func (r *GetSocialProfilesResponse) setMetadata(metadata ResponseMetadata) {
 	r.Metadata = metadata
+}
+
+// GetPinnedResources retrieves pinned collections/decks for a user.
+func (c *Client) GetPinnedResources(ctx context.Context, request *GetPinnedResourcesRequest, opts ...RequestOpt) (*GetPinnedResourcesResponse, error) {
+	if request == nil {
+		return nil, errors.New("request must not be nil")
+	}
+	userID := strings.TrimSpace(request.UserID)
+	if userID == "" {
+		return nil, errors.New("userID must not be empty")
+	}
+
+	path := fmt.Sprintf("/v1/users/%s/pins", url.PathEscape(userID))
+	req, err := c.newRequest(ctx, http.MethodGet, path, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetPinnedResourcesResponse{}
+	if err := c.do(req, response, opts...); err != nil {
+		return nil, err
+	}
+	return response, nil
+}
+
+// PinCollection pins a collection for the current user.
+func (c *Client) PinCollection(ctx context.Context, request *PinCollectionRequest, opts ...RequestOpt) (*PinCollectionResponse, error) {
+	if request == nil {
+		return nil, errors.New("request must not be nil")
+	}
+	collectionID := strings.TrimSpace(request.CollectionID)
+	if collectionID == "" {
+		return nil, errors.New("collectionID must not be empty")
+	}
+
+	body, err := jsonBody(struct {
+		CollectionID string `json:"collectionId,omitempty"`
+	}{
+		CollectionID: collectionID,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("encode body: %w", err)
+	}
+
+	req, err := c.newRequest(ctx, http.MethodPost, "/v1/me/pins/collections", body)
+	if err != nil {
+		return nil, err
+	}
+	if body != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
+
+	response := &PinCollectionResponse{}
+	if err := c.do(req, response, opts...); err != nil {
+		return nil, err
+	}
+	return response, nil
+}
+
+// UnpinCollection removes a pinned collection for the current user.
+func (c *Client) UnpinCollection(ctx context.Context, request *UnpinCollectionRequest, opts ...RequestOpt) (*UnpinCollectionResponse, error) {
+	if request == nil {
+		return nil, errors.New("request must not be nil")
+	}
+	collectionID := strings.TrimSpace(request.CollectionID)
+	if collectionID == "" {
+		return nil, errors.New("collectionID must not be empty")
+	}
+
+	path := fmt.Sprintf("/v1/me/pins/collections/%s", url.PathEscape(collectionID))
+	req, err := c.newRequest(ctx, http.MethodDelete, path, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UnpinCollectionResponse{}
+	if err := c.do(req, response, opts...); err != nil {
+		return nil, err
+	}
+	return response, nil
+}
+
+// PinDeck pins a deck for the current user.
+func (c *Client) PinDeck(ctx context.Context, request *PinDeckRequest, opts ...RequestOpt) (*PinDeckResponse, error) {
+	if request == nil {
+		return nil, errors.New("request must not be nil")
+	}
+	deckID := strings.TrimSpace(request.DeckID)
+	if deckID == "" {
+		return nil, errors.New("deckID must not be empty")
+	}
+
+	body, err := jsonBody(struct {
+		DeckID string `json:"deckId,omitempty"`
+	}{
+		DeckID: deckID,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("encode body: %w", err)
+	}
+
+	req, err := c.newRequest(ctx, http.MethodPost, "/v1/me/pins/decks", body)
+	if err != nil {
+		return nil, err
+	}
+	if body != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
+
+	response := &PinDeckResponse{}
+	if err := c.do(req, response, opts...); err != nil {
+		return nil, err
+	}
+	return response, nil
+}
+
+// UnpinDeck removes a pinned deck for the current user.
+func (c *Client) UnpinDeck(ctx context.Context, request *UnpinDeckRequest, opts ...RequestOpt) (*UnpinDeckResponse, error) {
+	if request == nil {
+		return nil, errors.New("request must not be nil")
+	}
+	deckID := strings.TrimSpace(request.DeckID)
+	if deckID == "" {
+		return nil, errors.New("deckID must not be empty")
+	}
+
+	path := fmt.Sprintf("/v1/me/pins/decks/%s", url.PathEscape(deckID))
+	req, err := c.newRequest(ctx, http.MethodDelete, path, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UnpinDeckResponse{}
+	if err := c.do(req, response, opts...); err != nil {
+		return nil, err
+	}
+	return response, nil
 }
 
 // GetMyProfile reads the authenticated user's profile.
