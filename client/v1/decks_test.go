@@ -95,6 +95,44 @@ func TestClientCreateDeck(t *testing.T) {
 	require.Equal(t, "deck-1", resp.Deck.ID)
 }
 
+func TestClientCloneDeck(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, http.MethodPost, r.Method)
+		require.Equal(t, "/v1/decks:clone", r.URL.Path)
+		require.Equal(t, "application/json", r.Header.Get("Content-Type"))
+
+		var payload CloneDeckRequest
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&payload))
+		require.Equal(t, "dv-source", payload.SourceDeckVersionID)
+		require.Equal(t, "New Deck", payload.Name)
+		require.NotNil(t, payload.Visibility)
+		require.Equal(t, VisibilityLevelShared, *payload.Visibility)
+		require.Equal(t, "deck-1", payload.DeckID)
+		require.Equal(t, "v1", payload.InitialVersionName)
+		require.Equal(t, "dv-1", payload.InitialDeckVersionID)
+
+		require.NoError(t, json.NewEncoder(w).Encode(CloneDeckResponse{
+			Deck:           &Deck{ID: "deck-1"},
+			InitialVersion: &DeckVersion{ID: "dv-1"},
+		}))
+	}))
+	t.Cleanup(server.Close)
+
+	client := newTestClient(t, WithBaseURL(server.URL), WithHTTPClient(server.Client()))
+	visibility := VisibilityLevelShared
+	resp, err := client.CloneDeck(context.Background(), &CloneDeckRequest{
+		SourceDeckVersionID:  "dv-source",
+		Name:                 "New Deck",
+		Visibility:           &visibility,
+		DeckID:               "deck-1",
+		InitialVersionName:   "v1",
+		InitialDeckVersionID: "dv-1",
+	})
+	require.NoError(t, err)
+	require.Equal(t, "deck-1", resp.Deck.ID)
+	require.Equal(t, "dv-1", resp.InitialVersion.ID)
+}
+
 func TestClientSearchDecks(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		require.Equal(t, http.MethodGet, r.Method)
@@ -647,23 +685,110 @@ func TestClientBatchGetDecks(t *testing.T) {
 		var payload BatchGetDecksRequest
 		require.NoError(t, json.NewDecoder(r.Body).Decode(&payload))
 		require.Equal(t, []string{"deck-1", "deck-2"}, payload.DeckIDs)
+		require.True(t, payload.AllowPartial)
 
 		require.NoError(t, json.NewEncoder(w).Encode(BatchGetDecksResponse{
-			Decks: []Deck{{ID: "deck-1"}, {ID: "deck-2"}},
+			Decks:       []Deck{{ID: "deck-1"}, {ID: "deck-2"}},
+			NotFoundIDs: []string{"deck-3"},
 		}))
 	}))
 	t.Cleanup(server.Close)
 
 	client := newTestClient(t, WithBaseURL(server.URL), WithHTTPClient(server.Client()))
 	resp, err := client.BatchGetDecks(context.Background(), &BatchGetDecksRequest{
-		DeckIDs: []string{"deck-1", "deck-2"},
+		DeckIDs:      []string{"deck-1", "deck-2"},
+		AllowPartial: true,
 	})
 	require.NoError(t, err)
 	require.Len(t, resp.Decks, 2)
+	require.Equal(t, []string{"deck-3"}, resp.NotFoundIDs)
 
 	resp, err = client.BatchGetDecks(context.Background(), &BatchGetDecksRequest{})
 	require.Nil(t, resp)
 	require.Error(t, err)
+}
+
+func TestClientExportDeck(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, http.MethodGet, r.Method)
+		require.Equal(t, "/v1/decks/deck-1:export", r.URL.Path)
+
+		require.NoError(t, json.NewEncoder(w).Encode(ExportDeckResponse{
+			Deck: &Deck{ID: "deck-1"},
+			Versions: []ExportDeckVersion{
+				{
+					DeckVersion:     &DeckVersion{ID: "dv-1"},
+					Notes:           "notes",
+					MainboardCards:  []DeckCard{{CardID: "card-1", Quantity: 3}},
+					SideboardCards:  []DeckCard{{CardID: "card-2", Quantity: 1}},
+					MaybeboardCards: []DeckCard{{CardID: "card-3", Quantity: 2}},
+				},
+			},
+		}))
+	}))
+	t.Cleanup(server.Close)
+
+	client := newTestClient(t, WithBaseURL(server.URL), WithHTTPClient(server.Client()))
+	resp, err := client.ExportDeck(context.Background(), &ExportDeckRequest{DeckID: "deck-1"})
+	require.NoError(t, err)
+	require.Equal(t, "deck-1", resp.Deck.ID)
+	require.Len(t, resp.Versions, 1)
+	require.Equal(t, "dv-1", resp.Versions[0].DeckVersion.ID)
+}
+
+func TestClientImportDeck(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, http.MethodPost, r.Method)
+		require.Equal(t, "/v1/decks:import", r.URL.Path)
+		require.Equal(t, "application/json", r.Header.Get("Content-Type"))
+
+		var payload ImportDeckRequest
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&payload))
+		require.Equal(t, "deck-1", payload.DeckID)
+		require.Equal(t, "Imported", payload.Name)
+		require.Equal(t, "hero-1", payload.HeroID)
+		require.Equal(t, "cc", payload.Format)
+		require.Equal(t, "desc", payload.Description)
+		require.Equal(t, "author", payload.Author)
+		require.NotNil(t, payload.Visibility)
+		require.Equal(t, VisibilityLevelPrivate, *payload.Visibility)
+		require.Len(t, payload.Versions, 1)
+		require.Equal(t, "dv-1", payload.Versions[0].DeckVersionID)
+		require.Equal(t, "v1", payload.Versions[0].Name)
+		require.Equal(t, "notes", payload.Versions[0].Notes)
+		require.Len(t, payload.Versions[0].MainboardCards, 1)
+
+		require.NoError(t, json.NewEncoder(w).Encode(ImportDeckResponse{
+			Deck:             &Deck{ID: "deck-1"},
+			ImportedVersions: 1,
+		}))
+	}))
+	t.Cleanup(server.Close)
+
+	client := newTestClient(t, WithBaseURL(server.URL), WithHTTPClient(server.Client()))
+	visibility := VisibilityLevelPrivate
+	resp, err := client.ImportDeck(context.Background(), &ImportDeckRequest{
+		DeckID:      "deck-1",
+		Name:        "Imported",
+		HeroID:      "hero-1",
+		Format:      "cc",
+		Description: "desc",
+		Author:      "author",
+		Visibility:  &visibility,
+		Versions: []ImportDeckVersion{
+			{
+				DeckVersionID:  "dv-1",
+				Name:           "v1",
+				ImageURL:       "image.png",
+				Description:    "version-desc",
+				Notes:          "notes",
+				MainboardCards: []DeckCard{{CardID: "card-1", Quantity: 3}},
+			},
+		},
+	})
+	require.NoError(t, err)
+	require.Equal(t, "deck-1", resp.Deck.ID)
+	require.Equal(t, int32(1), resp.ImportedVersions)
 }
 
 func TestClientListStarredDecks(t *testing.T) {

@@ -195,6 +195,56 @@ func (r *BatchGetCollectionsResponse) setMetadata(metadata ResponseMetadata) {
 	r.Metadata = metadata
 }
 
+// ExportCollectionRequest retrieves a collection export snapshot.
+type ExportCollectionRequest struct {
+	CollectionID string `json:"-"`
+	PageSize     *int32
+	NextToken    string
+}
+
+// ExportCollectionResponse returns a collection export snapshot.
+type ExportCollectionResponse struct {
+	Collection *Collection      `json:"collection,omitempty"`
+	Items      []CollectionItem `json:"items,omitempty"`
+	NextToken  string           `json:"nextToken,omitempty"`
+	Metadata   ResponseMetadata `json:"-"`
+}
+
+func (r *ExportCollectionResponse) setMetadata(metadata ResponseMetadata) {
+	r.Metadata = metadata
+}
+
+// ImportCollectionItem describes an item in an import request.
+type ImportCollectionItem struct {
+	ItemID    string    `json:"itemId,omitempty"`
+	ProductID string    `json:"productId,omitempty"`
+	Quantity  int32     `json:"quantity,omitempty"`
+	Condition Condition `json:"condition,omitempty"`
+	Value     *float64  `json:"value,omitempty"`
+}
+
+// ImportCollectionRequest imports a collection snapshot.
+type ImportCollectionRequest struct {
+	CollectionID   string                 `json:"collectionId,omitempty"`
+	Name           string                 `json:"name,omitempty"`
+	CollectionType CollectionType         `json:"collectionType,omitempty"`
+	Description    string                 `json:"description,omitempty"`
+	Visibility     VisibilityLevel        `json:"visibility,omitempty"`
+	Items          []ImportCollectionItem `json:"items,omitempty"`
+}
+
+// ImportCollectionResponse returns the imported collection details.
+type ImportCollectionResponse struct {
+	Collection    *Collection      `json:"collection,omitempty"`
+	Stats         *CollectionStats `json:"stats,omitempty"`
+	ImportedItems int32            `json:"importedItems,omitempty"`
+	Metadata      ResponseMetadata `json:"-"`
+}
+
+func (r *ImportCollectionResponse) setMetadata(metadata ResponseMetadata) {
+	r.Metadata = metadata
+}
+
 // GrantCollectionAccessRequest assigns a permission for a collection.
 type GrantCollectionAccessRequest struct {
 	CollectionID string               `json:"resourceId,omitempty"`
@@ -496,6 +546,66 @@ func (c *Client) BatchGetCollections(ctx context.Context, request *BatchGetColle
 	}
 
 	response := &BatchGetCollectionsResponse{}
+	if err := c.do(req, response, opts...); err != nil {
+		return nil, err
+	}
+
+	return response, nil
+}
+
+// ExportCollection exports a collection snapshot with items.
+func (c *Client) ExportCollection(ctx context.Context, request *ExportCollectionRequest, opts ...RequestOpt) (*ExportCollectionResponse, error) {
+	if request == nil {
+		return nil, errors.New("request must not be nil")
+	}
+	collectionID := strings.TrimSpace(request.CollectionID)
+	if collectionID == "" {
+		return nil, errors.New("collectionID must not be empty")
+	}
+
+	path := fmt.Sprintf("/v1/collections/%s:export", url.PathEscape(collectionID))
+	req, err := c.newRequest(ctx, http.MethodGet, path, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	query := req.URL.Query()
+	if request.PageSize != nil && *request.PageSize > 0 {
+		query.Set("pageSize", strconv.Itoa(int(*request.PageSize)))
+	}
+	if token := strings.TrimSpace(request.NextToken); token != "" {
+		query.Set("nextToken", token)
+	}
+	req.URL.RawQuery = query.Encode()
+
+	response := &ExportCollectionResponse{}
+	if err := c.do(req, response, opts...); err != nil {
+		return nil, err
+	}
+
+	return response, nil
+}
+
+// ImportCollection imports a collection snapshot including items.
+func (c *Client) ImportCollection(ctx context.Context, request *ImportCollectionRequest, opts ...RequestOpt) (*ImportCollectionResponse, error) {
+	if request == nil {
+		return nil, errors.New("request must not be nil")
+	}
+
+	body, err := jsonBody(request)
+	if err != nil {
+		return nil, fmt.Errorf("encode body: %w", err)
+	}
+
+	req, err := c.newRequest(ctx, http.MethodPost, "/v1/collections:import", body)
+	if err != nil {
+		return nil, err
+	}
+	if body != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
+
+	response := &ImportCollectionResponse{}
 	if err := c.do(req, response, opts...); err != nil {
 		return nil, err
 	}

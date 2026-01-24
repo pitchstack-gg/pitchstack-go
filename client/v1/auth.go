@@ -185,6 +185,20 @@ func (r *UpdateUserResponse) setMetadata(metadata ResponseMetadata) {
 	r.Metadata = metadata
 }
 
+// DeleteUserRequest identifies a user to delete.
+type DeleteUserRequest struct {
+	UserID string `json:"-"`
+}
+
+// DeleteUserResponse captures metadata for delete operations.
+type DeleteUserResponse struct {
+	Metadata ResponseMetadata `json:"-"`
+}
+
+func (r *DeleteUserResponse) setMetadata(metadata ResponseMetadata) {
+	r.Metadata = metadata
+}
+
 // User represents an account within Pitchstack.
 type User struct {
 	UserID           string     `json:"userId,omitempty"`
@@ -513,6 +527,30 @@ func (c *Client) UpdateUser(ctx context.Context, request *UpdateUserRequest, opt
 	}
 
 	response := &UpdateUserResponse{}
+	if err := c.do(req, response, opts...); err != nil {
+		return nil, err
+	}
+
+	return response, nil
+}
+
+// DeleteUser removes a user by ID.
+func (c *Client) DeleteUser(ctx context.Context, request *DeleteUserRequest, opts ...RequestOpt) (*DeleteUserResponse, error) {
+	if request == nil {
+		return nil, errors.New("request must not be nil")
+	}
+	userID := strings.TrimSpace(request.UserID)
+	if userID == "" {
+		return nil, errors.New("userID must not be empty")
+	}
+
+	path := fmt.Sprintf("/v1/users/%s", url.PathEscape(userID))
+	req, err := c.newRequest(ctx, http.MethodDelete, path, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DeleteUserResponse{}
 	if err := c.do(req, response, opts...); err != nil {
 		return nil, err
 	}

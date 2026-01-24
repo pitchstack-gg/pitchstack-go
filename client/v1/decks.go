@@ -139,6 +139,27 @@ func (r *CreateDeckResponse) setMetadata(metadata ResponseMetadata) {
 	r.Metadata = metadata
 }
 
+// CloneDeckRequest clones a deck from an existing deck version.
+type CloneDeckRequest struct {
+	SourceDeckVersionID  string           `json:"sourceDeckVersionId,omitempty"`
+	Name                 string           `json:"name,omitempty"`
+	Visibility           *VisibilityLevel `json:"visibility,omitempty"`
+	DeckID               string           `json:"deckId,omitempty"`
+	InitialVersionName   string           `json:"initialVersionName,omitempty"`
+	InitialDeckVersionID string           `json:"initialDeckVersionId,omitempty"`
+}
+
+// CloneDeckResponse returns the newly created deck and initial version.
+type CloneDeckResponse struct {
+	Deck           *Deck            `json:"deck,omitempty"`
+	InitialVersion *DeckVersion     `json:"initialVersion,omitempty"`
+	Metadata       ResponseMetadata `json:"-"`
+}
+
+func (r *CloneDeckResponse) setMetadata(metadata ResponseMetadata) {
+	r.Metadata = metadata
+}
+
 // SearchDecksRequest configures deck search parameters.
 type SearchDecksRequest struct {
 	HeroID     string
@@ -490,16 +511,78 @@ func (r *UpdateDeckVersionNotesResponse) setMetadata(metadata ResponseMetadata) 
 
 // BatchGetDecksRequest fetches multiple decks by ID.
 type BatchGetDecksRequest struct {
-	DeckIDs []string `json:"deckIds,omitempty"`
+	DeckIDs      []string `json:"deckIds,omitempty"`
+	AllowPartial bool     `json:"allowPartial,omitempty"`
 }
 
 // BatchGetDecksResponse returns decks requested in batch.
 type BatchGetDecksResponse struct {
-	Decks    []Deck           `json:"decks,omitempty"`
-	Metadata ResponseMetadata `json:"-"`
+	Decks       []Deck           `json:"decks,omitempty"`
+	NotFoundIDs []string         `json:"notFoundIds,omitempty"`
+	Metadata    ResponseMetadata `json:"-"`
 }
 
 func (r *BatchGetDecksResponse) setMetadata(metadata ResponseMetadata) {
+	r.Metadata = metadata
+}
+
+// ExportDeckRequest retrieves a deck export snapshot.
+type ExportDeckRequest struct {
+	DeckID string `json:"-"`
+}
+
+// ExportDeckVersion captures a deck version export.
+type ExportDeckVersion struct {
+	DeckVersion     *DeckVersion `json:"deckVersion,omitempty"`
+	Notes           string       `json:"notes,omitempty"`
+	MainboardCards  []DeckCard   `json:"mainboardCards,omitempty"`
+	SideboardCards  []DeckCard   `json:"sideboardCards,omitempty"`
+	MaybeboardCards []DeckCard   `json:"maybeboardCards,omitempty"`
+}
+
+// ExportDeckResponse returns a deck export snapshot.
+type ExportDeckResponse struct {
+	Deck     *Deck               `json:"deck,omitempty"`
+	Versions []ExportDeckVersion `json:"versions,omitempty"`
+	Metadata ResponseMetadata    `json:"-"`
+}
+
+func (r *ExportDeckResponse) setMetadata(metadata ResponseMetadata) {
+	r.Metadata = metadata
+}
+
+// ImportDeckVersion describes an imported deck version snapshot.
+type ImportDeckVersion struct {
+	DeckVersionID   string     `json:"deckVersionId,omitempty"`
+	Name            string     `json:"name,omitempty"`
+	ImageURL        string     `json:"imageUrl,omitempty"`
+	Description     string     `json:"description,omitempty"`
+	Notes           string     `json:"notes,omitempty"`
+	MainboardCards  []DeckCard `json:"mainboardCards,omitempty"`
+	SideboardCards  []DeckCard `json:"sideboardCards,omitempty"`
+	MaybeboardCards []DeckCard `json:"maybeboardCards,omitempty"`
+}
+
+// ImportDeckRequest imports a deck snapshot.
+type ImportDeckRequest struct {
+	DeckID      string              `json:"deckId,omitempty"`
+	Name        string              `json:"name,omitempty"`
+	HeroID      string              `json:"heroId,omitempty"`
+	Format      string              `json:"format,omitempty"`
+	Description string              `json:"description,omitempty"`
+	Author      string              `json:"author,omitempty"`
+	Visibility  *VisibilityLevel    `json:"visibility,omitempty"`
+	Versions    []ImportDeckVersion `json:"versions,omitempty"`
+}
+
+// ImportDeckResponse returns the imported deck details.
+type ImportDeckResponse struct {
+	Deck             *Deck            `json:"deck,omitempty"`
+	ImportedVersions int32            `json:"importedVersions,omitempty"`
+	Metadata         ResponseMetadata `json:"-"`
+}
+
+func (r *ImportDeckResponse) setMetadata(metadata ResponseMetadata) {
 	r.Metadata = metadata
 }
 
@@ -587,6 +670,47 @@ func (c *Client) CreateDeck(ctx context.Context, request *CreateDeckRequest, opt
 	}
 
 	response := &CreateDeckResponse{}
+	if err := c.do(req, response, opts...); err != nil {
+		return nil, err
+	}
+
+	return response, nil
+}
+
+// CloneDeck clones a deck from an existing deck version.
+func (c *Client) CloneDeck(ctx context.Context, request *CloneDeckRequest, opts ...RequestOpt) (*CloneDeckResponse, error) {
+	if request == nil {
+		return nil, errors.New("request must not be nil")
+	}
+
+	body, err := jsonBody(struct {
+		SourceDeckVersionID  string           `json:"sourceDeckVersionId,omitempty"`
+		Name                 string           `json:"name,omitempty"`
+		Visibility           *VisibilityLevel `json:"visibility,omitempty"`
+		DeckID               string           `json:"deckId,omitempty"`
+		InitialVersionName   string           `json:"initialVersionName,omitempty"`
+		InitialDeckVersionID string           `json:"initialDeckVersionId,omitempty"`
+	}{
+		SourceDeckVersionID:  strings.TrimSpace(request.SourceDeckVersionID),
+		Name:                 strings.TrimSpace(request.Name),
+		Visibility:           request.Visibility,
+		DeckID:               strings.TrimSpace(request.DeckID),
+		InitialVersionName:   strings.TrimSpace(request.InitialVersionName),
+		InitialDeckVersionID: strings.TrimSpace(request.InitialDeckVersionID),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("encode body: %w", err)
+	}
+
+	req, err := c.newRequest(ctx, http.MethodPost, "/v1/decks:clone", body)
+	if err != nil {
+		return nil, err
+	}
+	if body != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
+
+	response := &CloneDeckResponse{}
 	if err := c.do(req, response, opts...); err != nil {
 		return nil, err
 	}
@@ -1321,6 +1445,75 @@ func (c *Client) BatchGetDecks(ctx context.Context, request *BatchGetDecksReques
 	}
 
 	response := &BatchGetDecksResponse{}
+	if err := c.do(req, response, opts...); err != nil {
+		return nil, err
+	}
+
+	return response, nil
+}
+
+// ExportDeck exports a deck snapshot including versions.
+func (c *Client) ExportDeck(ctx context.Context, request *ExportDeckRequest, opts ...RequestOpt) (*ExportDeckResponse, error) {
+	if request == nil {
+		return nil, errors.New("request must not be nil")
+	}
+	deckID := strings.TrimSpace(request.DeckID)
+	if deckID == "" {
+		return nil, errors.New("deckID must not be empty")
+	}
+
+	path := fmt.Sprintf("/v1/decks/%s:export", url.PathEscape(deckID))
+	req, err := c.newRequest(ctx, http.MethodGet, path, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ExportDeckResponse{}
+	if err := c.do(req, response, opts...); err != nil {
+		return nil, err
+	}
+
+	return response, nil
+}
+
+// ImportDeck imports a deck snapshot including versions.
+func (c *Client) ImportDeck(ctx context.Context, request *ImportDeckRequest, opts ...RequestOpt) (*ImportDeckResponse, error) {
+	if request == nil {
+		return nil, errors.New("request must not be nil")
+	}
+
+	body, err := jsonBody(struct {
+		DeckID      string              `json:"deckId,omitempty"`
+		Name        string              `json:"name,omitempty"`
+		HeroID      string              `json:"heroId,omitempty"`
+		Format      string              `json:"format,omitempty"`
+		Description string              `json:"description,omitempty"`
+		Author      string              `json:"author,omitempty"`
+		Visibility  *VisibilityLevel    `json:"visibility,omitempty"`
+		Versions    []ImportDeckVersion `json:"versions,omitempty"`
+	}{
+		DeckID:      strings.TrimSpace(request.DeckID),
+		Name:        strings.TrimSpace(request.Name),
+		HeroID:      strings.TrimSpace(request.HeroID),
+		Format:      strings.TrimSpace(request.Format),
+		Description: strings.TrimSpace(request.Description),
+		Author:      strings.TrimSpace(request.Author),
+		Visibility:  request.Visibility,
+		Versions:    request.Versions,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("encode body: %w", err)
+	}
+
+	req, err := c.newRequest(ctx, http.MethodPost, "/v1/decks:import", body)
+	if err != nil {
+		return nil, err
+	}
+	if body != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
+
+	response := &ImportDeckResponse{}
 	if err := c.do(req, response, opts...); err != nil {
 		return nil, err
 	}

@@ -339,20 +339,6 @@ func (r *SetPreferredAuthMethodResponse) setMetadata(metadata ResponseMetadata) 
 	r.Metadata = metadata
 }
 
-// DeleteUserRequest identifies the user to delete.
-type DeleteUserRequest struct {
-	UserID string
-}
-
-// DeleteUserResponse captures metadata for delete operations.
-type DeleteUserResponse struct {
-	Metadata ResponseMetadata `json:"-"`
-}
-
-func (r *DeleteUserResponse) setMetadata(metadata ResponseMetadata) {
-	r.Metadata = metadata
-}
-
 func setQueryInt32(values url.Values, key string, value *int32) {
 	if value == nil || *value <= 0 {
 		return
@@ -892,29 +878,6 @@ func (c *Client) SetPreferredAuthMethod(ctx context.Context, request *SetPreferr
 	}
 
 	response := &SetPreferredAuthMethodResponse{}
-	if err := c.do(req, response, opts...); err != nil {
-		return nil, err
-	}
-	return response, nil
-}
-
-// DeleteUser deletes a user by ID.
-func (c *Client) DeleteUser(ctx context.Context, request *DeleteUserRequest, opts ...RequestOpt) (*DeleteUserResponse, error) {
-	if request == nil {
-		return nil, errors.New("request must not be nil")
-	}
-	userID := strings.TrimSpace(request.UserID)
-	if userID == "" {
-		return nil, errors.New("userID must not be empty")
-	}
-
-	path := fmt.Sprintf("/v1/users/%s", url.PathEscape(userID))
-	req, err := c.newRequest(ctx, http.MethodDelete, path, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	response := &DeleteUserResponse{}
 	if err := c.do(req, response, opts...); err != nil {
 		return nil, err
 	}

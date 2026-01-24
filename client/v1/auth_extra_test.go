@@ -314,18 +314,3 @@ func TestClientAuthMethodManagement(t *testing.T) {
 	require.True(t, sawRemove)
 	require.True(t, sawPreferred)
 }
-
-func TestClientDeleteUser(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		require.Equal(t, http.MethodDelete, r.Method)
-		require.Equal(t, "/v1/users/user-1", r.URL.Path)
-		w.Header().Set("X-Request-Id", "req-delete-user")
-		w.WriteHeader(http.StatusOK)
-	}))
-	t.Cleanup(server.Close)
-
-	client := newTestClient(t, WithBaseURL(server.URL), WithHTTPClient(server.Client()))
-	resp, err := client.DeleteUser(context.Background(), &DeleteUserRequest{UserID: "user-1"})
-	require.NoError(t, err)
-	require.Equal(t, "req-delete-user", resp.Metadata.RequestID)
-}

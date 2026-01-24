@@ -340,3 +340,21 @@ func TestClientUpdateUser(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "user@example.com", resp.User.Email)
 }
+
+func TestClientDeleteUser(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, http.MethodDelete, r.Method)
+		require.Equal(t, "/v1/users/user-1", r.URL.Path)
+		_, _ = w.Write([]byte(`{}`))
+	}))
+	t.Cleanup(server.Close)
+
+	client := newTestClient(t, WithBaseURL(server.URL), WithHTTPClient(server.Client()))
+	resp, err := client.DeleteUser(context.Background(), &DeleteUserRequest{UserID: "user-1"})
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+
+	resp, err = client.DeleteUser(context.Background(), &DeleteUserRequest{})
+	require.Nil(t, resp)
+	require.Error(t, err)
+}
