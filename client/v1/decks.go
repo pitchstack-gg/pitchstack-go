@@ -31,6 +31,16 @@ const (
 	BoardTypeMaybeboard  BoardType = "BOARD_TYPE_MAYBEBOARD"
 )
 
+// SideboardGuideTargetType represents v1SideboardGuideTargetType.
+type SideboardGuideTargetType string
+
+const (
+	SideboardGuideTargetTypeUnspecified SideboardGuideTargetType = "SIDEBOARD_GUIDE_TARGET_TYPE_UNSPECIFIED"
+	SideboardGuideTargetTypeHero        SideboardGuideTargetType = "SIDEBOARD_GUIDE_TARGET_TYPE_HERO"
+	SideboardGuideTargetTypeClass       SideboardGuideTargetType = "SIDEBOARD_GUIDE_TARGET_TYPE_CLASS"
+	SideboardGuideTargetTypeArchetype   SideboardGuideTargetType = "SIDEBOARD_GUIDE_TARGET_TYPE_ARCHETYPE"
+)
+
 // DeckPermission mirrors authzv1Permission for decks.
 type DeckPermission string
 
@@ -42,17 +52,17 @@ const (
 
 // Deck models v1Deck.
 type Deck struct {
-	ID           string               `json:"id,omitempty"`
-	UserID       string               `json:"userId,omitempty"`
-	Name         string               `json:"name,omitempty"`
-	Description  string               `json:"description,omitempty"`
-	Author       string               `json:"author,omitempty"`
-	HeroID       string               `json:"heroId,omitempty"`
-	Format       string               `json:"format,omitempty"`
-	Visibility   VisibilityLevel      `json:"visibility,omitempty"`
-	DeckVersions []DeckVersionSummary `json:"deckVersions,omitempty"`
-	CreatedAt    *time.Time           `json:"createdAt,omitempty"`
-	UpdatedAt    *time.Time           `json:"updatedAt,omitempty"`
+	ID                  string               `json:"id,omitempty"`
+	UserID              string               `json:"userId,omitempty"`
+	Name                string               `json:"name,omitempty"`
+	Author              string               `json:"author,omitempty"`
+	HeroID              string               `json:"heroId,omitempty"`
+	Format              string               `json:"format,omitempty"`
+	Visibility          VisibilityLevel      `json:"visibility,omitempty"`
+	DeckVersions        []DeckVersionSummary `json:"deckVersions,omitempty"`
+	ActiveDeckVersionID string               `json:"activeDeckVersionId,omitempty"`
+	CreatedAt           *time.Time           `json:"createdAt,omitempty"`
+	UpdatedAt           *time.Time           `json:"updatedAt,omitempty"`
 }
 
 // DeckVersionSummary represents v1DeckVersionSummary.
@@ -63,13 +73,11 @@ type DeckVersionSummary struct {
 
 // DeckVersion represents v1DeckVersion.
 type DeckVersion struct {
-	DeckID      string     `json:"deckId,omitempty"`
-	Name        string     `json:"name,omitempty"`
-	ImageURL    string     `json:"imageUrl,omitempty"`
-	Description string     `json:"description,omitempty"`
-	CreatedAt   *time.Time `json:"createdAt,omitempty"`
-	UpdatedAt   *time.Time `json:"updatedAt,omitempty"`
-	ID          string     `json:"id,omitempty"`
+	DeckID    string     `json:"deckId,omitempty"`
+	Name      string     `json:"name,omitempty"`
+	CreatedAt *time.Time `json:"createdAt,omitempty"`
+	UpdatedAt *time.Time `json:"updatedAt,omitempty"`
+	ID        string     `json:"id,omitempty"`
 }
 
 // DeckVersionChange mirrors v1DeckVersionChange.
@@ -114,7 +122,6 @@ type CreateDeckRequest struct {
 	Name                 string                    `json:"name,omitempty"`
 	HeroID               string                    `json:"heroId,omitempty"`
 	Format               string                    `json:"format,omitempty"`
-	Description          string                    `json:"description,omitempty"`
 	Author               string                    `json:"author,omitempty"`
 	Visibility           VisibilityLevel           `json:"visibility,omitempty"`
 	DeckID               string                    `json:"deckId,omitempty"`
@@ -211,10 +218,10 @@ func (r *DeleteDeckResponse) setMetadata(metadata ResponseMetadata) {
 
 // UpdateDeckRequest applies changes to a deck.
 type UpdateDeckRequest struct {
-	DeckID      string  `json:"-"`
-	Name        *string `json:"name,omitempty"`
-	Description *string `json:"description,omitempty"`
-	Author      *string `json:"author,omitempty"`
+	DeckID              string  `json:"-"`
+	Name                *string `json:"name,omitempty"`
+	Author              *string `json:"author,omitempty"`
+	ActiveDeckVersionID *string `json:"activeDeckVersionId,omitempty"`
 }
 
 // UpdateDeckResponse contains the updated deck.
@@ -364,10 +371,9 @@ func (r *ListDeckVersionsResponse) setMetadata(metadata ResponseMetadata) {
 type CreateDeckVersionRequest struct {
 	DeckID              string `json:"-"`
 	Name                string `json:"name,omitempty"`
-	ImageURL            string `json:"imageUrl,omitempty"`
-	Description         string `json:"description,omitempty"`
 	DeckVersionID       string `json:"deckVersionId,omitempty"`
 	SourceDeckVersionID string `json:"sourceDeckVersionId,omitempty"`
+	SetActive           *bool  `json:"setActive,omitempty"`
 }
 
 // CreateDeckVersionResponse includes the created version.
@@ -407,23 +413,6 @@ type DeleteDeckVersionResponse struct {
 }
 
 func (r *DeleteDeckVersionResponse) setMetadata(metadata ResponseMetadata) {
-	r.Metadata = metadata
-}
-
-// UpdateDeckVersionRequest updates attributes on a deck version.
-type UpdateDeckVersionRequest struct {
-	DeckVersionID string  `json:"-"`
-	ImageURL      *string `json:"imageUrl,omitempty"`
-	Description   *string `json:"description,omitempty"`
-}
-
-// UpdateDeckVersionResponse returns the updated version.
-type UpdateDeckVersionResponse struct {
-	DeckVersion *DeckVersion     `json:"deckVersion,omitempty"`
-	Metadata    ResponseMetadata `json:"-"`
-}
-
-func (r *UpdateDeckVersionResponse) setMetadata(metadata ResponseMetadata) {
 	r.Metadata = metadata
 }
 
@@ -509,6 +498,62 @@ func (r *UpdateDeckVersionNotesResponse) setMetadata(metadata ResponseMetadata) 
 	r.Metadata = metadata
 }
 
+// SideboardGuide mirrors v1SideboardGuide.
+type SideboardGuide struct {
+	TargetType SideboardGuideTargetType `json:"targetType,omitempty"`
+	Target     string                   `json:"target,omitempty"`
+	Guide      string                   `json:"guide,omitempty"`
+}
+
+// ListDeckVersionSideboardGuidesRequest lists sideboard guides for a deck version.
+type ListDeckVersionSideboardGuidesRequest struct {
+	DeckVersionID string
+}
+
+// ListDeckVersionSideboardGuidesResponse returns sideboard guides for a deck version.
+type ListDeckVersionSideboardGuidesResponse struct {
+	SideboardGuides []SideboardGuide `json:"sideboardGuides,omitempty"`
+	Metadata        ResponseMetadata `json:"-"`
+}
+
+func (r *ListDeckVersionSideboardGuidesResponse) setMetadata(metadata ResponseMetadata) {
+	r.Metadata = metadata
+}
+
+// UpsertDeckVersionSideboardGuideRequest creates or updates a sideboard guide.
+type UpsertDeckVersionSideboardGuideRequest struct {
+	DeckVersionID string                   `json:"-"`
+	TargetType    SideboardGuideTargetType `json:"targetType,omitempty"`
+	Target        string                   `json:"target,omitempty"`
+	Guide         string                   `json:"guide,omitempty"`
+}
+
+// UpsertDeckVersionSideboardGuideResponse returns the upserted guide.
+type UpsertDeckVersionSideboardGuideResponse struct {
+	SideboardGuide *SideboardGuide  `json:"sideboardGuide,omitempty"`
+	Metadata       ResponseMetadata `json:"-"`
+}
+
+func (r *UpsertDeckVersionSideboardGuideResponse) setMetadata(metadata ResponseMetadata) {
+	r.Metadata = metadata
+}
+
+// DeleteDeckVersionSideboardGuideRequest removes a sideboard guide.
+type DeleteDeckVersionSideboardGuideRequest struct {
+	DeckVersionID string                   `json:"-"`
+	TargetType    SideboardGuideTargetType `json:"targetType,omitempty"`
+	Target        string                   `json:"target,omitempty"`
+}
+
+// DeleteDeckVersionSideboardGuideResponse captures metadata for deletions.
+type DeleteDeckVersionSideboardGuideResponse struct {
+	Metadata ResponseMetadata `json:"-"`
+}
+
+func (r *DeleteDeckVersionSideboardGuideResponse) setMetadata(metadata ResponseMetadata) {
+	r.Metadata = metadata
+}
+
 // BatchGetDecksRequest fetches multiple decks by ID.
 type BatchGetDecksRequest struct {
 	DeckIDs      []string `json:"deckIds,omitempty"`
@@ -533,11 +578,12 @@ type ExportDeckRequest struct {
 
 // ExportDeckVersion captures a deck version export.
 type ExportDeckVersion struct {
-	DeckVersion     *DeckVersion `json:"deckVersion,omitempty"`
-	Notes           string       `json:"notes,omitempty"`
-	MainboardCards  []DeckCard   `json:"mainboardCards,omitempty"`
-	SideboardCards  []DeckCard   `json:"sideboardCards,omitempty"`
-	MaybeboardCards []DeckCard   `json:"maybeboardCards,omitempty"`
+	DeckVersion     *DeckVersion     `json:"deckVersion,omitempty"`
+	Notes           string           `json:"notes,omitempty"`
+	MainboardCards  []DeckCard       `json:"mainboardCards,omitempty"`
+	SideboardCards  []DeckCard       `json:"sideboardCards,omitempty"`
+	MaybeboardCards []DeckCard       `json:"maybeboardCards,omitempty"`
+	SideboardGuides []SideboardGuide `json:"sideboardGuides,omitempty"`
 }
 
 // ExportDeckResponse returns a deck export snapshot.
@@ -553,26 +599,25 @@ func (r *ExportDeckResponse) setMetadata(metadata ResponseMetadata) {
 
 // ImportDeckVersion describes an imported deck version snapshot.
 type ImportDeckVersion struct {
-	DeckVersionID   string     `json:"deckVersionId,omitempty"`
-	Name            string     `json:"name,omitempty"`
-	ImageURL        string     `json:"imageUrl,omitempty"`
-	Description     string     `json:"description,omitempty"`
-	Notes           string     `json:"notes,omitempty"`
-	MainboardCards  []DeckCard `json:"mainboardCards,omitempty"`
-	SideboardCards  []DeckCard `json:"sideboardCards,omitempty"`
-	MaybeboardCards []DeckCard `json:"maybeboardCards,omitempty"`
+	DeckVersionID   string           `json:"deckVersionId,omitempty"`
+	Name            string           `json:"name,omitempty"`
+	Notes           string           `json:"notes,omitempty"`
+	MainboardCards  []DeckCard       `json:"mainboardCards,omitempty"`
+	SideboardCards  []DeckCard       `json:"sideboardCards,omitempty"`
+	MaybeboardCards []DeckCard       `json:"maybeboardCards,omitempty"`
+	SideboardGuides []SideboardGuide `json:"sideboardGuides,omitempty"`
 }
 
 // ImportDeckRequest imports a deck snapshot.
 type ImportDeckRequest struct {
-	DeckID      string              `json:"deckId,omitempty"`
-	Name        string              `json:"name,omitempty"`
-	HeroID      string              `json:"heroId,omitempty"`
-	Format      string              `json:"format,omitempty"`
-	Description string              `json:"description,omitempty"`
-	Author      string              `json:"author,omitempty"`
-	Visibility  *VisibilityLevel    `json:"visibility,omitempty"`
-	Versions    []ImportDeckVersion `json:"versions,omitempty"`
+	DeckID              string              `json:"deckId,omitempty"`
+	Name                string              `json:"name,omitempty"`
+	HeroID              string              `json:"heroId,omitempty"`
+	Format              string              `json:"format,omitempty"`
+	Author              string              `json:"author,omitempty"`
+	Visibility          *VisibilityLevel    `json:"visibility,omitempty"`
+	Versions            []ImportDeckVersion `json:"versions,omitempty"`
+	ActiveDeckVersionID string              `json:"activeDeckVersionId,omitempty"`
 }
 
 // ImportDeckResponse returns the imported deck details.
@@ -874,17 +919,17 @@ func (c *Client) UpdateDeck(ctx context.Context, request *UpdateDeckRequest, opt
 	if deckID == "" {
 		return nil, errors.New("deckID must not be empty")
 	}
-	if request.Name == nil && request.Description == nil && request.Author == nil {
+	if request.Name == nil && request.Author == nil && request.ActiveDeckVersionID == nil {
 		return nil, errors.New("at least one field must be set")
 	}
 	body, err := jsonBody(struct {
-		Name        *string `json:"name,omitempty"`
-		Description *string `json:"description,omitempty"`
-		Author      *string `json:"author,omitempty"`
+		Name                *string `json:"name,omitempty"`
+		Author              *string `json:"author,omitempty"`
+		ActiveDeckVersionID *string `json:"activeDeckVersionId,omitempty"`
 	}{
-		Name:        request.Name,
-		Description: request.Description,
-		Author:      request.Author,
+		Name:                request.Name,
+		Author:              request.Author,
+		ActiveDeckVersionID: request.ActiveDeckVersionID,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("encode body: %w", err)
@@ -1140,16 +1185,14 @@ func (c *Client) CreateDeckVersion(ctx context.Context, request *CreateDeckVersi
 
 	body, err := jsonBody(struct {
 		Name                string `json:"name,omitempty"`
-		ImageURL            string `json:"imageUrl,omitempty"`
-		Description         string `json:"description,omitempty"`
 		DeckVersionID       string `json:"deckVersionId,omitempty"`
 		SourceDeckVersionID string `json:"sourceDeckVersionId,omitempty"`
+		SetActive           *bool  `json:"setActive,omitempty"`
 	}{
 		Name:                strings.TrimSpace(request.Name),
-		ImageURL:            strings.TrimSpace(request.ImageURL),
-		Description:         strings.TrimSpace(request.Description),
 		DeckVersionID:       strings.TrimSpace(request.DeckVersionID),
 		SourceDeckVersionID: strings.TrimSpace(request.SourceDeckVersionID),
+		SetActive:           request.SetActive,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("encode body: %w", err)
@@ -1222,8 +1265,8 @@ func (c *Client) DeleteDeckVersion(ctx context.Context, request *DeleteDeckVersi
 	return response, nil
 }
 
-// UpdateDeckVersion updates attributes for a deck version.
-func (c *Client) UpdateDeckVersion(ctx context.Context, request *UpdateDeckVersionRequest, opts ...RequestOpt) (*UpdateDeckVersionResponse, error) {
+// ListDeckVersionSideboardGuides lists sideboard guides for a deck version.
+func (c *Client) ListDeckVersionSideboardGuides(ctx context.Context, request *ListDeckVersionSideboardGuidesRequest, opts ...RequestOpt) (*ListDeckVersionSideboardGuidesResponse, error) {
 	if request == nil {
 		return nil, errors.New("request must not be nil")
 	}
@@ -1233,18 +1276,53 @@ func (c *Client) UpdateDeckVersion(ctx context.Context, request *UpdateDeckVersi
 		return nil, errors.New("deckVersionID must not be empty")
 	}
 
+	path := fmt.Sprintf("/v1/deck_versions/%s/sideboard_guides", url.PathEscape(deckVersionID))
+	req, err := c.newRequest(ctx, http.MethodGet, path, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListDeckVersionSideboardGuidesResponse{}
+	if err := c.do(req, response, opts...); err != nil {
+		return nil, err
+	}
+
+	return response, nil
+}
+
+// UpsertDeckVersionSideboardGuide creates or updates a sideboard guide.
+func (c *Client) UpsertDeckVersionSideboardGuide(ctx context.Context, request *UpsertDeckVersionSideboardGuideRequest, opts ...RequestOpt) (*UpsertDeckVersionSideboardGuideResponse, error) {
+	if request == nil {
+		return nil, errors.New("request must not be nil")
+	}
+
+	deckVersionID := strings.TrimSpace(request.DeckVersionID)
+	if deckVersionID == "" {
+		return nil, errors.New("deckVersionID must not be empty")
+	}
+	targetType := strings.TrimSpace(string(request.TargetType))
+	if targetType == "" || targetType == string(SideboardGuideTargetTypeUnspecified) {
+		return nil, errors.New("targetType must not be empty")
+	}
+	target := strings.TrimSpace(request.Target)
+	if target == "" {
+		return nil, errors.New("target must not be empty")
+	}
+
 	body, err := jsonBody(struct {
-		ImageURL    *string `json:"imageUrl,omitempty"`
-		Description *string `json:"description,omitempty"`
+		TargetType SideboardGuideTargetType `json:"targetType,omitempty"`
+		Target     string                   `json:"target,omitempty"`
+		Guide      string                   `json:"guide,omitempty"`
 	}{
-		ImageURL:    request.ImageURL,
-		Description: request.Description,
+		TargetType: request.TargetType,
+		Target:     target,
+		Guide:      request.Guide,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("encode body: %w", err)
 	}
 
-	path := fmt.Sprintf("/v1/deck_versions/%s", url.PathEscape(deckVersionID))
+	path := fmt.Sprintf("/v1/deck_versions/%s/sideboard_guides", url.PathEscape(deckVersionID))
 	req, err := c.newRequest(ctx, http.MethodPut, path, body)
 	if err != nil {
 		return nil, err
@@ -1253,7 +1331,45 @@ func (c *Client) UpdateDeckVersion(ctx context.Context, request *UpdateDeckVersi
 		req.Header.Set("Content-Type", "application/json")
 	}
 
-	response := &UpdateDeckVersionResponse{}
+	response := &UpsertDeckVersionSideboardGuideResponse{}
+	if err := c.do(req, response, opts...); err != nil {
+		return nil, err
+	}
+
+	return response, nil
+}
+
+// DeleteDeckVersionSideboardGuide removes a sideboard guide.
+func (c *Client) DeleteDeckVersionSideboardGuide(ctx context.Context, request *DeleteDeckVersionSideboardGuideRequest, opts ...RequestOpt) (*DeleteDeckVersionSideboardGuideResponse, error) {
+	if request == nil {
+		return nil, errors.New("request must not be nil")
+	}
+
+	deckVersionID := strings.TrimSpace(request.DeckVersionID)
+	if deckVersionID == "" {
+		return nil, errors.New("deckVersionID must not be empty")
+	}
+	targetType := strings.TrimSpace(string(request.TargetType))
+	if targetType == "" || targetType == string(SideboardGuideTargetTypeUnspecified) {
+		return nil, errors.New("targetType must not be empty")
+	}
+	target := strings.TrimSpace(request.Target)
+	if target == "" {
+		return nil, errors.New("target must not be empty")
+	}
+
+	path := fmt.Sprintf("/v1/deck_versions/%s/sideboard_guides", url.PathEscape(deckVersionID))
+	req, err := c.newRequest(ctx, http.MethodDelete, path, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	query := req.URL.Query()
+	query.Set("targetType", targetType)
+	query.Set("target", target)
+	req.URL.RawQuery = query.Encode()
+
+	response := &DeleteDeckVersionSideboardGuideResponse{}
 	if err := c.do(req, response, opts...); err != nil {
 		return nil, err
 	}
@@ -1483,23 +1599,23 @@ func (c *Client) ImportDeck(ctx context.Context, request *ImportDeckRequest, opt
 	}
 
 	body, err := jsonBody(struct {
-		DeckID      string              `json:"deckId,omitempty"`
-		Name        string              `json:"name,omitempty"`
-		HeroID      string              `json:"heroId,omitempty"`
-		Format      string              `json:"format,omitempty"`
-		Description string              `json:"description,omitempty"`
-		Author      string              `json:"author,omitempty"`
-		Visibility  *VisibilityLevel    `json:"visibility,omitempty"`
-		Versions    []ImportDeckVersion `json:"versions,omitempty"`
+		DeckID              string              `json:"deckId,omitempty"`
+		Name                string              `json:"name,omitempty"`
+		HeroID              string              `json:"heroId,omitempty"`
+		Format              string              `json:"format,omitempty"`
+		Author              string              `json:"author,omitempty"`
+		Visibility          *VisibilityLevel    `json:"visibility,omitempty"`
+		Versions            []ImportDeckVersion `json:"versions,omitempty"`
+		ActiveDeckVersionID string              `json:"activeDeckVersionId,omitempty"`
 	}{
-		DeckID:      strings.TrimSpace(request.DeckID),
-		Name:        strings.TrimSpace(request.Name),
-		HeroID:      strings.TrimSpace(request.HeroID),
-		Format:      strings.TrimSpace(request.Format),
-		Description: strings.TrimSpace(request.Description),
-		Author:      strings.TrimSpace(request.Author),
-		Visibility:  request.Visibility,
-		Versions:    request.Versions,
+		DeckID:              strings.TrimSpace(request.DeckID),
+		Name:                strings.TrimSpace(request.Name),
+		HeroID:              strings.TrimSpace(request.HeroID),
+		Format:              strings.TrimSpace(request.Format),
+		Author:              strings.TrimSpace(request.Author),
+		Visibility:          request.Visibility,
+		Versions:            request.Versions,
+		ActiveDeckVersionID: strings.TrimSpace(request.ActiveDeckVersionID),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("encode body: %w", err)

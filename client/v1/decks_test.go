@@ -59,7 +59,6 @@ func TestClientCreateDeck(t *testing.T) {
 		require.Equal(t, "Aggro", payload.Name)
 		require.Equal(t, "hero-1", payload.HeroID)
 		require.Equal(t, "cc", payload.Format)
-		require.Equal(t, "desc", payload.Description)
 		require.Equal(t, "author", payload.Author)
 		require.Equal(t, VisibilityLevelShared, payload.Visibility)
 		require.Equal(t, "deck-client-1", payload.DeckID)
@@ -81,7 +80,6 @@ func TestClientCreateDeck(t *testing.T) {
 		Name:                 "Aggro",
 		HeroID:               "hero-1",
 		Format:               "cc",
-		Description:          "desc",
 		Author:               "author",
 		Visibility:           VisibilityLevelShared,
 		DeckID:               "deck-client-1",
@@ -254,14 +252,14 @@ func TestClientUpdateDeck(t *testing.T) {
 		require.Equal(t, "/v1/decks/deck-1", r.URL.Path)
 
 		var payload struct {
-			Name        string `json:"name"`
-			Description string `json:"description"`
-			Author      string `json:"author"`
+			Name                string `json:"name"`
+			Author              string `json:"author"`
+			ActiveDeckVersionID string `json:"activeDeckVersionId"`
 		}
 		require.NoError(t, json.NewDecoder(r.Body).Decode(&payload))
 		require.Equal(t, "Updated", payload.Name)
-		require.Equal(t, "New desc", payload.Description)
 		require.Equal(t, "New author", payload.Author)
+		require.Equal(t, "dv-active", payload.ActiveDeckVersionID)
 
 		require.NoError(t, json.NewEncoder(w).Encode(UpdateDeckResponse{
 			Deck: &Deck{ID: "deck-1", Name: "Updated"},
@@ -272,13 +270,13 @@ func TestClientUpdateDeck(t *testing.T) {
 
 	client := newTestClient(t, WithBaseURL(server.URL), WithHTTPClient(server.Client()))
 	name := "Updated"
-	description := "New desc"
 	author := "New author"
+	activeVersion := "dv-active"
 	resp, err := client.UpdateDeck(context.Background(), &UpdateDeckRequest{
-		DeckID:      "deck-1",
-		Name:        &name,
-		Description: &description,
-		Author:      &author,
+		DeckID:              "deck-1",
+		Name:                &name,
+		Author:              &author,
+		ActiveDeckVersionID: &activeVersion,
 	})
 	require.NoError(t, err)
 	require.Equal(t, "Updated", resp.Deck.Name)
@@ -449,17 +447,16 @@ func TestClientCreateDeckVersion(t *testing.T) {
 
 		var payload struct {
 			Name                string `json:"name"`
-			ImageURL            string `json:"imageUrl"`
-			Description         string `json:"description"`
 			DeckVersionID       string `json:"deckVersionId"`
 			SourceDeckVersionID string `json:"sourceDeckVersionId"`
+			SetActive           *bool  `json:"setActive"`
 		}
 		require.NoError(t, json.NewDecoder(r.Body).Decode(&payload))
 		require.Equal(t, "v2", payload.Name)
-		require.Equal(t, "https://image", payload.ImageURL)
-		require.Equal(t, "desc", payload.Description)
 		require.Equal(t, "dv-2", payload.DeckVersionID)
 		require.Equal(t, "dv-source", payload.SourceDeckVersionID)
+		require.NotNil(t, payload.SetActive)
+		require.False(t, *payload.SetActive)
 
 		require.NoError(t, json.NewEncoder(w).Encode(CreateDeckVersionResponse{
 			DeckVersion: &DeckVersion{ID: "dv-2", Name: "v2"},
@@ -468,13 +465,13 @@ func TestClientCreateDeckVersion(t *testing.T) {
 	t.Cleanup(server.Close)
 
 	client := newTestClient(t, WithBaseURL(server.URL), WithHTTPClient(server.Client()))
+	setActive := false
 	resp, err := client.CreateDeckVersion(context.Background(), &CreateDeckVersionRequest{
 		DeckID:              "deck-1",
 		Name:                "v2",
-		ImageURL:            "https://image",
-		Description:         "desc",
 		DeckVersionID:       "dv-2",
 		SourceDeckVersionID: "dv-source",
+		SetActive:           &setActive,
 	})
 	require.NoError(t, err)
 	require.Equal(t, "v2", resp.DeckVersion.Name)
@@ -521,36 +518,89 @@ func TestClientDeleteDeckVersion(t *testing.T) {
 	require.Equal(t, "req-delete-version", resp.Metadata.RequestID)
 }
 
-func TestClientUpdateDeckVersion(t *testing.T) {
+func TestClientListDeckVersionSideboardGuides(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		require.Equal(t, http.MethodPut, r.Method)
-		require.Equal(t, "/v1/deck_versions/dv-1", r.URL.Path)
+		require.Equal(t, http.MethodGet, r.Method)
+		require.Equal(t, "/v1/deck_versions/dv-1/sideboard_guides", r.URL.Path)
 
-		var payload struct {
-			ImageURL    string `json:"imageUrl"`
-			Description string `json:"description"`
-		}
-		require.NoError(t, json.NewDecoder(r.Body).Decode(&payload))
-		require.Equal(t, "https://image", payload.ImageURL)
-		require.Equal(t, "desc", payload.Description)
-
-		require.NoError(t, json.NewEncoder(w).Encode(UpdateDeckVersionResponse{
-			DeckVersion: &DeckVersion{ImageURL: "https://image"},
+		require.NoError(t, json.NewEncoder(w).Encode(ListDeckVersionSideboardGuidesResponse{
+			SideboardGuides: []SideboardGuide{
+				{
+					TargetType: SideboardGuideTargetTypeHero,
+					Target:     "Dorinthea",
+					Guide:      "Swap in 3x Sink Below.",
+				},
+			},
 		}))
-
 	}))
 	t.Cleanup(server.Close)
 
 	client := newTestClient(t, WithBaseURL(server.URL), WithHTTPClient(server.Client()))
-	imageURL := "https://image"
-	desc := "desc"
-	resp, err := client.UpdateDeckVersion(context.Background(), &UpdateDeckVersionRequest{
+	resp, err := client.ListDeckVersionSideboardGuides(context.Background(), &ListDeckVersionSideboardGuidesRequest{
 		DeckVersionID: "dv-1",
-		ImageURL:      &imageURL,
-		Description:   &desc,
 	})
 	require.NoError(t, err)
-	require.Equal(t, "https://image", resp.DeckVersion.ImageURL)
+	require.Len(t, resp.SideboardGuides, 1)
+	require.Equal(t, SideboardGuideTargetTypeHero, resp.SideboardGuides[0].TargetType)
+}
+
+func TestClientUpsertDeckVersionSideboardGuide(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, http.MethodPut, r.Method)
+		require.Equal(t, "/v1/deck_versions/dv-1/sideboard_guides", r.URL.Path)
+		require.Equal(t, "application/json", r.Header.Get("Content-Type"))
+
+		var payload struct {
+			TargetType string `json:"targetType"`
+			Target     string `json:"target"`
+			Guide      string `json:"guide"`
+		}
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&payload))
+		require.Equal(t, string(SideboardGuideTargetTypeClass), payload.TargetType)
+		require.Equal(t, "Warrior", payload.Target)
+		require.Equal(t, "Prioritize armor.", payload.Guide)
+
+		require.NoError(t, json.NewEncoder(w).Encode(UpsertDeckVersionSideboardGuideResponse{
+			SideboardGuide: &SideboardGuide{
+				TargetType: SideboardGuideTargetTypeClass,
+				Target:     "Warrior",
+				Guide:      "Prioritize armor.",
+			},
+		}))
+	}))
+	t.Cleanup(server.Close)
+
+	client := newTestClient(t, WithBaseURL(server.URL), WithHTTPClient(server.Client()))
+	resp, err := client.UpsertDeckVersionSideboardGuide(context.Background(), &UpsertDeckVersionSideboardGuideRequest{
+		DeckVersionID: "dv-1",
+		TargetType:    SideboardGuideTargetTypeClass,
+		Target:        "Warrior",
+		Guide:         "Prioritize armor.",
+	})
+	require.NoError(t, err)
+	require.Equal(t, "Warrior", resp.SideboardGuide.Target)
+}
+
+func TestClientDeleteDeckVersionSideboardGuide(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, http.MethodDelete, r.Method)
+		require.Equal(t, "/v1/deck_versions/dv-1/sideboard_guides", r.URL.Path)
+		require.Equal(t, string(SideboardGuideTargetTypeArchetype), r.URL.Query().Get("targetType"))
+		require.Equal(t, "Fatigue", r.URL.Query().Get("target"))
+
+		w.Header().Set("X-Request-Id", "req-delete-guide")
+		_, _ = w.Write([]byte(`{}`))
+	}))
+	t.Cleanup(server.Close)
+
+	client := newTestClient(t, WithBaseURL(server.URL), WithHTTPClient(server.Client()))
+	resp, err := client.DeleteDeckVersionSideboardGuide(context.Background(), &DeleteDeckVersionSideboardGuideRequest{
+		DeckVersionID: "dv-1",
+		TargetType:    SideboardGuideTargetTypeArchetype,
+		Target:        "Fatigue",
+	})
+	require.NoError(t, err)
+	require.Equal(t, "req-delete-guide", resp.Metadata.RequestID)
 }
 
 func TestClientListDeckVersionCards(t *testing.T) {
@@ -722,6 +772,11 @@ func TestClientExportDeck(t *testing.T) {
 					MainboardCards:  []DeckCard{{CardID: "card-1", Quantity: 3}},
 					SideboardCards:  []DeckCard{{CardID: "card-2", Quantity: 1}},
 					MaybeboardCards: []DeckCard{{CardID: "card-3", Quantity: 2}},
+					SideboardGuides: []SideboardGuide{{
+						TargetType: SideboardGuideTargetTypeHero,
+						Target:     "Dorinthea",
+						Guide:      "Swap in 3x Sink Below.",
+					}},
 				},
 			},
 		}))
@@ -734,6 +789,7 @@ func TestClientExportDeck(t *testing.T) {
 	require.Equal(t, "deck-1", resp.Deck.ID)
 	require.Len(t, resp.Versions, 1)
 	require.Equal(t, "dv-1", resp.Versions[0].DeckVersion.ID)
+	require.Len(t, resp.Versions[0].SideboardGuides, 1)
 }
 
 func TestClientImportDeck(t *testing.T) {
@@ -748,15 +804,16 @@ func TestClientImportDeck(t *testing.T) {
 		require.Equal(t, "Imported", payload.Name)
 		require.Equal(t, "hero-1", payload.HeroID)
 		require.Equal(t, "cc", payload.Format)
-		require.Equal(t, "desc", payload.Description)
 		require.Equal(t, "author", payload.Author)
 		require.NotNil(t, payload.Visibility)
 		require.Equal(t, VisibilityLevelPrivate, *payload.Visibility)
+		require.Equal(t, "dv-active", payload.ActiveDeckVersionID)
 		require.Len(t, payload.Versions, 1)
 		require.Equal(t, "dv-1", payload.Versions[0].DeckVersionID)
 		require.Equal(t, "v1", payload.Versions[0].Name)
 		require.Equal(t, "notes", payload.Versions[0].Notes)
 		require.Len(t, payload.Versions[0].MainboardCards, 1)
+		require.Len(t, payload.Versions[0].SideboardGuides, 1)
 
 		require.NoError(t, json.NewEncoder(w).Encode(ImportDeckResponse{
 			Deck:             &Deck{ID: "deck-1"},
@@ -768,21 +825,24 @@ func TestClientImportDeck(t *testing.T) {
 	client := newTestClient(t, WithBaseURL(server.URL), WithHTTPClient(server.Client()))
 	visibility := VisibilityLevelPrivate
 	resp, err := client.ImportDeck(context.Background(), &ImportDeckRequest{
-		DeckID:      "deck-1",
-		Name:        "Imported",
-		HeroID:      "hero-1",
-		Format:      "cc",
-		Description: "desc",
-		Author:      "author",
-		Visibility:  &visibility,
+		DeckID:              "deck-1",
+		Name:                "Imported",
+		HeroID:              "hero-1",
+		Format:              "cc",
+		Author:              "author",
+		Visibility:          &visibility,
+		ActiveDeckVersionID: "dv-active",
 		Versions: []ImportDeckVersion{
 			{
 				DeckVersionID:  "dv-1",
 				Name:           "v1",
-				ImageURL:       "image.png",
-				Description:    "version-desc",
 				Notes:          "notes",
 				MainboardCards: []DeckCard{{CardID: "card-1", Quantity: 3}},
+				SideboardGuides: []SideboardGuide{{
+					TargetType: SideboardGuideTargetTypeHero,
+					Target:     "Dorinthea",
+					Guide:      "Swap in 3x Sink Below.",
+				}},
 			},
 		},
 	})
