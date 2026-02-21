@@ -115,6 +115,22 @@ func (r *UpdateCollectionItemResponse) setMetadata(metadata ResponseMetadata) {
 	r.Metadata = metadata
 }
 
+// TransferCollectionItemRequest moves an item to another collection.
+type TransferCollectionItemRequest struct {
+	ItemID                  string `json:"-"`
+	DestinationCollectionID string `json:"destinationCollectionId,omitempty"`
+}
+
+// TransferCollectionItemResponse returns the transferred item.
+type TransferCollectionItemResponse struct {
+	Item     *CollectionItem  `json:"item,omitempty"`
+	Metadata ResponseMetadata `json:"-"`
+}
+
+func (r *TransferCollectionItemResponse) setMetadata(metadata ResponseMetadata) {
+	r.Metadata = metadata
+}
+
 // DeleteCollectionItemRequest identifies the item to delete.
 type DeleteCollectionItemRequest struct {
 	ItemID string `json:"-"`
@@ -270,6 +286,44 @@ func (c *Client) UpdateCollectionItem(ctx context.Context, request *UpdateCollec
 	}
 
 	response := &UpdateCollectionItemResponse{}
+	if err := c.do(req, response, opts...); err != nil {
+		return nil, err
+	}
+
+	return response, nil
+}
+
+// TransferCollectionItem moves an existing item into another collection.
+func (c *Client) TransferCollectionItem(ctx context.Context, request *TransferCollectionItemRequest, opts ...RequestOpt) (*TransferCollectionItemResponse, error) {
+	if request == nil {
+		return nil, errors.New("request must not be nil")
+	}
+	itemID := strings.TrimSpace(request.ItemID)
+	if itemID == "" {
+		return nil, errors.New("itemID must not be empty")
+	}
+	destinationCollectionID := strings.TrimSpace(request.DestinationCollectionID)
+	if destinationCollectionID == "" {
+		return nil, errors.New("destinationCollectionID must not be empty")
+	}
+
+	body, err := jsonBody(struct {
+		DestinationCollectionID string `json:"destinationCollectionId,omitempty"`
+	}{
+		DestinationCollectionID: destinationCollectionID,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("encode body: %w", err)
+	}
+
+	path := fmt.Sprintf("/v1/collection_items/%s:transfer", url.PathEscape(itemID))
+	req, err := c.newRequest(ctx, http.MethodPost, path, body)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	response := &TransferCollectionItemResponse{}
 	if err := c.do(req, response, opts...); err != nil {
 		return nil, err
 	}

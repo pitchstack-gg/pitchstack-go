@@ -30,6 +30,42 @@ const (
 	SyncStatusError       SyncStatus = "ERROR"
 )
 
+// CrudEntry mirrors sync.v1.CrudEntry used by PowerSync clients.
+type CrudEntry struct {
+	OpID     any            `json:"opId,omitempty"`
+	Op       string         `json:"op,omitempty"`
+	Type     string         `json:"type,omitempty"`
+	ID       string         `json:"id,omitempty"`
+	TxID     *int64         `json:"txId,omitempty"`
+	Data     map[string]any `json:"data,omitempty"`
+	Old      map[string]any `json:"old,omitempty"`
+	Metadata *string        `json:"metadata,omitempty"`
+}
+
+// UploadCrudRequest configures SyncService.UploadCrud.
+type UploadCrudRequest struct {
+	DeviceID string      `json:"deviceId,omitempty"`
+	Entries  []CrudEntry `json:"entries,omitempty"`
+}
+
+// UploadCrudResult mirrors sync.v1.UploadCrudResult.
+type UploadCrudResult struct {
+	OpID         string     `json:"opId,omitempty"`
+	Status       SyncStatus `json:"status,omitempty"`
+	ErrorMessage string     `json:"errorMessage,omitempty"`
+}
+
+// UploadCrudResponse is returned from SyncService.UploadCrud.
+type UploadCrudResponse struct {
+	Results         []UploadCrudResult `json:"results,omitempty"`
+	WriteCheckpoint string             `json:"writeCheckpoint,omitempty"`
+	Metadata        ResponseMetadata   `json:"-"`
+}
+
+func (r *UploadCrudResponse) setMetadata(metadata ResponseMetadata) {
+	r.Metadata = metadata
+}
+
 // SyncEventKind enumerates sync.v1.SyncEventKind values.
 type SyncEventKind string
 
@@ -305,6 +341,57 @@ func (c *Client) ListSubscriptions(ctx context.Context, opts ...RequestOpt) (*Li
 		return nil, err
 	}
 	return response, nil
+}
+
+// UploadCrud submits PowerSync CRUD outbox operations.
+func (c *Client) UploadCrud(ctx context.Context, request *UploadCrudRequest, opts ...RequestOpt) (*UploadCrudResponse, error) {
+	if request == nil {
+		return nil, errors.New("request must not be nil")
+	}
+	if strings.TrimSpace(request.DeviceID) == "" {
+		return nil, errors.New("deviceID must not be empty")
+	}
+	if len(request.Entries) == 0 {
+		return nil, errors.New("entries must not be empty")
+	}
+	for i, entry := range request.Entries {
+		if err := validateCrudEntry(entry); err != nil {
+			return nil, fmt.Errorf("entries[%d]: %w", i, err)
+		}
+	}
+
+	body, err := jsonBody(request)
+	if err != nil {
+		return nil, fmt.Errorf("encode body: %w", err)
+	}
+
+	req, err := c.newRequest(ctx, http.MethodPost, "/v1/sync/powersync/crud:upload", body)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	response := &UploadCrudResponse{}
+	if err := c.do(req, response, opts...); err != nil {
+		return nil, err
+	}
+	return response, nil
+}
+
+func validateCrudEntry(entry CrudEntry) error {
+	if entry.OpID == nil {
+		return errors.New("opID must be provided")
+	}
+	if strings.TrimSpace(entry.Op) == "" {
+		return errors.New("op must not be empty")
+	}
+	if strings.TrimSpace(entry.Type) == "" {
+		return errors.New("type must not be empty")
+	}
+	if strings.TrimSpace(entry.ID) == "" {
+		return errors.New("id must not be empty")
+	}
+	return nil
 }
 
 func validateLocalChange(change LocalChange) error {

@@ -166,6 +166,59 @@ func TestClientUpdateCollectionItem(t *testing.T) {
 	})
 }
 
+func TestClientTransferCollectionItem(t *testing.T) {
+	t.Run("when request valid, then transfer succeeds", func(t *testing.T) {
+		handler := func(w http.ResponseWriter, r *http.Request) {
+			require.Equal(t, http.MethodPost, r.Method)
+			require.Equal(t, "/v1/collection_items/item-1:transfer", r.URL.Path)
+			require.Equal(t, "application/json", r.Header.Get("Content-Type"))
+
+			var body map[string]interface{}
+			require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+			require.Equal(t, "col-2", body["destinationCollectionId"])
+
+			resp := TransferCollectionItemResponse{
+				Item: &CollectionItem{
+					ID:           "item-1",
+					CollectionID: "col-2",
+				},
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(resp)
+		}
+
+		server := httptest.NewServer(http.HandlerFunc(handler))
+		t.Cleanup(server.Close)
+
+		client := newTestClient(t, WithBaseURL(server.URL), WithHTTPClient(server.Client()))
+		resp, err := client.TransferCollectionItem(context.Background(), &TransferCollectionItemRequest{
+			ItemID:                  "item-1",
+			DestinationCollectionID: "col-2",
+		})
+		require.NoError(t, err)
+		require.NotNil(t, resp.Item)
+		require.Equal(t, "col-2", resp.Item.CollectionID)
+	})
+
+	t.Run("when item id missing, then returns error", func(t *testing.T) {
+		client := newTestClient(t)
+		resp, err := client.TransferCollectionItem(context.Background(), &TransferCollectionItemRequest{
+			DestinationCollectionID: "col-2",
+		})
+		require.Error(t, err)
+		require.Nil(t, resp)
+	})
+
+	t.Run("when destination missing, then returns error", func(t *testing.T) {
+		client := newTestClient(t)
+		resp, err := client.TransferCollectionItem(context.Background(), &TransferCollectionItemRequest{
+			ItemID: "item-1",
+		})
+		require.Error(t, err)
+		require.Nil(t, resp)
+	})
+}
+
 func TestClientDeleteCollectionItem(t *testing.T) {
 	t.Run("when id provided, then delete succeeds", func(t *testing.T) {
 		handler := func(w http.ResponseWriter, r *http.Request) {

@@ -256,3 +256,85 @@ func TestClientListSubscriptions(t *testing.T) {
 	require.Equal(t, SubscriptionSourceOwned, resp.Subscriptions[0].Source)
 	require.Equal(t, http.StatusOK, resp.Metadata.StatusCode)
 }
+
+func TestClientUploadCrud(t *testing.T) {
+	t.Run("when request valid, then payload sent and response decoded", func(t *testing.T) {
+		handler := func(w http.ResponseWriter, r *http.Request) {
+			require.Equal(t, http.MethodPost, r.Method)
+			require.Equal(t, "/v1/sync/powersync/crud:upload", r.URL.Path)
+			require.Equal(t, "application/json", r.Header.Get("Content-Type"))
+
+			var payload UploadCrudRequest
+			require.NoError(t, json.NewDecoder(r.Body).Decode(&payload))
+			require.Equal(t, "device-1", payload.DeviceID)
+			require.Len(t, payload.Entries, 1)
+			require.Equal(t, "PUT", payload.Entries[0].Op)
+			require.Equal(t, "collections", payload.Entries[0].Type)
+			require.Equal(t, "col-1", payload.Entries[0].ID)
+
+			resp := UploadCrudResponse{
+				Results: []UploadCrudResult{
+					{
+						OpID:   "1",
+						Status: SyncStatusOK,
+					},
+				},
+				WriteCheckpoint: "chk-1",
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(resp)
+		}
+
+		server := httptest.NewServer(http.HandlerFunc(handler))
+		t.Cleanup(server.Close)
+
+		client := newTestClient(t, WithBaseURL(server.URL), WithHTTPClient(server.Client()))
+		resp, err := client.UploadCrud(context.Background(), &UploadCrudRequest{
+			DeviceID: "device-1",
+			Entries: []CrudEntry{
+				{
+					OpID: 1,
+					Op:   "PUT",
+					Type: "collections",
+					ID:   "col-1",
+					Data: map[string]any{"name": "binder"},
+				},
+			},
+		})
+		require.NoError(t, err)
+		require.Len(t, resp.Results, 1)
+		require.Equal(t, SyncStatusOK, resp.Results[0].Status)
+		require.Equal(t, "chk-1", resp.WriteCheckpoint)
+		require.Equal(t, http.StatusOK, resp.Metadata.StatusCode)
+	})
+
+	t.Run("when request nil, then error returned", func(t *testing.T) {
+		client := newTestClient(t)
+		resp, err := client.UploadCrud(context.Background(), nil)
+		require.Error(t, err)
+		require.Nil(t, resp)
+	})
+
+	t.Run("when request missing fields, then error returned", func(t *testing.T) {
+		client := newTestClient(t)
+
+		resp, err := client.UploadCrud(context.Background(), &UploadCrudRequest{
+			Entries: []CrudEntry{{OpID: 1, Op: "PUT", Type: "collections", ID: "col-1"}},
+		})
+		require.Error(t, err)
+		require.Nil(t, resp)
+
+		resp, err = client.UploadCrud(context.Background(), &UploadCrudRequest{
+			DeviceID: "device-1",
+		})
+		require.Error(t, err)
+		require.Nil(t, resp)
+
+		resp, err = client.UploadCrud(context.Background(), &UploadCrudRequest{
+			DeviceID: "device-1",
+			Entries:  []CrudEntry{{Op: "PUT", Type: "collections", ID: "col-1"}},
+		})
+		require.Error(t, err)
+		require.Nil(t, resp)
+	})
+}

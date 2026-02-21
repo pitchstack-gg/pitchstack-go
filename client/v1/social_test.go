@@ -155,3 +155,58 @@ func TestClientIsFollowing(t *testing.T) {
 	_, err = client.IsFollowing(context.Background(), &IsFollowingRequest{FollowerID: "follower"})
 	require.Error(t, err)
 }
+
+func TestClientListActivityFeed(t *testing.T) {
+	t.Run("when request valid, then feed returned", func(t *testing.T) {
+		size := int32(20)
+		handler := func(w http.ResponseWriter, r *http.Request) {
+			require.Equal(t, http.MethodGet, r.Method)
+			require.Equal(t, "/v1/activity", r.URL.Path)
+			require.Equal(t, "20", r.URL.Query().Get("pageSize"))
+			require.Equal(t, "tok-1", r.URL.Query().Get("nextToken"))
+			require.Equal(t, []string{
+				string(ActivityScopeFollowing),
+				string(ActivityScopeSystem),
+			}, r.URL.Query()["scopes"])
+
+			resp := ListActivityFeedResponse{
+				Items: []ActivityItem{
+					{
+						ActivityID: "act-1",
+						Kind:       ActivityKindSocial,
+						ActorID:    "user-1",
+						Verb:       "followed",
+					},
+				},
+				NextToken: "tok-2",
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(resp)
+		}
+
+		server := httptest.NewServer(http.HandlerFunc(handler))
+		t.Cleanup(server.Close)
+
+		client := newTestClient(t, WithBaseURL(server.URL), WithHTTPClient(server.Client()))
+		resp, err := client.ListActivityFeed(context.Background(), &ListActivityFeedRequest{
+			PageSize:  &size,
+			NextToken: " tok-1 ",
+			Scopes: []ActivityScope{
+				ActivityScopeFollowing,
+				ActivityScopeUnspecified,
+				ActivityScopeSystem,
+			},
+		})
+		require.NoError(t, err)
+		require.Len(t, resp.Items, 1)
+		require.Equal(t, "act-1", resp.Items[0].ActivityID)
+		require.Equal(t, "tok-2", resp.NextToken)
+	})
+
+	t.Run("when request nil, then error returned", func(t *testing.T) {
+		client := newTestClient(t)
+		resp, err := client.ListActivityFeed(context.Background(), nil)
+		require.Error(t, err)
+		require.Nil(t, resp)
+	})
+}

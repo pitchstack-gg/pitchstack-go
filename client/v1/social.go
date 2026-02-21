@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // FollowUserRequest initiates a follow action for the target user.
@@ -103,6 +104,64 @@ type IsFollowingResponse struct {
 }
 
 func (r *IsFollowingResponse) setMetadata(metadata ResponseMetadata) {
+	r.Metadata = metadata
+}
+
+// ActivityKind represents social.v1.ActivityKind.
+type ActivityKind string
+
+const (
+	ActivityKindUnspecified ActivityKind = "ACTIVITY_KIND_UNSPECIFIED"
+	ActivityKindSocial      ActivityKind = "ACTIVITY_KIND_SOCIAL"
+	ActivityKindGroup       ActivityKind = "ACTIVITY_KIND_GROUP"
+	ActivityKindShared      ActivityKind = "ACTIVITY_KIND_SHARED"
+	ActivityKindSystem      ActivityKind = "ACTIVITY_KIND_SYSTEM"
+)
+
+// ActivityScope represents social.v1.ActivityScope.
+type ActivityScope string
+
+const (
+	ActivityScopeUnspecified ActivityScope = "ACTIVITY_SCOPE_UNSPECIFIED"
+	ActivityScopeFollowing   ActivityScope = "ACTIVITY_SCOPE_FOLLOWING"
+	ActivityScopeShared      ActivityScope = "ACTIVITY_SCOPE_SHARED"
+	ActivityScopeGroups      ActivityScope = "ACTIVITY_SCOPE_GROUPS"
+	ActivityScopeSystem      ActivityScope = "ACTIVITY_SCOPE_SYSTEM"
+)
+
+// ActivityItem mirrors social.v1.ActivityItem.
+type ActivityItem struct {
+	ActivityID      string         `json:"activityId,omitempty"`
+	Kind            ActivityKind   `json:"kind,omitempty"`
+	ActorID         string         `json:"actorId,omitempty"`
+	Verb            string         `json:"verb,omitempty"`
+	ResourceType    string         `json:"resourceType,omitempty"`
+	ResourceID      string         `json:"resourceId,omitempty"`
+	TargetUserID    string         `json:"targetUserId,omitempty"`
+	TargetGroupID   string         `json:"targetGroupId,omitempty"`
+	Summary         string         `json:"summary,omitempty"`
+	Metadata        map[string]any `json:"metadata,omitempty"`
+	Count           int64          `json:"count,omitempty"`
+	FirstOccurredAt *time.Time     `json:"firstOccurredAt,omitempty"`
+	LastOccurredAt  *time.Time     `json:"lastOccurredAt,omitempty"`
+	CreatedAt       *time.Time     `json:"createdAt,omitempty"`
+}
+
+// ListActivityFeedRequest configures activity feed listing.
+type ListActivityFeedRequest struct {
+	PageSize  *int32
+	NextToken string
+	Scopes    []ActivityScope
+}
+
+// ListActivityFeedResponse returns feed items.
+type ListActivityFeedResponse struct {
+	Items     []ActivityItem   `json:"items,omitempty"`
+	NextToken string           `json:"nextToken,omitempty"`
+	Metadata  ResponseMetadata `json:"-"`
+}
+
+func (r *ListActivityFeedResponse) setMetadata(metadata ResponseMetadata) {
 	r.Metadata = metadata
 }
 
@@ -266,6 +325,39 @@ func (c *Client) IsFollowing(ctx context.Context, request *IsFollowingRequest, o
 	}
 
 	response := &IsFollowingResponse{}
+	if err := c.do(req, response, opts...); err != nil {
+		return nil, err
+	}
+	return response, nil
+}
+
+// ListActivityFeed retrieves social activity for the caller.
+func (c *Client) ListActivityFeed(ctx context.Context, request *ListActivityFeedRequest, opts ...RequestOpt) (*ListActivityFeedResponse, error) {
+	if request == nil {
+		return nil, errors.New("request must not be nil")
+	}
+
+	req, err := c.newRequest(ctx, http.MethodGet, "/v1/activity", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	query := req.URL.Query()
+	if request.PageSize != nil && *request.PageSize > 0 {
+		query.Set("pageSize", strconv.Itoa(int(*request.PageSize)))
+	}
+	if token := strings.TrimSpace(request.NextToken); token != "" {
+		query.Set("nextToken", token)
+	}
+	for _, scope := range request.Scopes {
+		if scope == "" || scope == ActivityScopeUnspecified {
+			continue
+		}
+		query.Add("scopes", string(scope))
+	}
+	req.URL.RawQuery = query.Encode()
+
+	response := &ListActivityFeedResponse{}
 	if err := c.do(req, response, opts...); err != nil {
 		return nil, err
 	}
