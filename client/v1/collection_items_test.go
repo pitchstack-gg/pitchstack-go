@@ -119,6 +119,48 @@ func TestClientCreateCollectionItem(t *testing.T) {
 	})
 }
 
+func TestClientAdjustCollectionItemQuantity(t *testing.T) {
+	t.Run("when request provided, then quantity adjusted", func(t *testing.T) {
+		handler := func(w http.ResponseWriter, r *http.Request) {
+			require.Equal(t, http.MethodPost, r.Method)
+			require.Equal(t, "/v1/collection_items:adjustQuantity", r.URL.Path)
+
+			var body AdjustCollectionItemQuantityRequest
+			require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+			require.Equal(t, "col-1", body.CollectionID)
+			require.Equal(t, "product-1", body.ProductID)
+			require.Equal(t, ConditionNearMint, body.Condition)
+			require.Equal(t, int32(2), body.QuantityDelta)
+			require.Equal(t, "mutation-1", body.ClientMutationID)
+
+			resp := AdjustCollectionItemQuantityResponse{Item: &CollectionItem{ID: "item-1", Quantity: 2}}
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(resp)
+		}
+
+		server := httptest.NewServer(http.HandlerFunc(handler))
+		t.Cleanup(server.Close)
+
+		client := newTestClient(t, WithBaseURL(server.URL), WithHTTPClient(server.Client()))
+		resp, err := client.AdjustCollectionItemQuantity(context.Background(), &AdjustCollectionItemQuantityRequest{
+			CollectionID:     "col-1",
+			ProductID:        "product-1",
+			Condition:        ConditionNearMint,
+			QuantityDelta:    2,
+			ClientMutationID: "mutation-1",
+		})
+		require.NoError(t, err)
+		require.Equal(t, int32(2), resp.Item.Quantity)
+	})
+
+	t.Run("when required fields missing, then returns error", func(t *testing.T) {
+		client := newTestClient(t)
+		resp, err := client.AdjustCollectionItemQuantity(context.Background(), &AdjustCollectionItemQuantityRequest{})
+		require.Error(t, err)
+		require.Nil(t, resp)
+	})
+}
+
 func TestClientUpdateCollectionItem(t *testing.T) {
 	t.Run("when fields provided, then update request sent", func(t *testing.T) {
 		handler := func(w http.ResponseWriter, r *http.Request) {

@@ -80,7 +80,7 @@ func TestClientDeleteGroup(t *testing.T) {
 func TestClientListGroups(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		require.Equal(t, http.MethodGet, r.Method)
-		require.Equal(t, "/v1/groups/search", r.URL.Path)
+		require.Equal(t, "/v1/groups:mine", r.URL.Path)
 		query := r.URL.Query()
 		require.Equal(t, "25", query.Get("pageSize"))
 		require.Equal(t, "token", query.Get("nextToken"))

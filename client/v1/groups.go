@@ -409,7 +409,7 @@ func (c *Client) ListGroups(ctx context.Context, request *ListGroupsRequest, opt
 	if request == nil {
 		request = &ListGroupsRequest{}
 	}
-	searchResponse, err := c.SearchGroups(ctx, &SearchGroupsRequest{
+	listMyGroupsResponse, err := c.ListMyGroups(ctx, &ListMyGroupsRequest{
 		PageSize:  request.PageSize,
 		NextToken: request.NextToken,
 	}, opts...)
@@ -418,9 +418,9 @@ func (c *Client) ListGroups(ctx context.Context, request *ListGroupsRequest, opt
 	}
 
 	return &ListGroupsResponse{
-		Groups:    searchResponse.Groups,
-		NextToken: searchResponse.NextToken,
-		Metadata:  searchResponse.Metadata,
+		Groups:    listMyGroupsResponse.Groups,
+		NextToken: listMyGroupsResponse.NextToken,
+		Metadata:  listMyGroupsResponse.Metadata,
 	}, nil
 }
 

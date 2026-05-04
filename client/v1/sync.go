@@ -66,6 +66,17 @@ func (r *UploadCrudResponse) setMetadata(metadata ResponseMetadata) {
 	r.Metadata = metadata
 }
 
+// PowerSyncClientConfigResponse returns PowerSync connection config.
+type PowerSyncClientConfigResponse struct {
+	PowerSyncURL string           `json:"powerSyncUrl,omitempty"`
+	SyncEpoch    string           `json:"syncEpoch,omitempty"`
+	Metadata     ResponseMetadata `json:"-"`
+}
+
+func (r *PowerSyncClientConfigResponse) setMetadata(metadata ResponseMetadata) {
+	r.Metadata = metadata
+}
+
 // SyncEventKind enumerates sync.v1.SyncEventKind values.
 type SyncEventKind string
 
@@ -337,6 +348,20 @@ func (c *Client) ListSubscriptions(ctx context.Context, opts ...RequestOpt) (*Li
 	}
 
 	response := &ListSubscriptionsResponse{}
+	if err := c.do(req, response, opts...); err != nil {
+		return nil, err
+	}
+	return response, nil
+}
+
+// GetPowerSyncClientConfig retrieves the active PowerSync client configuration.
+func (c *Client) GetPowerSyncClientConfig(ctx context.Context, opts ...RequestOpt) (*PowerSyncClientConfigResponse, error) {
+	req, err := c.newRequest(ctx, http.MethodGet, "/v1/sync/powersync/client-config", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	response := &PowerSyncClientConfigResponse{}
 	if err := c.do(req, response, opts...); err != nil {
 		return nil, err
 	}

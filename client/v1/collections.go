@@ -70,6 +70,60 @@ type CollectionStats struct {
 	UniqueCardCount int32 `json:"uniqueCardCount,omitempty"`
 }
 
+// CollectionHistoryEventType matches v1CollectionHistoryEventType.
+type CollectionHistoryEventType string
+
+const (
+	CollectionHistoryEventTypeUnspecified                 CollectionHistoryEventType = "COLLECTION_HISTORY_EVENT_TYPE_UNSPECIFIED"
+	CollectionHistoryEventTypeCollectionCreated           CollectionHistoryEventType = "COLLECTION_HISTORY_EVENT_TYPE_COLLECTION_CREATED"
+	CollectionHistoryEventTypeCollectionUpdated           CollectionHistoryEventType = "COLLECTION_HISTORY_EVENT_TYPE_COLLECTION_UPDATED"
+	CollectionHistoryEventTypeCollectionVisibilityChanged CollectionHistoryEventType = "COLLECTION_HISTORY_EVENT_TYPE_COLLECTION_VISIBILITY_CHANGED"
+	CollectionHistoryEventTypeItemAdded                   CollectionHistoryEventType = "COLLECTION_HISTORY_EVENT_TYPE_ITEM_ADDED"
+	CollectionHistoryEventTypeItemRemoved                 CollectionHistoryEventType = "COLLECTION_HISTORY_EVENT_TYPE_ITEM_REMOVED"
+	CollectionHistoryEventTypeItemUpdated                 CollectionHistoryEventType = "COLLECTION_HISTORY_EVENT_TYPE_ITEM_UPDATED"
+	CollectionHistoryEventTypeItemTransferredIn           CollectionHistoryEventType = "COLLECTION_HISTORY_EVENT_TYPE_ITEM_TRANSFERRED_IN"
+	CollectionHistoryEventTypeItemTransferredOut          CollectionHistoryEventType = "COLLECTION_HISTORY_EVENT_TYPE_ITEM_TRANSFERRED_OUT"
+)
+
+// CollectionHistoryItemChangeOperation matches v1CollectionHistoryItemChangeOperation.
+type CollectionHistoryItemChangeOperation string
+
+const (
+	CollectionHistoryItemChangeOperationUnspecified CollectionHistoryItemChangeOperation = "COLLECTION_HISTORY_ITEM_CHANGE_OPERATION_UNSPECIFIED"
+	CollectionHistoryItemChangeOperationAdd         CollectionHistoryItemChangeOperation = "COLLECTION_HISTORY_ITEM_CHANGE_OPERATION_ADD"
+	CollectionHistoryItemChangeOperationRemove      CollectionHistoryItemChangeOperation = "COLLECTION_HISTORY_ITEM_CHANGE_OPERATION_REMOVE"
+	CollectionHistoryItemChangeOperationUpdate      CollectionHistoryItemChangeOperation = "COLLECTION_HISTORY_ITEM_CHANGE_OPERATION_UPDATE"
+	CollectionHistoryItemChangeOperationTransferIn  CollectionHistoryItemChangeOperation = "COLLECTION_HISTORY_ITEM_CHANGE_OPERATION_TRANSFER_IN"
+	CollectionHistoryItemChangeOperationTransferOut CollectionHistoryItemChangeOperation = "COLLECTION_HISTORY_ITEM_CHANGE_OPERATION_TRANSFER_OUT"
+)
+
+// CollectionHistoryItemChange describes one item-level history change.
+type CollectionHistoryItemChange struct {
+	ItemID            string                               `json:"itemId,omitempty"`
+	ProductID         string                               `json:"productId,omitempty"`
+	Operation         CollectionHistoryItemChangeOperation `json:"operation,omitempty"`
+	PreviousQuantity  int32                                `json:"previousQuantity,omitempty"`
+	NewQuantity       int32                                `json:"newQuantity,omitempty"`
+	PreviousCondition Condition                            `json:"previousCondition,omitempty"`
+	NewCondition      Condition                            `json:"newCondition,omitempty"`
+	PreviousValue     float64                              `json:"previousValue,omitempty"`
+	NewValue          float64                              `json:"newValue,omitempty"`
+	PreviousPinned    bool                                 `json:"previousPinned,omitempty"`
+	NewPinned         bool                                 `json:"newPinned,omitempty"`
+	FromCollectionID  string                               `json:"fromCollectionId,omitempty"`
+	ToCollectionID    string                               `json:"toCollectionId,omitempty"`
+}
+
+// CollectionHistoryChange describes a collection history event.
+type CollectionHistoryChange struct {
+	ID           string                        `json:"id,omitempty"`
+	CollectionID string                        `json:"collectionId,omitempty"`
+	Description  string                        `json:"description,omitempty"`
+	Timestamp    *time.Time                    `json:"timestamp,omitempty"`
+	EventType    CollectionHistoryEventType    `json:"eventType,omitempty"`
+	ItemChanges  []CollectionHistoryItemChange `json:"itemChanges,omitempty"`
+}
+
 // CollectionWithStats bundles a collection and its stats.
 type CollectionWithStats struct {
 	Collection *Collection      `json:"collection,omitempty"`
@@ -128,6 +182,21 @@ type GetCollectionResponse struct {
 }
 
 func (r *GetCollectionResponse) setMetadata(metadata ResponseMetadata) {
+	r.Metadata = metadata
+}
+
+// GetCollectionHistoryRequest identifies the collection history to fetch.
+type GetCollectionHistoryRequest struct {
+	CollectionID string `json:"-"`
+}
+
+// GetCollectionHistoryResponse returns collection history changes.
+type GetCollectionHistoryResponse struct {
+	Changes  []CollectionHistoryChange `json:"changes,omitempty"`
+	Metadata ResponseMetadata          `json:"-"`
+}
+
+func (r *GetCollectionHistoryResponse) setMetadata(metadata ResponseMetadata) {
 	r.Metadata = metadata
 }
 
@@ -216,11 +285,12 @@ func (r *ExportCollectionResponse) setMetadata(metadata ResponseMetadata) {
 
 // ImportCollectionItem describes an item in an import request.
 type ImportCollectionItem struct {
-	ItemID    string    `json:"itemId,omitempty"`
-	ProductID string    `json:"productId,omitempty"`
-	Quantity  int32     `json:"quantity,omitempty"`
-	Condition Condition `json:"condition,omitempty"`
-	Value     *float64  `json:"value,omitempty"`
+	ItemID    string     `json:"itemId,omitempty"`
+	ProductID string     `json:"productId,omitempty"`
+	Quantity  int32      `json:"quantity,omitempty"`
+	Condition Condition  `json:"condition,omitempty"`
+	Value     *float64   `json:"value,omitempty"`
+	CreatedAt *time.Time `json:"createdAt,omitempty"`
 }
 
 // ImportCollectionRequest imports a collection snapshot.
@@ -230,6 +300,7 @@ type ImportCollectionRequest struct {
 	CollectionType CollectionType         `json:"collectionType,omitempty"`
 	Description    string                 `json:"description,omitempty"`
 	Visibility     VisibilityLevel        `json:"visibility,omitempty"`
+	CreatedAt      *time.Time             `json:"createdAt,omitempty"`
 	Items          []ImportCollectionItem `json:"items,omitempty"`
 }
 
@@ -421,6 +492,29 @@ func (c *Client) GetCollection(ctx context.Context, request *GetCollectionReques
 	}
 
 	response := &GetCollectionResponse{}
+	if err := c.do(req, response, opts...); err != nil {
+		return nil, err
+	}
+
+	return response, nil
+}
+
+// GetCollectionHistory retrieves collection history changes.
+func (c *Client) GetCollectionHistory(ctx context.Context, request *GetCollectionHistoryRequest, opts ...RequestOpt) (*GetCollectionHistoryResponse, error) {
+	if request == nil {
+		return nil, errors.New("request must not be nil")
+	}
+	if strings.TrimSpace(request.CollectionID) == "" {
+		return nil, errors.New("collectionID must not be empty")
+	}
+
+	path := fmt.Sprintf("/v1/collections/%s/history", url.PathEscape(request.CollectionID))
+	req, err := c.newRequest(ctx, http.MethodGet, path, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetCollectionHistoryResponse{}
 	if err := c.do(req, response, opts...); err != nil {
 		return nil, err
 	}

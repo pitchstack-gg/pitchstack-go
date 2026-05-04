@@ -162,6 +162,45 @@ func TestClientGetCollection(t *testing.T) {
 	})
 }
 
+func TestClientGetCollectionHistory(t *testing.T) {
+	t.Run("when id provided, then history fetched", func(t *testing.T) {
+		handler := func(w http.ResponseWriter, r *http.Request) {
+			require.Equal(t, http.MethodGet, r.Method)
+			require.Equal(t, "/v1/collections/col-1/history", r.URL.Path)
+			response := GetCollectionHistoryResponse{
+				Changes: []CollectionHistoryChange{{
+					ID:           "change-1",
+					CollectionID: "col-1",
+					EventType:    CollectionHistoryEventTypeItemAdded,
+					ItemChanges: []CollectionHistoryItemChange{{
+						ItemID:    "item-1",
+						ProductID: "product-1",
+						Operation: CollectionHistoryItemChangeOperationAdd,
+					}},
+				}},
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(response)
+		}
+
+		server := httptest.NewServer(http.HandlerFunc(handler))
+		t.Cleanup(server.Close)
+
+		client := newTestClient(t, WithBaseURL(server.URL), WithHTTPClient(server.Client()))
+		resp, err := client.GetCollectionHistory(context.Background(), &GetCollectionHistoryRequest{CollectionID: "col-1"})
+		require.NoError(t, err)
+		require.Len(t, resp.Changes, 1)
+		require.Equal(t, CollectionHistoryEventTypeItemAdded, resp.Changes[0].EventType)
+	})
+
+	t.Run("when id missing, then returns error", func(t *testing.T) {
+		client := newTestClient(t)
+		resp, err := client.GetCollectionHistory(context.Background(), &GetCollectionHistoryRequest{})
+		require.Error(t, err)
+		require.Nil(t, resp)
+	})
+}
+
 func TestClientUpdateCollection(t *testing.T) {
 	t.Run("when fields provided, then partial update is sent", func(t *testing.T) {
 		handler := func(w http.ResponseWriter, r *http.Request) {

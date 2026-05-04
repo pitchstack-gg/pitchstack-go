@@ -2,9 +2,11 @@ package client
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -97,6 +99,31 @@ type TrendingResource struct {
 	LastViewedAt *time.Time             `json:"lastViewedAt,omitempty"`
 }
 
+func (r *TrendingResource) UnmarshalJSON(data []byte) error {
+	type rawTrendingResource struct {
+		Resource     *EngagementResourceRef `json:"resource,omitempty"`
+		ViewCount    json.RawMessage        `json:"viewCount,omitempty"`
+		Score        float64                `json:"score,omitempty"`
+		LastViewedAt *time.Time             `json:"lastViewedAt,omitempty"`
+	}
+
+	var raw rawTrendingResource
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+
+	count, err := parseFlexibleInt64(raw.ViewCount)
+	if err != nil {
+		return fmt.Errorf("viewCount: %w", err)
+	}
+
+	r.Resource = raw.Resource
+	r.ViewCount = count
+	r.Score = raw.Score
+	r.LastViewedAt = raw.LastViewedAt
+	return nil
+}
+
 // ListTrendingResourcesResponse mirrors engagement.v1.ListTrendingResourcesResponse.
 type ListTrendingResourcesResponse struct {
 	Resources     []TrendingResource `json:"resources,omitempty"`
@@ -118,6 +145,29 @@ type ResourceViewCount struct {
 	Resource     *EngagementResourceRef `json:"resource,omitempty"`
 	TotalViews   int64                  `json:"totalViews,omitempty"`
 	LastViewedAt *time.Time             `json:"lastViewedAt,omitempty"`
+}
+
+func (r *ResourceViewCount) UnmarshalJSON(data []byte) error {
+	type rawResourceViewCount struct {
+		Resource     *EngagementResourceRef `json:"resource,omitempty"`
+		TotalViews   json.RawMessage        `json:"totalViews,omitempty"`
+		LastViewedAt *time.Time             `json:"lastViewedAt,omitempty"`
+	}
+
+	var raw rawResourceViewCount
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+
+	totalViews, err := parseFlexibleInt64(raw.TotalViews)
+	if err != nil {
+		return fmt.Errorf("totalViews: %w", err)
+	}
+
+	r.Resource = raw.Resource
+	r.TotalViews = totalViews
+	r.LastViewedAt = raw.LastViewedAt
+	return nil
 }
 
 // BatchGetViewCountsResponse mirrors engagement.v1.BatchGetViewCountsResponse.
@@ -264,4 +314,30 @@ func validateEngagementResourceRef(resource *EngagementResourceRef) error {
 		return errors.New("resource.resourceID must not be empty")
 	}
 	return nil
+}
+
+func parseFlexibleInt64(raw json.RawMessage) (int64, error) {
+	if len(raw) == 0 || string(raw) == "null" {
+		return 0, nil
+	}
+
+	var asInt int64
+	if err := json.Unmarshal(raw, &asInt); err == nil {
+		return asInt, nil
+	}
+
+	var asString string
+	if err := json.Unmarshal(raw, &asString); err == nil {
+		asString = strings.TrimSpace(asString)
+		if asString == "" {
+			return 0, nil
+		}
+		value, parseErr := strconv.ParseInt(asString, 10, 64)
+		if parseErr != nil {
+			return 0, parseErr
+		}
+		return value, nil
+	}
+
+	return 0, fmt.Errorf("expected int64 or string-encoded int64, got %s", string(raw))
 }

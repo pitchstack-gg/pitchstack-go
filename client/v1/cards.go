@@ -143,6 +143,24 @@ type ProductSummary struct {
 	BackCardID      string `json:"backCardId,omitempty"`
 	BackPrintingID  string `json:"backPrintingId,omitempty"`
 	IsDFC           bool   `json:"isDfc,omitempty"`
+	Type            string `json:"type,omitempty"`
+	CardID          string `json:"cardId,omitempty"`
+	PrintingID      string `json:"printingId,omitempty"`
+	ProductGroupID  string `json:"productGroupId,omitempty"`
+	Name            string `json:"name,omitempty"`
+	Slug            string `json:"slug,omitempty"`
+	PrintedDate     string `json:"printedDate,omitempty"`
+	PrintedLanguage string `json:"printedLanguage,omitempty"`
+	ReleaseDate     string `json:"releaseDate,omitempty"`
+	Description     string `json:"description,omitempty"`
+	Quantity        int32  `json:"quantity,omitempty"`
+}
+
+// SetSummary mirrors v1SetSummary.
+type SetSummary struct {
+	Code        string `json:"code,omitempty"`
+	Name        string `json:"name,omitempty"`
+	ReleaseDate string `json:"releaseDate,omitempty"`
 }
 
 // PrintingSummary mirrors v1PrintingSummary.
@@ -359,6 +377,77 @@ type BatchGetProductsResponse struct {
 }
 
 func (r *BatchGetProductsResponse) setMetadata(metadata ResponseMetadata) {
+	r.Metadata = metadata
+}
+
+// ListProductsRequest enumerates products with optional filters.
+type ListProductsRequest struct {
+	Type           string
+	SetCode        string
+	ProductGroupID string
+	CardID         string
+	PrintingID     string
+	PageSize       *int32
+	NextToken      string
+}
+
+// ListProductsResponse mirrors v1ListProductsResponse.
+type ListProductsResponse struct {
+	Summaries []ProductSummary `json:"summaries,omitempty"`
+	NextToken string           `json:"nextToken,omitempty"`
+	Metadata  ResponseMetadata `json:"-"`
+}
+
+func (r *ListProductsResponse) setMetadata(metadata ResponseMetadata) {
+	r.Metadata = metadata
+}
+
+// GetSetRequest identifies a set by code.
+type GetSetRequest struct {
+	SetCode string `json:"-"`
+}
+
+// GetSetResponse returns a set summary.
+type GetSetResponse struct {
+	Summary  *SetSummary      `json:"summary,omitempty"`
+	Metadata ResponseMetadata `json:"-"`
+}
+
+func (r *GetSetResponse) setMetadata(metadata ResponseMetadata) {
+	r.Metadata = metadata
+}
+
+// ListSetsRequest enumerates sets.
+type ListSetsRequest struct {
+	PageSize  *int32
+	NextToken string
+}
+
+// ListSetsResponse mirrors v1ListSetsResponse.
+type ListSetsResponse struct {
+	Summaries []SetSummary     `json:"summaries,omitempty"`
+	NextToken string           `json:"nextToken,omitempty"`
+	Metadata  ResponseMetadata `json:"-"`
+}
+
+func (r *ListSetsResponse) setMetadata(metadata ResponseMetadata) {
+	r.Metadata = metadata
+}
+
+// BatchGetSetsRequest fetches sets in bulk.
+type BatchGetSetsRequest struct {
+	SetCodes     []string `json:"setCodes,omitempty"`
+	AllowPartial bool     `json:"allowPartial,omitempty"`
+}
+
+// BatchGetSetsResponse returns bulk set summaries.
+type BatchGetSetsResponse struct {
+	Sets          map[string]SetSummary `json:"sets,omitempty"`
+	NotFoundCodes []string              `json:"notFoundCodes,omitempty"`
+	Metadata      ResponseMetadata      `json:"-"`
+}
+
+func (r *BatchGetSetsResponse) setMetadata(metadata ResponseMetadata) {
 	r.Metadata = metadata
 }
 
@@ -633,6 +722,113 @@ func (c *Client) BatchGetProducts(ctx context.Context, request *BatchGetProducts
 	}
 
 	response := &BatchGetProductsResponse{}
+	if err := c.do(req, response, opts...); err != nil {
+		return nil, err
+	}
+
+	return response, nil
+}
+
+// ListProducts lists product summaries.
+func (c *Client) ListProducts(ctx context.Context, request *ListProductsRequest, opts ...RequestOpt) (*ListProductsResponse, error) {
+	if request == nil {
+		request = &ListProductsRequest{}
+	}
+
+	req, err := c.newRequest(ctx, http.MethodGet, "/v1/products", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	query := req.URL.Query()
+	setQueryString(query, "type", request.Type)
+	setQueryString(query, "setCode", request.SetCode)
+	setQueryString(query, "productGroupId", request.ProductGroupID)
+	setQueryString(query, "cardId", request.CardID)
+	setQueryString(query, "printingId", request.PrintingID)
+	if request.PageSize != nil && *request.PageSize > 0 {
+		query.Set("pageSize", strconv.Itoa(int(*request.PageSize)))
+	}
+	setQueryString(query, "nextToken", request.NextToken)
+	req.URL.RawQuery = query.Encode()
+
+	response := &ListProductsResponse{}
+	if err := c.do(req, response, opts...); err != nil {
+		return nil, err
+	}
+
+	return response, nil
+}
+
+// GetSet fetches a set summary.
+func (c *Client) GetSet(ctx context.Context, request *GetSetRequest, opts ...RequestOpt) (*GetSetResponse, error) {
+	if request == nil {
+		return nil, errors.New("request must not be nil")
+	}
+	if strings.TrimSpace(request.SetCode) == "" {
+		return nil, errors.New("setCode must not be empty")
+	}
+
+	path := fmt.Sprintf("/v1/sets/%s", url.PathEscape(request.SetCode))
+	req, err := c.newRequest(ctx, http.MethodGet, path, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetSetResponse{}
+	if err := c.do(req, response, opts...); err != nil {
+		return nil, err
+	}
+
+	return response, nil
+}
+
+// ListSets lists set summaries.
+func (c *Client) ListSets(ctx context.Context, request *ListSetsRequest, opts ...RequestOpt) (*ListSetsResponse, error) {
+	if request == nil {
+		request = &ListSetsRequest{}
+	}
+
+	req, err := c.newRequest(ctx, http.MethodGet, "/v1/sets", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	query := req.URL.Query()
+	if request.PageSize != nil && *request.PageSize > 0 {
+		query.Set("pageSize", strconv.Itoa(int(*request.PageSize)))
+	}
+	setQueryString(query, "nextToken", request.NextToken)
+	req.URL.RawQuery = query.Encode()
+
+	response := &ListSetsResponse{}
+	if err := c.do(req, response, opts...); err != nil {
+		return nil, err
+	}
+
+	return response, nil
+}
+
+// BatchGetSets fetches multiple sets.
+func (c *Client) BatchGetSets(ctx context.Context, request *BatchGetSetsRequest, opts ...RequestOpt) (*BatchGetSetsResponse, error) {
+	if request == nil {
+		return nil, errors.New("request must not be nil")
+	}
+
+	body, err := jsonBody(request)
+	if err != nil {
+		return nil, fmt.Errorf("encode body: %w", err)
+	}
+
+	req, err := c.newRequest(ctx, http.MethodPost, "/v1/sets:batchGet", body)
+	if err != nil {
+		return nil, err
+	}
+	if body != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
+
+	response := &BatchGetSetsResponse{}
 	if err := c.do(req, response, opts...); err != nil {
 		return nil, err
 	}

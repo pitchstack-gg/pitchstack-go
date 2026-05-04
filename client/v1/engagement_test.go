@@ -103,4 +103,61 @@ func TestClientEngagement(t *testing.T) {
 		_, err = client.BatchGetViewCounts(context.Background(), &BatchGetViewCountsRequest{})
 		require.Error(t, err)
 	})
+
+	t.Run("batch get view counts with string encoded totals", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			require.Equal(t, http.MethodPost, r.Method)
+			require.Equal(t, "/v1/engagement/views:batchGet", r.URL.Path)
+			require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
+				"counts": []map[string]any{
+					{
+						"resource": map[string]any{
+							"resourceType": string(TrackableResourceTypeDeck),
+							"resourceId":   "d-1",
+						},
+						"totalViews": "3",
+					},
+				},
+			}))
+		}))
+		t.Cleanup(server.Close)
+
+		client := newTestClient(t, WithBaseURL(server.URL), WithHTTPClient(server.Client()))
+		resp, err := client.BatchGetViewCounts(context.Background(), &BatchGetViewCountsRequest{
+			Resources: []EngagementResourceRef{{ResourceType: TrackableResourceTypeDeck, ResourceID: "d-1"}},
+		})
+		require.NoError(t, err)
+		require.Len(t, resp.Counts, 1)
+		require.Equal(t, int64(3), resp.Counts[0].TotalViews)
+	})
+
+	t.Run("list trending resources with string encoded view count", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			require.Equal(t, http.MethodPost, r.Method)
+			require.Equal(t, "/v1/engagement/trending:list", r.URL.Path)
+			require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
+				"resources": []map[string]any{
+					{
+						"resource": map[string]any{
+							"resourceType": string(TrackableResourceTypeDeck),
+							"resourceId":   "d-1",
+						},
+						"viewCount": "7",
+						"score":     1.5,
+					},
+				},
+			}))
+		}))
+		t.Cleanup(server.Close)
+
+		client := newTestClient(t, WithBaseURL(server.URL), WithHTTPClient(server.Client()))
+		resp, err := client.ListTrendingResources(context.Background(), &ListTrendingResourcesRequest{
+			ResourceType: TrackableResourceTypeDeck,
+			Window:       TrendingWindow24H,
+			PageSize:     10,
+		})
+		require.NoError(t, err)
+		require.Len(t, resp.Resources, 1)
+		require.Equal(t, int64(7), resp.Resources[0].ViewCount)
+	})
 }

@@ -257,6 +257,26 @@ func TestClientListSubscriptions(t *testing.T) {
 	require.Equal(t, http.StatusOK, resp.Metadata.StatusCode)
 }
 
+func TestClientGetPowerSyncClientConfig(t *testing.T) {
+	handler := func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, http.MethodGet, r.Method)
+		require.Equal(t, "/v1/sync/powersync/client-config", r.URL.Path)
+		require.NoError(t, json.NewEncoder(w).Encode(PowerSyncClientConfigResponse{
+			PowerSyncURL: "https://powersync.example.com",
+			SyncEpoch:    "epoch-1",
+		}))
+	}
+
+	server := httptest.NewServer(http.HandlerFunc(handler))
+	client := newTestClient(t, WithBaseURL(server.URL), WithHTTPClient(server.Client()))
+	t.Cleanup(server.Close)
+
+	resp, err := client.GetPowerSyncClientConfig(context.Background())
+	require.NoError(t, err)
+	require.Equal(t, "https://powersync.example.com", resp.PowerSyncURL)
+	require.Equal(t, "epoch-1", resp.SyncEpoch)
+}
+
 func TestClientUploadCrud(t *testing.T) {
 	t.Run("when request valid, then payload sent and response decoded", func(t *testing.T) {
 		handler := func(w http.ResponseWriter, r *http.Request) {

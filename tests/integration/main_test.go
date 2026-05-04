@@ -23,7 +23,7 @@ const (
 	envCollectionItemID  = "PITCHSTACK_COLLECTION_ITEM_ID"
 	envNonexistentCardID = "PITCHSTACK_NONEXISTENT_CARD_ID"
 
-	defaultAPIBaseURL = "https://gamma-api.pitchstack.gg"
+	defaultAPIBaseURL = "https://api.pitchstack.gg"
 )
 
 type testConfig struct {

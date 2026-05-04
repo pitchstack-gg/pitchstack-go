@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -22,12 +23,24 @@ const (
 
 // UserProfile represents a user's public profile details.
 type UserProfile struct {
-	Username  string `json:"username,omitempty"`
-	Name      string `json:"name,omitempty"`
-	AvatarURL string `json:"avatarUrl,omitempty"`
-	Bio       string `json:"bio,omitempty"`
-	Location  string `json:"location,omitempty"`
-	Pronouns  string `json:"pronouns,omitempty"`
+	Username             string `json:"username,omitempty"`
+	Name                 string `json:"name,omitempty"`
+	AvatarURL            string `json:"avatarUrl,omitempty"`
+	Bio                  string `json:"bio,omitempty"`
+	Location             string `json:"location,omitempty"`
+	Pronouns             string `json:"pronouns,omitempty"`
+	GemID                string `json:"gemId,omitempty"`
+	ProfileColor         string `json:"profileColor,omitempty"`
+	ProfileBackgroundURL string `json:"profileBackgroundUrl,omitempty"`
+}
+
+// UserSearchResult represents a compact search result for a user.
+type UserSearchResult struct {
+	UserID       string `json:"userId,omitempty"`
+	Username     string `json:"username,omitempty"`
+	Name         string `json:"name,omitempty"`
+	AvatarURL    string `json:"avatarUrl,omitempty"`
+	UserIDSuffix string `json:"userIdSuffix,omitempty"`
 }
 
 // ProfileSettings controls profile visibility preferences.
@@ -94,6 +107,51 @@ func (r *CompleteAvatarUploadResponse) setMetadata(metadata ResponseMetadata) {
 	r.Metadata = metadata
 }
 
+// BeginProfileBackgroundUploadRequest starts a server-controlled profile background upload.
+type BeginProfileBackgroundUploadRequest struct {
+	ContentType   string `json:"contentType,omitempty"`
+	ContentLength *int64 `json:"contentLength,omitempty,string"`
+}
+
+// BeginProfileBackgroundUploadResponse returns upload instructions.
+type BeginProfileBackgroundUploadResponse struct {
+	UploadID        string            `json:"uploadId,omitempty"`
+	UploadURL       string            `json:"uploadUrl,omitempty"`
+	RequiredHeaders map[string]string `json:"requiredHeaders,omitempty"`
+	MaxBytes        int64             `json:"maxBytes,omitempty,string"`
+	ExpiresAt       *time.Time        `json:"expiresAt,omitempty"`
+	Metadata        ResponseMetadata  `json:"-"`
+}
+
+func (r *BeginProfileBackgroundUploadResponse) setMetadata(metadata ResponseMetadata) {
+	r.Metadata = metadata
+}
+
+// CompleteProfileBackgroundUploadRequest completes a profile background upload.
+type CompleteProfileBackgroundUploadRequest struct {
+	UploadID string `json:"uploadId,omitempty"`
+}
+
+// CompleteProfileBackgroundUploadResponse returns the updated profile.
+type CompleteProfileBackgroundUploadResponse struct {
+	Profile  *UserProfile     `json:"profile,omitempty"`
+	Metadata ResponseMetadata `json:"-"`
+}
+
+func (r *CompleteProfileBackgroundUploadResponse) setMetadata(metadata ResponseMetadata) {
+	r.Metadata = metadata
+}
+
+// ClearProfileBackgroundResponse returns the updated profile after clearing the background.
+type ClearProfileBackgroundResponse struct {
+	Profile  *UserProfile     `json:"profile,omitempty"`
+	Metadata ResponseMetadata `json:"-"`
+}
+
+func (r *ClearProfileBackgroundResponse) setMetadata(metadata ResponseMetadata) {
+	r.Metadata = metadata
+}
+
 // UpdateProfileRequest modifies the authenticated user's profile.
 type UpdateProfileRequest struct {
 	Profile    *UserProfile
@@ -122,6 +180,67 @@ type GetProfileResponse struct {
 }
 
 func (r *GetProfileResponse) setMetadata(metadata ResponseMetadata) {
+	r.Metadata = metadata
+}
+
+// SearchUsersRequest searches for users by username prefix.
+type SearchUsersRequest struct {
+	SearchTerm string
+	PageSize   *int32
+	NextToken  string
+}
+
+// SearchUsersResponse lists users matching the search term.
+type SearchUsersResponse struct {
+	Users     []UserSearchResult `json:"users,omitempty"`
+	NextToken string             `json:"nextToken,omitempty"`
+	Metadata  ResponseMetadata   `json:"-"`
+}
+
+func (r *SearchUsersResponse) setMetadata(metadata ResponseMetadata) {
+	r.Metadata = metadata
+}
+
+// PrivacyConsent represents account-level privacy consent state.
+type PrivacyConsent struct {
+	AnalyticsAllowed bool       `json:"analyticsAllowed,omitempty"`
+	ConsentVersion   int32      `json:"consentVersion,omitempty"`
+	Source           string     `json:"source,omitempty"`
+	Platform         string     `json:"platform,omitempty"`
+	AppVersion       string     `json:"appVersion,omitempty"`
+	DeviceIDHash     string     `json:"deviceIdHash,omitempty"`
+	UpdatedAt        *time.Time `json:"updatedAt,omitempty"`
+	ClientActionAt   *time.Time `json:"clientActionAt,omitempty"`
+}
+
+// GetPrivacyConsentResponse returns account-level privacy consent.
+type GetPrivacyConsentResponse struct {
+	Consent  *PrivacyConsent  `json:"consent,omitempty"`
+	Metadata ResponseMetadata `json:"-"`
+}
+
+func (r *GetPrivacyConsentResponse) setMetadata(metadata ResponseMetadata) {
+	r.Metadata = metadata
+}
+
+// UpdatePrivacyConsentRequest updates account-level privacy consent.
+type UpdatePrivacyConsentRequest struct {
+	AnalyticsAllowed bool       `json:"analyticsAllowed,omitempty"`
+	ConsentVersion   int32      `json:"consentVersion,omitempty"`
+	Source           string     `json:"source,omitempty"`
+	Platform         string     `json:"platform,omitempty"`
+	AppVersion       string     `json:"appVersion,omitempty"`
+	DeviceIDHash     string     `json:"deviceIdHash,omitempty"`
+	ClientActionAt   *time.Time `json:"clientActionAt,omitempty"`
+}
+
+// UpdatePrivacyConsentResponse returns updated account-level privacy consent.
+type UpdatePrivacyConsentResponse struct {
+	Consent  *PrivacyConsent  `json:"consent,omitempty"`
+	Metadata ResponseMetadata `json:"-"`
+}
+
+func (r *UpdatePrivacyConsentResponse) setMetadata(metadata ResponseMetadata) {
 	r.Metadata = metadata
 }
 
@@ -437,6 +556,38 @@ func (c *Client) GetMyProfile(ctx context.Context, opts ...RequestOpt) (*GetProf
 	return response, nil
 }
 
+// SearchUsers searches for users by username prefix.
+func (c *Client) SearchUsers(ctx context.Context, request *SearchUsersRequest, opts ...RequestOpt) (*SearchUsersResponse, error) {
+	if request == nil {
+		request = &SearchUsersRequest{}
+	}
+
+	req, err := c.newRequest(ctx, http.MethodGet, "/v1/users/search", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	query := req.URL.Query()
+	if term := strings.TrimSpace(request.SearchTerm); term != "" {
+		query.Set("searchTerm", term)
+	}
+	if request.PageSize != nil && *request.PageSize > 0 {
+		query.Set("pageSize", strconv.Itoa(int(*request.PageSize)))
+	}
+	if token := strings.TrimSpace(request.NextToken); token != "" {
+		query.Set("nextToken", token)
+	}
+	if len(query) > 0 {
+		req.URL.RawQuery = query.Encode()
+	}
+
+	response := &SearchUsersResponse{}
+	if err := c.do(req, response, opts...); err != nil {
+		return nil, err
+	}
+	return response, nil
+}
+
 // SetAvatarURL updates the authenticated user's avatar URL.
 func (c *Client) SetAvatarURL(ctx context.Context, request *SetAvatarURLRequest, opts ...RequestOpt) (*SetAvatarURLResponse, error) {
 	if request == nil {
@@ -528,6 +679,80 @@ func (c *Client) CompleteAvatarUpload(ctx context.Context, request *CompleteAvat
 	return response, nil
 }
 
+// BeginProfileBackgroundUpload starts a server-controlled profile background upload session.
+func (c *Client) BeginProfileBackgroundUpload(ctx context.Context, request *BeginProfileBackgroundUploadRequest, opts ...RequestOpt) (*BeginProfileBackgroundUploadResponse, error) {
+	if request == nil {
+		return nil, errors.New("request must not be nil")
+	}
+	if strings.TrimSpace(request.ContentType) == "" {
+		return nil, errors.New("contentType must not be empty")
+	}
+
+	body, err := jsonBody(request)
+	if err != nil {
+		return nil, fmt.Errorf("encode body: %w", err)
+	}
+
+	req, err := c.newRequest(ctx, http.MethodPost, "/v1/me/profile/background:beginUpload", body)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	response := &BeginProfileBackgroundUploadResponse{}
+	if err := c.do(req, response, opts...); err != nil {
+		return nil, err
+	}
+	return response, nil
+}
+
+// CompleteProfileBackgroundUpload completes a profile background upload session.
+func (c *Client) CompleteProfileBackgroundUpload(ctx context.Context, request *CompleteProfileBackgroundUploadRequest, opts ...RequestOpt) (*CompleteProfileBackgroundUploadResponse, error) {
+	if request == nil {
+		return nil, errors.New("request must not be nil")
+	}
+	if strings.TrimSpace(request.UploadID) == "" {
+		return nil, errors.New("uploadID must not be empty")
+	}
+
+	body, err := jsonBody(request)
+	if err != nil {
+		return nil, fmt.Errorf("encode body: %w", err)
+	}
+
+	req, err := c.newRequest(ctx, http.MethodPost, "/v1/me/profile/background:completeUpload", body)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	response := &CompleteProfileBackgroundUploadResponse{}
+	if err := c.do(req, response, opts...); err != nil {
+		return nil, err
+	}
+	return response, nil
+}
+
+// ClearProfileBackground clears the current user's profile background image.
+func (c *Client) ClearProfileBackground(ctx context.Context, opts ...RequestOpt) (*ClearProfileBackgroundResponse, error) {
+	body, err := jsonBody(struct{}{})
+	if err != nil {
+		return nil, fmt.Errorf("encode body: %w", err)
+	}
+
+	req, err := c.newRequest(ctx, http.MethodPost, "/v1/me/profile/background:clear", body)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	response := &ClearProfileBackgroundResponse{}
+	if err := c.do(req, response, opts...); err != nil {
+		return nil, err
+	}
+	return response, nil
+}
+
 // UpdateProfile applies updates to the authenticated user's profile.
 func (c *Client) UpdateProfile(ctx context.Context, request *UpdateProfileRequest, opts ...RequestOpt) (*UpdateProfileResponse, error) {
 	if request == nil {
@@ -578,6 +803,44 @@ func (c *Client) GetProfile(ctx context.Context, request *GetProfileRequest, opt
 	}
 
 	response := &GetProfileResponse{}
+	if err := c.do(req, response, opts...); err != nil {
+		return nil, err
+	}
+	return response, nil
+}
+
+// GetPrivacyConsent returns account-level privacy consent for the authenticated user.
+func (c *Client) GetPrivacyConsent(ctx context.Context, opts ...RequestOpt) (*GetPrivacyConsentResponse, error) {
+	req, err := c.newRequest(ctx, http.MethodGet, "/v1/me/privacy/consent", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetPrivacyConsentResponse{}
+	if err := c.do(req, response, opts...); err != nil {
+		return nil, err
+	}
+	return response, nil
+}
+
+// UpdatePrivacyConsent updates account-level privacy consent for the authenticated user.
+func (c *Client) UpdatePrivacyConsent(ctx context.Context, request *UpdatePrivacyConsentRequest, opts ...RequestOpt) (*UpdatePrivacyConsentResponse, error) {
+	if request == nil {
+		return nil, errors.New("request must not be nil")
+	}
+
+	body, err := jsonBody(request)
+	if err != nil {
+		return nil, fmt.Errorf("encode body: %w", err)
+	}
+
+	req, err := c.newRequest(ctx, http.MethodPut, "/v1/me/privacy/consent", body)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	response := &UpdatePrivacyConsentResponse{}
 	if err := c.do(req, response, opts...); err != nil {
 		return nil, err
 	}

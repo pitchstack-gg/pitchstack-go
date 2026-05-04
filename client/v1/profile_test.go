@@ -52,6 +52,41 @@ func TestClientGetMyProfile(t *testing.T) {
 	require.Equal(t, "me", resp.Profile.Username)
 }
 
+func TestClientSearchUsers(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, http.MethodGet, r.Method)
+		require.Equal(t, "/v1/users/search", r.URL.Path)
+		query := r.URL.Query()
+		require.Equal(t, "alex", query.Get("searchTerm"))
+		require.Equal(t, "25", query.Get("pageSize"))
+		require.Equal(t, "token", query.Get("nextToken"))
+		require.NoError(t, json.NewEncoder(w).Encode(SearchUsersResponse{
+			Users: []UserSearchResult{{
+				UserID:       "u-00000000-0000-0000-0000-0000000000a1",
+				Username:     "alex",
+				Name:         "Alex Search",
+				AvatarURL:    "https://cdn.example.com/alex.png",
+				UserIDSuffix: "00a1",
+			}},
+			NextToken: "next-page-token",
+		}))
+	}))
+	t.Cleanup(server.Close)
+
+	client := newTestClient(t, WithBaseURL(server.URL), WithHTTPClient(server.Client()))
+	pageSize := int32(25)
+	resp, err := client.SearchUsers(context.Background(), &SearchUsersRequest{
+		SearchTerm: "alex",
+		PageSize:   &pageSize,
+		NextToken:  "token",
+	})
+	require.NoError(t, err)
+	require.Len(t, resp.Users, 1)
+	require.Equal(t, "u-00000000-0000-0000-0000-0000000000a1", resp.Users[0].UserID)
+	require.Equal(t, "00a1", resp.Users[0].UserIDSuffix)
+	require.Equal(t, "next-page-token", resp.NextToken)
+}
+
 func TestClientAvatarUploadFlow(t *testing.T) {
 	var sawBegin, sawComplete bool
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -92,6 +127,56 @@ func TestClientAvatarUploadFlow(t *testing.T) {
 	require.True(t, sawComplete)
 }
 
+func TestClientProfileBackgroundUploadFlow(t *testing.T) {
+	var sawBegin, sawComplete, sawClear bool
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/v1/me/profile/background:beginUpload":
+			sawBegin = true
+			require.Equal(t, http.MethodPost, r.Method)
+			var payload BeginProfileBackgroundUploadRequest
+			require.NoError(t, json.NewDecoder(r.Body).Decode(&payload))
+			require.Equal(t, "image/jpeg", payload.ContentType)
+			require.NoError(t, json.NewEncoder(w).Encode(BeginProfileBackgroundUploadResponse{
+				UploadID:  "bg-up-1",
+				UploadURL: "https://upload/background",
+				MaxBytes:  2048,
+			}))
+		case "/v1/me/profile/background:completeUpload":
+			sawComplete = true
+			require.Equal(t, http.MethodPost, r.Method)
+			var payload CompleteProfileBackgroundUploadRequest
+			require.NoError(t, json.NewDecoder(r.Body).Decode(&payload))
+			require.Equal(t, "bg-up-1", payload.UploadID)
+			require.NoError(t, json.NewEncoder(w).Encode(CompleteProfileBackgroundUploadResponse{
+				Profile: &UserProfile{ProfileBackgroundURL: "https://cdn/background.jpg"},
+			}))
+		case "/v1/me/profile/background:clear":
+			sawClear = true
+			require.Equal(t, http.MethodPost, r.Method)
+			require.NoError(t, json.NewEncoder(w).Encode(ClearProfileBackgroundResponse{
+				Profile: &UserProfile{ProfileBackgroundURL: ""},
+			}))
+		default:
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+	}))
+	t.Cleanup(server.Close)
+
+	client := newTestClient(t, WithBaseURL(server.URL), WithHTTPClient(server.Client()))
+	_, err := client.BeginProfileBackgroundUpload(context.Background(), &BeginProfileBackgroundUploadRequest{ContentType: "image/jpeg"})
+	require.NoError(t, err)
+	completeResp, err := client.CompleteProfileBackgroundUpload(context.Background(), &CompleteProfileBackgroundUploadRequest{UploadID: "bg-up-1"})
+	require.NoError(t, err)
+	require.Equal(t, "https://cdn/background.jpg", completeResp.Profile.ProfileBackgroundURL)
+	clearResp, err := client.ClearProfileBackground(context.Background())
+	require.NoError(t, err)
+	require.NotNil(t, clearResp.Profile)
+	require.True(t, sawBegin)
+	require.True(t, sawComplete)
+	require.True(t, sawClear)
+}
+
 func TestClientUpdateProfile(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		require.Equal(t, http.MethodPatch, r.Method)
@@ -128,6 +213,44 @@ func TestClientUpdateProfile(t *testing.T) {
 
 	_, err = client.UpdateProfile(context.Background(), &UpdateProfileRequest{})
 	require.Error(t, err)
+}
+
+func TestClientPrivacyConsent(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			require.Equal(t, "/v1/me/privacy/consent", r.URL.Path)
+			require.NoError(t, json.NewEncoder(w).Encode(GetPrivacyConsentResponse{
+				Consent: &PrivacyConsent{AnalyticsAllowed: true, ConsentVersion: 2},
+			}))
+		case http.MethodPut:
+			require.Equal(t, "/v1/me/privacy/consent", r.URL.Path)
+			var payload UpdatePrivacyConsentRequest
+			require.NoError(t, json.NewDecoder(r.Body).Decode(&payload))
+			require.True(t, payload.AnalyticsAllowed)
+			require.Equal(t, int32(2), payload.ConsentVersion)
+			require.NoError(t, json.NewEncoder(w).Encode(UpdatePrivacyConsentResponse{
+				Consent: &PrivacyConsent{AnalyticsAllowed: payload.AnalyticsAllowed, ConsentVersion: payload.ConsentVersion},
+			}))
+		default:
+			t.Fatalf("unexpected method: %s", r.Method)
+		}
+	}))
+	t.Cleanup(server.Close)
+
+	client := newTestClient(t, WithBaseURL(server.URL), WithHTTPClient(server.Client()))
+	getResp, err := client.GetPrivacyConsent(context.Background())
+	require.NoError(t, err)
+	require.True(t, getResp.Consent.AnalyticsAllowed)
+
+	updateResp, err := client.UpdatePrivacyConsent(context.Background(), &UpdatePrivacyConsentRequest{
+		AnalyticsAllowed: true,
+		ConsentVersion:   2,
+		Source:           "settings",
+		Platform:         "ios",
+	})
+	require.NoError(t, err)
+	require.Equal(t, int32(2), updateResp.Consent.ConsentVersion)
 }
 
 func TestClientGetProfile(t *testing.T) {

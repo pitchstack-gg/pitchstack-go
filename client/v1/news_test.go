@@ -14,7 +14,7 @@ func TestClientNews(t *testing.T) {
 	t.Run("list recommended articles", func(t *testing.T) {
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			require.Equal(t, http.MethodGet, r.Method)
-			require.Equal(t, "/v1/news/recommended", r.URL.Path)
+			require.Equal(t, "/v1/news/recommendations", r.URL.Path)
 			q := r.URL.Query()
 			require.Equal(t, "20", q.Get("pageSize"))
 			require.Equal(t, "tok-1", q.Get("nextToken"))
@@ -41,7 +41,7 @@ func TestClientNews(t *testing.T) {
 	t.Run("get article", func(t *testing.T) {
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			require.Equal(t, http.MethodGet, r.Method)
-			require.Equal(t, "/v1/news/a-1", r.URL.Path)
+			require.Equal(t, "/v1/news/articles/a-1", r.URL.Path)
 			require.NoError(t, json.NewEncoder(w).Encode(GetArticleResponse{Article: &NewsArticle{ArticleID: "a-1"}}))
 		}))
 		t.Cleanup(server.Close)
@@ -59,14 +59,14 @@ func TestClientNews(t *testing.T) {
 		var impressions, clicks int
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			switch r.URL.Path {
-			case "/v1/news/a-1:trackImpression":
+			case "/v1/news/articles/a-1:trackImpression":
 				require.Equal(t, http.MethodPost, r.Method)
 				impressions++
 				var payload TrackArticleImpressionRequest
 				require.NoError(t, json.NewDecoder(r.Body).Decode(&payload))
 				require.Equal(t, "a-1", payload.ArticleID)
 				require.NoError(t, json.NewEncoder(w).Encode(TrackArticleImpressionResponse{Accepted: true}))
-			case "/v1/news/a-1:trackClick":
+			case "/v1/news/articles/a-1:trackClick":
 				require.Equal(t, http.MethodPost, r.Method)
 				clicks++
 				var payload TrackArticleClickRequest

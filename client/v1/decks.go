@@ -21,6 +21,25 @@ const (
 	DeckListScopeAccessible  DeckListScope = "DECK_LIST_SCOPE_ACCESSIBLE"
 )
 
+// DeckKind matches v1DeckKind.
+type DeckKind string
+
+const (
+	DeckKindUnspecified DeckKind = "DECK_KIND_UNSPECIFIED"
+	DeckKindUser        DeckKind = "DECK_KIND_USER"
+	DeckKindReference   DeckKind = "DECK_KIND_REFERENCE"
+)
+
+// DeckSourceKind matches v1DeckSourceKind.
+type DeckSourceKind string
+
+const (
+	DeckSourceKindUnspecified      DeckSourceKind = "DECK_SOURCE_KIND_UNSPECIFIED"
+	DeckSourceKindPromoArticle     DeckSourceKind = "DECK_SOURCE_KIND_PROMO_ARTICLE"
+	DeckSourceKindPrecon           DeckSourceKind = "DECK_SOURCE_KIND_PRECON"
+	DeckSourceKindTournamentResult DeckSourceKind = "DECK_SOURCE_KIND_TOURNAMENT_RESULT"
+)
+
 // BoardType represents v1BoardType.
 type BoardType string
 
@@ -61,6 +80,9 @@ type Deck struct {
 	Visibility          VisibilityLevel      `json:"visibility,omitempty"`
 	DeckVersions        []DeckVersionSummary `json:"deckVersions,omitempty"`
 	ActiveDeckVersionID string               `json:"activeDeckVersionId,omitempty"`
+	DeckKind            DeckKind             `json:"deckKind,omitempty"`
+	SourceKind          DeckSourceKind       `json:"sourceKind,omitempty"`
+	SourceReference     string               `json:"sourceReference,omitempty"`
 	CreatedAt           *time.Time           `json:"createdAt,omitempty"`
 	UpdatedAt           *time.Time           `json:"updatedAt,omitempty"`
 }
@@ -82,10 +104,50 @@ type DeckVersion struct {
 
 // DeckVersionChange mirrors v1DeckVersionChange.
 type DeckVersionChange struct {
-	DeckID      string     `json:"deckId,omitempty"`
-	Name        string     `json:"name,omitempty"`
-	Description string     `json:"description,omitempty"`
-	Timestamp   *time.Time `json:"timestamp,omitempty"`
+	DeckID      string                     `json:"deckId,omitempty"`
+	Name        string                     `json:"name,omitempty"`
+	Description string                     `json:"description,omitempty"`
+	Timestamp   *time.Time                 `json:"timestamp,omitempty"`
+	ID          string                     `json:"id,omitempty"`
+	EventType   DeckVersionChangeEventType `json:"eventType,omitempty"`
+	CardChanges []DeckVersionCardChange    `json:"cardChanges,omitempty"`
+}
+
+// DeckVersionChangeEventType matches v1DeckVersionChangeEventType.
+type DeckVersionChangeEventType string
+
+const (
+	DeckVersionChangeEventTypeUnspecified          DeckVersionChangeEventType = "DECK_VERSION_CHANGE_EVENT_TYPE_UNSPECIFIED"
+	DeckVersionChangeEventTypeDeckCardChange       DeckVersionChangeEventType = "DECK_VERSION_CHANGE_EVENT_TYPE_DECK_CARD_CHANGE"
+	DeckVersionChangeEventTypeVersionCreated       DeckVersionChangeEventType = "DECK_VERSION_CHANGE_EVENT_TYPE_VERSION_CREATED"
+	DeckVersionChangeEventTypeVersionCloned        DeckVersionChangeEventType = "DECK_VERSION_CHANGE_EVENT_TYPE_VERSION_CLONED"
+	DeckVersionChangeEventTypeNotesUpdated         DeckVersionChangeEventType = "DECK_VERSION_CHANGE_EVENT_TYPE_NOTES_UPDATED"
+	DeckVersionChangeEventTypeSideboardGuideUpsert DeckVersionChangeEventType = "DECK_VERSION_CHANGE_EVENT_TYPE_SIDEBOARD_GUIDE_UPSERT"
+	DeckVersionChangeEventTypeSideboardGuideDelete DeckVersionChangeEventType = "DECK_VERSION_CHANGE_EVENT_TYPE_SIDEBOARD_GUIDE_DELETE"
+	DeckVersionChangeEventTypeMatchCreated         DeckVersionChangeEventType = "DECK_VERSION_CHANGE_EVENT_TYPE_MATCH_CREATED"
+	DeckVersionChangeEventTypeMatchDeleted         DeckVersionChangeEventType = "DECK_VERSION_CHANGE_EVENT_TYPE_MATCH_DELETED"
+)
+
+// DeckVersionCardChangeOperation matches v1DeckVersionCardChangeOperation.
+type DeckVersionCardChangeOperation string
+
+const (
+	DeckVersionCardChangeOperationUnspecified    DeckVersionCardChangeOperation = "DECK_VERSION_CARD_CHANGE_OPERATION_UNSPECIFIED"
+	DeckVersionCardChangeOperationAdd            DeckVersionCardChangeOperation = "DECK_VERSION_CARD_CHANGE_OPERATION_ADD"
+	DeckVersionCardChangeOperationRemove         DeckVersionCardChangeOperation = "DECK_VERSION_CARD_CHANGE_OPERATION_REMOVE"
+	DeckVersionCardChangeOperationQuantityChange DeckVersionCardChangeOperation = "DECK_VERSION_CARD_CHANGE_OPERATION_QUANTITY_CHANGE"
+	DeckVersionCardChangeOperationMove           DeckVersionCardChangeOperation = "DECK_VERSION_CARD_CHANGE_OPERATION_MOVE"
+)
+
+// DeckVersionCardChange describes a card change in deck version history.
+type DeckVersionCardChange struct {
+	CardID           string                         `json:"cardId,omitempty"`
+	FromBoard        BoardType                      `json:"fromBoard,omitempty"`
+	ToBoard          BoardType                      `json:"toBoard,omitempty"`
+	QuantityDelta    int32                          `json:"quantityDelta,omitempty"`
+	PreviousQuantity int32                          `json:"previousQuantity,omitempty"`
+	NewQuantity      int32                          `json:"newQuantity,omitempty"`
+	Operation        DeckVersionCardChangeOperation `json:"operation,omitempty"`
 }
 
 // DeckCard mirrors v1Card used within deck operations.
@@ -169,11 +231,14 @@ func (r *CloneDeckResponse) setMetadata(metadata ResponseMetadata) {
 
 // SearchDecksRequest configures deck search parameters.
 type SearchDecksRequest struct {
-	HeroID     string
-	Format     string
-	SearchTerm string
-	PageSize   *int32
-	NextToken  string
+	HeroID          string
+	Format          string
+	SearchTerm      string
+	PageSize        *int32
+	NextToken       string
+	DeckKind        DeckKind
+	SourceKind      DeckSourceKind
+	SourceReference string
 }
 
 // SearchDecksResponse returns decks matching the search query.
@@ -500,9 +565,17 @@ func (r *UpdateDeckVersionNotesResponse) setMetadata(metadata ResponseMetadata) 
 
 // SideboardGuide mirrors v1SideboardGuide.
 type SideboardGuide struct {
-	TargetType SideboardGuideTargetType `json:"targetType,omitempty"`
-	Target     string                   `json:"target,omitempty"`
-	Guide      string                   `json:"guide,omitempty"`
+	TargetType    SideboardGuideTargetType   `json:"targetType,omitempty"`
+	Target        string                     `json:"target,omitempty"`
+	Guide         string                     `json:"guide,omitempty"`
+	CardsToAdd    []SideboardGuideCardChange `json:"cardsToAdd,omitempty"`
+	CardsToRemove []SideboardGuideCardChange `json:"cardsToRemove,omitempty"`
+}
+
+// SideboardGuideCardChange mirrors v1SideboardGuideCardChange.
+type SideboardGuideCardChange struct {
+	CardID   string `json:"cardId,omitempty"`
+	Quantity int32  `json:"quantity,omitempty"`
 }
 
 // ListDeckVersionSideboardGuidesRequest lists sideboard guides for a deck version.
@@ -522,10 +595,12 @@ func (r *ListDeckVersionSideboardGuidesResponse) setMetadata(metadata ResponseMe
 
 // UpsertDeckVersionSideboardGuideRequest creates or updates a sideboard guide.
 type UpsertDeckVersionSideboardGuideRequest struct {
-	DeckVersionID string                   `json:"-"`
-	TargetType    SideboardGuideTargetType `json:"targetType,omitempty"`
-	Target        string                   `json:"target,omitempty"`
-	Guide         string                   `json:"guide,omitempty"`
+	DeckVersionID string                     `json:"-"`
+	TargetType    SideboardGuideTargetType   `json:"targetType,omitempty"`
+	Target        string                     `json:"target,omitempty"`
+	Guide         string                     `json:"guide,omitempty"`
+	CardsToAdd    []SideboardGuideCardChange `json:"cardsToAdd,omitempty"`
+	CardsToRemove []SideboardGuideCardChange `json:"cardsToRemove,omitempty"`
 }
 
 // UpsertDeckVersionSideboardGuideResponse returns the upserted guide.
@@ -605,6 +680,7 @@ type ImportDeckVersion struct {
 	MainboardCards  []DeckCard       `json:"mainboardCards,omitempty"`
 	SideboardCards  []DeckCard       `json:"sideboardCards,omitempty"`
 	MaybeboardCards []DeckCard       `json:"maybeboardCards,omitempty"`
+	CreatedAt       *time.Time       `json:"createdAt,omitempty"`
 	SideboardGuides []SideboardGuide `json:"sideboardGuides,omitempty"`
 }
 
@@ -616,6 +692,7 @@ type ImportDeckRequest struct {
 	Format              string              `json:"format,omitempty"`
 	Author              string              `json:"author,omitempty"`
 	Visibility          *VisibilityLevel    `json:"visibility,omitempty"`
+	CreatedAt           *time.Time          `json:"createdAt,omitempty"`
 	Versions            []ImportDeckVersion `json:"versions,omitempty"`
 	ActiveDeckVersionID string              `json:"activeDeckVersionId,omitempty"`
 }
@@ -789,6 +866,15 @@ func (c *Client) SearchDecks(ctx context.Context, request *SearchDecksRequest, o
 	}
 	if token := strings.TrimSpace(request.NextToken); token != "" {
 		query.Set("nextToken", token)
+	}
+	if deckKind := strings.TrimSpace(string(request.DeckKind)); deckKind != "" && deckKind != string(DeckKindUnspecified) {
+		query.Set("deckKind", deckKind)
+	}
+	if sourceKind := strings.TrimSpace(string(request.SourceKind)); sourceKind != "" && sourceKind != string(DeckSourceKindUnspecified) {
+		query.Set("sourceKind", sourceKind)
+	}
+	if sourceReference := strings.TrimSpace(request.SourceReference); sourceReference != "" {
+		query.Set("sourceReference", sourceReference)
 	}
 	req.URL.RawQuery = query.Encode()
 
@@ -1310,13 +1396,17 @@ func (c *Client) UpsertDeckVersionSideboardGuide(ctx context.Context, request *U
 	}
 
 	body, err := jsonBody(struct {
-		TargetType SideboardGuideTargetType `json:"targetType,omitempty"`
-		Target     string                   `json:"target,omitempty"`
-		Guide      string                   `json:"guide,omitempty"`
+		TargetType    SideboardGuideTargetType   `json:"targetType,omitempty"`
+		Target        string                     `json:"target,omitempty"`
+		Guide         string                     `json:"guide,omitempty"`
+		CardsToAdd    []SideboardGuideCardChange `json:"cardsToAdd,omitempty"`
+		CardsToRemove []SideboardGuideCardChange `json:"cardsToRemove,omitempty"`
 	}{
-		TargetType: request.TargetType,
-		Target:     target,
-		Guide:      request.Guide,
+		TargetType:    request.TargetType,
+		Target:        target,
+		Guide:         request.Guide,
+		CardsToAdd:    request.CardsToAdd,
+		CardsToRemove: request.CardsToRemove,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("encode body: %w", err)
@@ -1605,6 +1695,7 @@ func (c *Client) ImportDeck(ctx context.Context, request *ImportDeckRequest, opt
 		Format              string              `json:"format,omitempty"`
 		Author              string              `json:"author,omitempty"`
 		Visibility          *VisibilityLevel    `json:"visibility,omitempty"`
+		CreatedAt           *time.Time          `json:"createdAt,omitempty"`
 		Versions            []ImportDeckVersion `json:"versions,omitempty"`
 		ActiveDeckVersionID string              `json:"activeDeckVersionId,omitempty"`
 	}{
@@ -1614,6 +1705,7 @@ func (c *Client) ImportDeck(ctx context.Context, request *ImportDeckRequest, opt
 		Format:              strings.TrimSpace(request.Format),
 		Author:              strings.TrimSpace(request.Author),
 		Visibility:          request.Visibility,
+		CreatedAt:           request.CreatedAt,
 		Versions:            request.Versions,
 		ActiveDeckVersionID: strings.TrimSpace(request.ActiveDeckVersionID),
 	})

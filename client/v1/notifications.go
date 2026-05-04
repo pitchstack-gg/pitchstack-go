@@ -33,6 +33,106 @@ type Notification struct {
 	ArchivedAt   *time.Time           `json:"archivedAt,omitempty"`
 }
 
+// PushDevice represents a registered mobile push target.
+type PushDevice struct {
+	DeviceID         string     `json:"deviceId,omitempty"`
+	Platform         string     `json:"platform,omitempty"`
+	ExpoPushToken    string     `json:"expoPushToken,omitempty"`
+	AppVersion       string     `json:"appVersion,omitempty"`
+	Active           bool       `json:"active,omitempty"`
+	LastRegisteredAt *time.Time `json:"lastRegisteredAt,omitempty"`
+}
+
+// NotificationPreference controls delivery channels for a category.
+type NotificationPreference struct {
+	Category     string `json:"category,omitempty"`
+	InAppEnabled bool   `json:"inAppEnabled,omitempty"`
+	PushEnabled  bool   `json:"pushEnabled,omitempty"`
+	EmailEnabled bool   `json:"emailEnabled,omitempty"`
+}
+
+// CreateMessageRequest submits a producer message for a target user inbox.
+type CreateMessageRequest struct {
+	TargetUserID   string               `json:"targetUserId,omitempty"`
+	Source         string               `json:"source,omitempty"`
+	IdempotencyKey string               `json:"idempotencyKey,omitempty"`
+	Category       string               `json:"category,omitempty"`
+	Severity       string               `json:"severity,omitempty"`
+	Title          string               `json:"title,omitempty"`
+	BodyMarkdown   *string              `json:"bodyMarkdown,omitempty"`
+	Blocks         map[string]any       `json:"blocks,omitempty"`
+	Actions        []NotificationAction `json:"actions,omitempty"`
+	ExpiresAt      *time.Time           `json:"expiresAt,omitempty"`
+}
+
+// CreateMessageResponse returns the created (or deduplicated existing) message id.
+type CreateMessageResponse struct {
+	MessageID string           `json:"messageId,omitempty"`
+	Created   bool             `json:"created,omitempty"`
+	Metadata  ResponseMetadata `json:"-"`
+}
+
+func (r *CreateMessageResponse) setMetadata(metadata ResponseMetadata) {
+	r.Metadata = metadata
+}
+
+// RegisterPushDeviceRequest registers or updates a mobile push device.
+type RegisterPushDeviceRequest struct {
+	DeviceID      string `json:"deviceId,omitempty"`
+	Platform      string `json:"platform,omitempty"`
+	ExpoPushToken string `json:"expoPushToken,omitempty"`
+	AppVersion    string `json:"appVersion,omitempty"`
+}
+
+// RegisterPushDeviceResponse returns the registered push device.
+type RegisterPushDeviceResponse struct {
+	Device   *PushDevice      `json:"device,omitempty"`
+	Metadata ResponseMetadata `json:"-"`
+}
+
+func (r *RegisterPushDeviceResponse) setMetadata(metadata ResponseMetadata) {
+	r.Metadata = metadata
+}
+
+// UnregisterPushDeviceRequest disables a mobile push device.
+type UnregisterPushDeviceRequest struct {
+	DeviceID string `json:"-"`
+}
+
+// UnregisterPushDeviceResponse captures metadata for unregister operations.
+type UnregisterPushDeviceResponse struct {
+	Metadata ResponseMetadata `json:"-"`
+}
+
+func (r *UnregisterPushDeviceResponse) setMetadata(metadata ResponseMetadata) {
+	r.Metadata = metadata
+}
+
+// GetNotificationPreferencesResponse returns notification channel preferences.
+type GetNotificationPreferencesResponse struct {
+	Preferences []NotificationPreference `json:"preferences,omitempty"`
+	Metadata    ResponseMetadata         `json:"-"`
+}
+
+func (r *GetNotificationPreferencesResponse) setMetadata(metadata ResponseMetadata) {
+	r.Metadata = metadata
+}
+
+// UpdateNotificationPreferencesRequest updates notification channel preferences.
+type UpdateNotificationPreferencesRequest struct {
+	Preferences []NotificationPreference `json:"preferences,omitempty"`
+}
+
+// UpdateNotificationPreferencesResponse returns updated notification channel preferences.
+type UpdateNotificationPreferencesResponse struct {
+	Preferences []NotificationPreference `json:"preferences,omitempty"`
+	Metadata    ResponseMetadata         `json:"-"`
+}
+
+func (r *UpdateNotificationPreferencesResponse) setMetadata(metadata ResponseMetadata) {
+	r.Metadata = metadata
+}
+
 // ListInboxRequest controls ListInbox filtering and pagination.
 type ListInboxRequest struct {
 	UnreadOnly      *bool
@@ -109,6 +209,139 @@ type ArchiveMessageResponse struct {
 
 func (r *ArchiveMessageResponse) setMetadata(metadata ResponseMetadata) {
 	r.Metadata = metadata
+}
+
+// CreateMessage creates a notification message via the producer service.
+func (c *Client) CreateMessage(ctx context.Context, request *CreateMessageRequest, opts ...RequestOpt) (*CreateMessageResponse, error) {
+	if request == nil {
+		return nil, errors.New("request must not be nil")
+	}
+	if strings.TrimSpace(request.TargetUserID) == "" {
+		return nil, errors.New("targetUserID must not be empty")
+	}
+	if strings.TrimSpace(request.Source) == "" {
+		return nil, errors.New("source must not be empty")
+	}
+	if strings.TrimSpace(request.IdempotencyKey) == "" {
+		return nil, errors.New("idempotencyKey must not be empty")
+	}
+	if strings.TrimSpace(request.Category) == "" {
+		return nil, errors.New("category must not be empty")
+	}
+	if strings.TrimSpace(request.Title) == "" {
+		return nil, errors.New("title must not be empty")
+	}
+
+	body, err := jsonBody(request)
+	if err != nil {
+		return nil, fmt.Errorf("encode body: %w", err)
+	}
+
+	req, err := c.newRequest(ctx, http.MethodPost, "/notifications.v1.NotificationsProducerService/CreateMessage", body)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	response := &CreateMessageResponse{}
+	if err := c.do(req, response, opts...); err != nil {
+		return nil, err
+	}
+	return response, nil
+}
+
+// RegisterPushDevice registers or updates a mobile push device.
+func (c *Client) RegisterPushDevice(ctx context.Context, request *RegisterPushDeviceRequest, opts ...RequestOpt) (*RegisterPushDeviceResponse, error) {
+	if request == nil {
+		return nil, errors.New("request must not be nil")
+	}
+	if strings.TrimSpace(request.DeviceID) == "" {
+		return nil, errors.New("deviceID must not be empty")
+	}
+	if strings.TrimSpace(request.Platform) == "" {
+		return nil, errors.New("platform must not be empty")
+	}
+	if strings.TrimSpace(request.ExpoPushToken) == "" {
+		return nil, errors.New("expoPushToken must not be empty")
+	}
+
+	body, err := jsonBody(request)
+	if err != nil {
+		return nil, fmt.Errorf("encode body: %w", err)
+	}
+
+	req, err := c.newRequest(ctx, http.MethodPost, "/v1/notifications/devices", body)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	response := &RegisterPushDeviceResponse{}
+	if err := c.do(req, response, opts...); err != nil {
+		return nil, err
+	}
+	return response, nil
+}
+
+// UnregisterPushDevice disables a mobile push device.
+func (c *Client) UnregisterPushDevice(ctx context.Context, request *UnregisterPushDeviceRequest, opts ...RequestOpt) (*UnregisterPushDeviceResponse, error) {
+	if request == nil {
+		return nil, errors.New("request must not be nil")
+	}
+	deviceID := strings.TrimSpace(request.DeviceID)
+	if deviceID == "" {
+		return nil, errors.New("deviceID must not be empty")
+	}
+
+	path := fmt.Sprintf("/v1/notifications/devices/%s", url.PathEscape(deviceID))
+	req, err := c.newRequest(ctx, http.MethodDelete, path, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UnregisterPushDeviceResponse{}
+	if err := c.do(req, response, opts...); err != nil {
+		return nil, err
+	}
+	return response, nil
+}
+
+// GetNotificationPreferences returns notification channel preferences.
+func (c *Client) GetNotificationPreferences(ctx context.Context, opts ...RequestOpt) (*GetNotificationPreferencesResponse, error) {
+	req, err := c.newRequest(ctx, http.MethodGet, "/v1/notifications/preferences", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetNotificationPreferencesResponse{}
+	if err := c.do(req, response, opts...); err != nil {
+		return nil, err
+	}
+	return response, nil
+}
+
+// UpdateNotificationPreferences updates notification channel preferences.
+func (c *Client) UpdateNotificationPreferences(ctx context.Context, request *UpdateNotificationPreferencesRequest, opts ...RequestOpt) (*UpdateNotificationPreferencesResponse, error) {
+	if request == nil {
+		return nil, errors.New("request must not be nil")
+	}
+
+	body, err := jsonBody(request)
+	if err != nil {
+		return nil, fmt.Errorf("encode body: %w", err)
+	}
+
+	req, err := c.newRequest(ctx, http.MethodPut, "/v1/notifications/preferences", body)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	response := &UpdateNotificationPreferencesResponse{}
+	if err := c.do(req, response, opts...); err != nil {
+		return nil, err
+	}
+	return response, nil
 }
 
 // ListInbox lists notifications for the authenticated user.

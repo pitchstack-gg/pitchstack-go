@@ -141,9 +141,17 @@ func TestClientSearchDecks(t *testing.T) {
 		require.Equal(t, "aggro", query.Get("searchTerm"))
 		require.Equal(t, "10", query.Get("pageSize"))
 		require.Equal(t, "token", query.Get("nextToken"))
+		require.Equal(t, string(DeckKindReference), query.Get("deckKind"))
+		require.Equal(t, string(DeckSourceKindPrecon), query.Get("sourceKind"))
+		require.Equal(t, "precon-1", query.Get("sourceReference"))
 
 		require.NoError(t, json.NewEncoder(w).Encode(SearchDecksResponse{
-			Decks: []Deck{{ID: "deck-1"}},
+			Decks: []Deck{{
+				ID:              "deck-1",
+				DeckKind:        DeckKindReference,
+				SourceKind:      DeckSourceKindPrecon,
+				SourceReference: "precon-1",
+			}},
 		}))
 	}))
 	t.Cleanup(server.Close)
@@ -151,14 +159,18 @@ func TestClientSearchDecks(t *testing.T) {
 	client := newTestClient(t, WithBaseURL(server.URL), WithHTTPClient(server.Client()))
 	pageSize := int32(10)
 	resp, err := client.SearchDecks(context.Background(), &SearchDecksRequest{
-		HeroID:     "hero-1",
-		Format:     "cc",
-		SearchTerm: "aggro",
-		PageSize:   &pageSize,
-		NextToken:  "token",
+		HeroID:          "hero-1",
+		Format:          "cc",
+		SearchTerm:      "aggro",
+		PageSize:        &pageSize,
+		NextToken:       "token",
+		DeckKind:        DeckKindReference,
+		SourceKind:      DeckSourceKindPrecon,
+		SourceReference: "precon-1",
 	})
 	require.NoError(t, err)
 	require.Len(t, resp.Decks, 1)
+	require.Equal(t, DeckKindReference, resp.Decks[0].DeckKind)
 }
 
 func TestClientGetDeck(t *testing.T) {

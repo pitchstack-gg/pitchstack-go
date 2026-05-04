@@ -342,7 +342,7 @@ func (c *Client) ListRecommendedArticles(ctx context.Context, request *ListRecom
 		request = &ListRecommendedArticlesRequest{}
 	}
 
-	req, err := c.newRequest(ctx, http.MethodGet, "/v1/news/recommended", nil)
+	req, err := c.newRequest(ctx, http.MethodGet, "/v1/news/recommendations", nil)
 	if err != nil {
 		return nil, err
 	}
@@ -374,7 +374,7 @@ func (c *Client) GetArticle(ctx context.Context, request *GetArticleRequest, opt
 		return nil, errors.New("articleID must not be empty")
 	}
 
-	path := fmt.Sprintf("/v1/news/%s", url.PathEscape(articleID))
+	path := fmt.Sprintf("/v1/news/articles/%s", url.PathEscape(articleID))
 	req, err := c.newRequest(ctx, http.MethodGet, path, nil)
 	if err != nil {
 		return nil, err
@@ -415,7 +415,7 @@ func (c *Client) TrackArticleImpression(ctx context.Context, request *TrackArtic
 		return nil, fmt.Errorf("encode body: %w", err)
 	}
 
-	path := fmt.Sprintf("/v1/news/%s:trackImpression", url.PathEscape(articleID))
+	path := fmt.Sprintf("/v1/news/articles/%s:trackImpression", url.PathEscape(articleID))
 	req, err := c.newRequest(ctx, http.MethodPost, path, body)
 	if err != nil {
 		return nil, err
@@ -459,7 +459,7 @@ func (c *Client) TrackArticleClick(ctx context.Context, request *TrackArticleCli
 		return nil, fmt.Errorf("encode body: %w", err)
 	}
 
-	path := fmt.Sprintf("/v1/news/%s:trackClick", url.PathEscape(articleID))
+	path := fmt.Sprintf("/v1/news/articles/%s:trackClick", url.PathEscape(articleID))
 	req, err := c.newRequest(ctx, http.MethodPost, path, body)
 	if err != nil {
 		return nil, err

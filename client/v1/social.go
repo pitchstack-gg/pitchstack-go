@@ -82,8 +82,8 @@ type GetFollowStatsRequest struct {
 
 // GetFollowStatsResponse returns follower/following totals.
 type GetFollowStatsResponse struct {
-	Followers int64            `json:"followers,omitempty"`
-	Following int64            `json:"following,omitempty"`
+	Followers int64            `json:"followers,omitempty,string"`
+	Following int64            `json:"following,omitempty,string"`
 	Metadata  ResponseMetadata `json:"-"`
 }
 
@@ -141,7 +141,7 @@ type ActivityItem struct {
 	TargetGroupID   string         `json:"targetGroupId,omitempty"`
 	Summary         string         `json:"summary,omitempty"`
 	Metadata        map[string]any `json:"metadata,omitempty"`
-	Count           int64          `json:"count,omitempty"`
+	Count           int64          `json:"count,omitempty,string"`
 	FirstOccurredAt *time.Time     `json:"firstOccurredAt,omitempty"`
 	LastOccurredAt  *time.Time     `json:"lastOccurredAt,omitempty"`
 	CreatedAt       *time.Time     `json:"createdAt,omitempty"`

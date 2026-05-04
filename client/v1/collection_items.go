@@ -96,13 +96,35 @@ func (r *CreateCollectionItemResponse) setMetadata(metadata ResponseMetadata) {
 	r.Metadata = metadata
 }
 
+// AdjustCollectionItemQuantityRequest adjusts a collection item quantity by product.
+type AdjustCollectionItemQuantityRequest struct {
+	CollectionID     string    `json:"collectionId,omitempty"`
+	ProductID        string    `json:"productId,omitempty"`
+	Condition        Condition `json:"condition,omitempty"`
+	QuantityDelta    int32     `json:"quantityDelta,omitempty"`
+	ItemID           string    `json:"itemId,omitempty"`
+	ClientMutationID string    `json:"clientMutationId,omitempty"`
+}
+
+// AdjustCollectionItemQuantityResponse returns the adjusted item.
+type AdjustCollectionItemQuantityResponse struct {
+	Item     *CollectionItem  `json:"item,omitempty"`
+	Metadata ResponseMetadata `json:"-"`
+}
+
+func (r *AdjustCollectionItemQuantityResponse) setMetadata(metadata ResponseMetadata) {
+	r.Metadata = metadata
+}
+
 // UpdateCollectionItemRequest adjusts quantity or condition for an item.
 type UpdateCollectionItemRequest struct {
-	ItemID    string     `json:"-"`
-	Quantity  *int32     `json:"quantity,omitempty"`
-	Condition *Condition `json:"condition,omitempty"`
-	Value     *float64   `json:"value,omitempty"`
-	Pinned    *bool      `json:"pinned,omitempty"`
+	ItemID            string     `json:"-"`
+	Quantity          *int32     `json:"quantity,omitempty"`
+	Condition         *Condition `json:"condition,omitempty"`
+	Value             *float64   `json:"value,omitempty"`
+	Pinned            *bool      `json:"pinned,omitempty"`
+	ExpectedUpdatedAt *time.Time `json:"expectedUpdatedAt,omitempty"`
+	ClientMutationID  string     `json:"clientMutationId,omitempty"`
 }
 
 // UpdateCollectionItemResponse returns the updated item.
@@ -252,6 +274,40 @@ func (c *Client) CreateCollectionItem(ctx context.Context, request *CreateCollec
 	return response, nil
 }
 
+// AdjustCollectionItemQuantity adjusts a collection item quantity by product.
+func (c *Client) AdjustCollectionItemQuantity(ctx context.Context, request *AdjustCollectionItemQuantityRequest, opts ...RequestOpt) (*AdjustCollectionItemQuantityResponse, error) {
+	if request == nil {
+		return nil, errors.New("request must not be nil")
+	}
+	if strings.TrimSpace(request.CollectionID) == "" {
+		return nil, errors.New("collectionID must not be empty")
+	}
+	if strings.TrimSpace(request.ProductID) == "" {
+		return nil, errors.New("productID must not be empty")
+	}
+	if request.QuantityDelta == 0 {
+		return nil, errors.New("quantityDelta must not be zero")
+	}
+
+	body, err := jsonBody(request)
+	if err != nil {
+		return nil, fmt.Errorf("encode body: %w", err)
+	}
+
+	req, err := c.newRequest(ctx, http.MethodPost, "/v1/collection_items:adjustQuantity", body)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	response := &AdjustCollectionItemQuantityResponse{}
+	if err := c.do(req, response, opts...); err != nil {
+		return nil, err
+	}
+
+	return response, nil
+}
+
 // UpdateCollectionItem modifies an existing collection item.
 func (c *Client) UpdateCollectionItem(ctx context.Context, request *UpdateCollectionItemRequest, opts ...RequestOpt) (*UpdateCollectionItemResponse, error) {
 	if request == nil {
@@ -262,15 +318,19 @@ func (c *Client) UpdateCollectionItem(ctx context.Context, request *UpdateCollec
 	}
 
 	body, err := jsonBody(struct {
-		Quantity  *int32     `json:"quantity,omitempty"`
-		Condition *Condition `json:"condition,omitempty"`
-		Value     *float64   `json:"value,omitempty"`
-		Pinned    *bool      `json:"pinned,omitempty"`
+		Quantity          *int32     `json:"quantity,omitempty"`
+		Condition         *Condition `json:"condition,omitempty"`
+		Value             *float64   `json:"value,omitempty"`
+		Pinned            *bool      `json:"pinned,omitempty"`
+		ExpectedUpdatedAt *time.Time `json:"expectedUpdatedAt,omitempty"`
+		ClientMutationID  string     `json:"clientMutationId,omitempty"`
 	}{
-		Quantity:  request.Quantity,
-		Condition: request.Condition,
-		Value:     request.Value,
-		Pinned:    request.Pinned,
+		Quantity:          request.Quantity,
+		Condition:         request.Condition,
+		Value:             request.Value,
+		Pinned:            request.Pinned,
+		ExpectedUpdatedAt: request.ExpectedUpdatedAt,
+		ClientMutationID:  strings.TrimSpace(request.ClientMutationID),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("encode body: %w", err)

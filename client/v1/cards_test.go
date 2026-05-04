@@ -343,6 +343,166 @@ func TestClientBatchGetProducts(t *testing.T) {
 	})
 }
 
+func TestClientListProducts(t *testing.T) {
+	t.Run("when filters provided, then query parameters are set and response decoded", func(t *testing.T) {
+		pageSize := int32(25)
+		handler := func(w http.ResponseWriter, r *http.Request) {
+			require.Equal(t, "/v1/products", r.URL.Path)
+			require.Equal(t, "pack", r.URL.Query().Get("type"))
+			require.Equal(t, "WTR", r.URL.Query().Get("setCode"))
+			require.Equal(t, "WTR", r.URL.Query().Get("productGroupId"))
+			require.Equal(t, "card-1", r.URL.Query().Get("cardId"))
+			require.Equal(t, "printing-1", r.URL.Query().Get("printingId"))
+			require.Equal(t, "25", r.URL.Query().Get("pageSize"))
+			require.Equal(t, "token-1", r.URL.Query().Get("nextToken"))
+
+			resp := ListProductsResponse{
+				Summaries: []ProductSummary{{Identifier: "prod-1", Type: "pack", ProductGroupID: "WTR"}},
+				NextToken: "token-2",
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(resp)
+		}
+		server := httptest.NewServer(http.HandlerFunc(handler))
+		t.Cleanup(server.Close)
+
+		client := newTestClient(t, WithBaseURL(server.URL), WithHTTPClient(server.Client()))
+		resp, err := client.ListProducts(context.Background(), &ListProductsRequest{
+			Type:           "pack",
+			SetCode:        "WTR",
+			ProductGroupID: "WTR",
+			CardID:         "card-1",
+			PrintingID:     "printing-1",
+			PageSize:       &pageSize,
+			NextToken:      "token-1",
+		})
+		require.NoError(t, err)
+		require.Len(t, resp.Summaries, 1)
+		require.Equal(t, "pack", resp.Summaries[0].Type)
+		require.Equal(t, "WTR", resp.Summaries[0].ProductGroupID)
+		require.Equal(t, "token-2", resp.NextToken)
+	})
+
+	t.Run("when request is nil, then defaults applied", func(t *testing.T) {
+		handler := func(w http.ResponseWriter, r *http.Request) {
+			require.Empty(t, r.URL.RawQuery)
+			resp := ListProductsResponse{}
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(resp)
+		}
+		server := httptest.NewServer(http.HandlerFunc(handler))
+		t.Cleanup(server.Close)
+
+		client := newTestClient(t, WithBaseURL(server.URL), WithHTTPClient(server.Client()))
+		resp, err := client.ListProducts(context.Background(), nil)
+		require.NoError(t, err)
+		require.NotNil(t, resp)
+	})
+}
+
+func TestClientGetSet(t *testing.T) {
+	t.Run("when set code provided, then summary returned", func(t *testing.T) {
+		handler := func(w http.ResponseWriter, r *http.Request) {
+			require.Equal(t, "/v1/sets/WTR", r.URL.Path)
+			resp := GetSetResponse{Summary: &SetSummary{Code: "WTR", Name: "Welcome to Rathe"}}
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(resp)
+		}
+		server := httptest.NewServer(http.HandlerFunc(handler))
+		t.Cleanup(server.Close)
+
+		client := newTestClient(t, WithBaseURL(server.URL), WithHTTPClient(server.Client()))
+		resp, err := client.GetSet(context.Background(), &GetSetRequest{SetCode: "WTR"})
+		require.NoError(t, err)
+		require.Equal(t, "WTR", resp.Summary.Code)
+	})
+
+	t.Run("when set code missing, then returns error", func(t *testing.T) {
+		client := newTestClient(t)
+		resp, err := client.GetSet(context.Background(), &GetSetRequest{})
+		require.Error(t, err)
+		require.Nil(t, resp)
+	})
+}
+
+func TestClientListSets(t *testing.T) {
+	t.Run("when filters provided, then query params are set", func(t *testing.T) {
+		pageSize := int32(10)
+		handler := func(w http.ResponseWriter, r *http.Request) {
+			require.Equal(t, "/v1/sets", r.URL.Path)
+			require.Equal(t, "10", r.URL.Query().Get("pageSize"))
+			require.Equal(t, "token-1", r.URL.Query().Get("nextToken"))
+
+			resp := ListSetsResponse{
+				Summaries: []SetSummary{{Code: "WTR", Name: "Welcome to Rathe"}},
+				NextToken: "token-2",
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(resp)
+		}
+		server := httptest.NewServer(http.HandlerFunc(handler))
+		t.Cleanup(server.Close)
+
+		client := newTestClient(t, WithBaseURL(server.URL), WithHTTPClient(server.Client()))
+		resp, err := client.ListSets(context.Background(), &ListSetsRequest{PageSize: &pageSize, NextToken: "token-1"})
+		require.NoError(t, err)
+		require.Len(t, resp.Summaries, 1)
+		require.Equal(t, "WTR", resp.Summaries[0].Code)
+		require.Equal(t, "token-2", resp.NextToken)
+	})
+
+	t.Run("when request is nil, then defaults applied", func(t *testing.T) {
+		handler := func(w http.ResponseWriter, r *http.Request) {
+			require.Empty(t, r.URL.RawQuery)
+			resp := ListSetsResponse{}
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(resp)
+		}
+		server := httptest.NewServer(http.HandlerFunc(handler))
+		t.Cleanup(server.Close)
+
+		client := newTestClient(t, WithBaseURL(server.URL), WithHTTPClient(server.Client()))
+		resp, err := client.ListSets(context.Background(), nil)
+		require.NoError(t, err)
+		require.NotNil(t, resp)
+	})
+}
+
+func TestClientBatchGetSets(t *testing.T) {
+	t.Run("when set codes provided, then sets returned", func(t *testing.T) {
+		handler := func(w http.ResponseWriter, r *http.Request) {
+			var body BatchGetSetsRequest
+			require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+			require.ElementsMatch(t, []string{"WTR", "ARC"}, body.SetCodes)
+			require.True(t, body.AllowPartial)
+
+			resp := BatchGetSetsResponse{
+				Sets: map[string]SetSummary{"WTR": {Code: "WTR", Name: "Welcome to Rathe"}},
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(resp)
+		}
+		server := httptest.NewServer(http.HandlerFunc(handler))
+		t.Cleanup(server.Close)
+
+		client := newTestClient(t, WithBaseURL(server.URL), WithHTTPClient(server.Client()))
+		resp, err := client.BatchGetSets(context.Background(), &BatchGetSetsRequest{
+			SetCodes:     []string{"WTR", "ARC"},
+			AllowPartial: true,
+		})
+		require.NoError(t, err)
+		require.Len(t, resp.Sets, 1)
+		require.Equal(t, "WTR", resp.Sets["WTR"].Code)
+	})
+
+	t.Run("when request is nil, then returns error", func(t *testing.T) {
+		client := newTestClient(t)
+		resp, err := client.BatchGetSets(context.Background(), nil)
+		require.Error(t, err)
+		require.Nil(t, resp)
+	})
+}
+
 func TestClientGetDataSnapshot(t *testing.T) {
 	t.Run("when version filters provided, then query string set", func(t *testing.T) {
 		schemaVersion := int32(3)
