@@ -213,6 +213,24 @@ func TestClientGetDeckAccess(t *testing.T) {
 	require.Error(t, err)
 }
 
+func TestClientStopDeckShare(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, http.MethodPost, r.Method)
+		require.Equal(t, "/v1/decks/deck-1/access:stop", r.URL.Path)
+		w.WriteHeader(http.StatusOK)
+	}))
+	t.Cleanup(server.Close)
+
+	client := newTestClient(t, WithBaseURL(server.URL), WithHTTPClient(server.Client()))
+	resp, err := client.StopDeckShare(context.Background(), &StopDeckShareRequest{DeckID: "deck-1"})
+	require.NoError(t, err)
+	require.Equal(t, http.StatusOK, resp.Metadata.StatusCode)
+
+	resp, err = client.StopDeckShare(context.Background(), &StopDeckShareRequest{})
+	require.Nil(t, resp)
+	require.Error(t, err)
+}
+
 func TestClientListDeckAccessGrants(t *testing.T) {
 	pageSize := int32(5)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

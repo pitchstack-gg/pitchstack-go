@@ -506,6 +506,24 @@ func TestClientGetCollectionAccess(t *testing.T) {
 	})
 }
 
+func TestClientStopCollectionShare(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, http.MethodPost, r.Method)
+		require.Equal(t, "/v1/collections/col-1/access:stop", r.URL.Path)
+		w.WriteHeader(http.StatusOK)
+	}))
+	t.Cleanup(server.Close)
+
+	client := newTestClient(t, WithBaseURL(server.URL), WithHTTPClient(server.Client()))
+	resp, err := client.StopCollectionShare(context.Background(), &StopCollectionShareRequest{CollectionID: "col-1"})
+	require.NoError(t, err)
+	require.Equal(t, http.StatusOK, resp.Metadata.StatusCode)
+
+	resp, err = client.StopCollectionShare(context.Background(), &StopCollectionShareRequest{})
+	require.Nil(t, resp)
+	require.Error(t, err)
+}
+
 func TestClientListCollectionAccessGrants(t *testing.T) {
 	t.Run("when request includes pagination, then query and grants are returned", func(t *testing.T) {
 		pageSize := int32(10)

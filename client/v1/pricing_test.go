@@ -141,3 +141,59 @@ func TestClientBatchGetProductPrices(t *testing.T) {
 		require.Nil(t, resp)
 	})
 }
+
+func TestClientProductPriceWatches(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/price-watches":
+			require.Equal(t, "true", r.URL.Query().Get("activeOnly"))
+			require.Equal(t, []string{"prod-1", "prod-2"}, r.URL.Query()["productIds"])
+			require.NoError(t, json.NewEncoder(w).Encode(ListProductPriceWatchesResponse{
+				Watches: []ProductPriceWatch{{WatchID: "watch-1", ProductID: "prod-1"}},
+			}))
+		case r.Method == http.MethodPost && r.URL.Path == "/v1/price-watches":
+			var payload CreateProductPriceWatchRequest
+			require.NoError(t, json.NewDecoder(r.Body).Decode(&payload))
+			require.Equal(t, "prod-1", payload.ProductID)
+			require.Equal(t, "down", payload.Direction)
+			require.NoError(t, json.NewEncoder(w).Encode(CreateProductPriceWatchResponse{Watch: &ProductPriceWatch{WatchID: "watch-1"}}))
+		case r.Method == http.MethodPatch && r.URL.Path == "/v1/price-watches/watch-1":
+			var payload UpdateProductPriceWatchRequest
+			require.NoError(t, json.NewDecoder(r.Body).Decode(&payload))
+			require.NotNil(t, payload.Active)
+			require.NoError(t, json.NewEncoder(w).Encode(UpdateProductPriceWatchResponse{Watch: &ProductPriceWatch{WatchID: "watch-1", Active: *payload.Active}}))
+		case r.Method == http.MethodDelete && r.URL.Path == "/v1/price-watches/watch-1":
+			w.WriteHeader(http.StatusOK)
+		default:
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.Path)
+		}
+	}))
+	t.Cleanup(server.Close)
+
+	client := newTestClient(t, WithBaseURL(server.URL), WithHTTPClient(server.Client()))
+	activeOnly := true
+	listResp, err := client.ListProductPriceWatches(context.Background(), &ListProductPriceWatchesRequest{
+		ActiveOnly: &activeOnly,
+		ProductIDs: []string{"prod-1", "prod-2"},
+	})
+	require.NoError(t, err)
+	require.Len(t, listResp.Watches, 1)
+
+	createResp, err := client.CreateProductPriceWatch(context.Background(), &CreateProductPriceWatchRequest{
+		ProductID: "prod-1",
+		Source:    "TCGPlayer",
+		Direction: "down",
+		Period:    "7d",
+	})
+	require.NoError(t, err)
+	require.Equal(t, "watch-1", createResp.Watch.WatchID)
+
+	active := false
+	updateResp, err := client.UpdateProductPriceWatch(context.Background(), &UpdateProductPriceWatchRequest{WatchID: "watch-1", Active: &active})
+	require.NoError(t, err)
+	require.False(t, updateResp.Watch.Active)
+
+	deleteResp, err := client.DeleteProductPriceWatch(context.Background(), &DeleteProductPriceWatchRequest{WatchID: "watch-1"})
+	require.NoError(t, err)
+	require.Equal(t, http.StatusOK, deleteResp.Metadata.StatusCode)
+}

@@ -11,6 +11,22 @@ import (
 )
 
 func TestClientNews(t *testing.T) {
+	t.Run("list news sources", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			require.Equal(t, http.MethodGet, r.Method)
+			require.Equal(t, "/v1/news/sources", r.URL.Path)
+			require.NoError(t, json.NewEncoder(w).Encode(ListNewsSourcesResponse{
+				Sources: []NewsSource{{SourceID: "source-1", SourceKey: "official"}},
+			}))
+		}))
+		t.Cleanup(server.Close)
+
+		client := newTestClient(t, WithBaseURL(server.URL), WithHTTPClient(server.Client()))
+		resp, err := client.ListNewsSources(context.Background())
+		require.NoError(t, err)
+		require.Equal(t, "official", resp.Sources[0].SourceKey)
+	})
+
 	t.Run("list recommended articles", func(t *testing.T) {
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			require.Equal(t, http.MethodGet, r.Method)

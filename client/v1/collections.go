@@ -369,6 +369,20 @@ func (r *GetCollectionAccessResponse) setMetadata(metadata ResponseMetadata) {
 	r.Metadata = metadata
 }
 
+// StopCollectionShareRequest removes all explicit shares for a collection.
+type StopCollectionShareRequest struct {
+	CollectionID string `json:"-"`
+}
+
+// StopCollectionShareResponse captures metadata for stop-share operations.
+type StopCollectionShareResponse struct {
+	Metadata ResponseMetadata `json:"-"`
+}
+
+func (r *StopCollectionShareResponse) setMetadata(metadata ResponseMetadata) {
+	r.Metadata = metadata
+}
+
 // ListCollectionAccessGrantsRequest lists subjects explicitly granted access to a collection.
 type ListCollectionAccessGrantsRequest struct {
 	CollectionID string `json:"-"`
@@ -752,6 +766,36 @@ func (c *Client) GetCollectionAccess(ctx context.Context, request *GetCollection
 	}
 
 	response := &GetCollectionAccessResponse{}
+	if err := c.do(req, response, opts...); err != nil {
+		return nil, err
+	}
+
+	return response, nil
+}
+
+// StopCollectionShare removes all explicit shares for a collection.
+func (c *Client) StopCollectionShare(ctx context.Context, request *StopCollectionShareRequest, opts ...RequestOpt) (*StopCollectionShareResponse, error) {
+	if request == nil {
+		return nil, errors.New("request must not be nil")
+	}
+	collectionID := strings.TrimSpace(request.CollectionID)
+	if collectionID == "" {
+		return nil, errors.New("collectionID must not be empty")
+	}
+
+	body, err := jsonBody(struct{}{})
+	if err != nil {
+		return nil, fmt.Errorf("encode body: %w", err)
+	}
+
+	path := fmt.Sprintf("/v1/collections/%s/access:stop", url.PathEscape(collectionID))
+	req, err := c.newRequest(ctx, http.MethodPost, path, body)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	response := &StopCollectionShareResponse{}
 	if err := c.do(req, response, opts...); err != nil {
 		return nil, err
 	}

@@ -100,6 +100,53 @@ func TestClientPushDevicesAndPreferences(t *testing.T) {
 	require.Equal(t, "social", updateResp.Preferences[0].Category)
 }
 
+func TestClientNotificationTopicSubscriptions(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			require.Equal(t, "/v1/notifications/topic-subscriptions", r.URL.Path)
+			require.Equal(t, "news", r.URL.Query().Get("category"))
+			require.Equal(t, "source", r.URL.Query().Get("topicType"))
+			require.NoError(t, json.NewEncoder(w).Encode(GetNotificationTopicSubscriptionsResponse{
+				TopicIDs: []string{"source-1"},
+				Subscriptions: []NotificationTopicSubscription{{
+					Category:  "news",
+					TopicType: "source",
+					TopicID:   "source-1",
+				}},
+			}))
+		case http.MethodPut:
+			require.Equal(t, "/v1/notifications/topic-subscriptions", r.URL.Path)
+			var payload UpdateNotificationTopicSubscriptionsRequest
+			require.NoError(t, json.NewDecoder(r.Body).Decode(&payload))
+			require.Equal(t, "news", payload.Category)
+			require.Equal(t, []string{"source-1"}, payload.TopicIDs)
+			require.NoError(t, json.NewEncoder(w).Encode(UpdateNotificationTopicSubscriptionsResponse{
+				TopicIDs: payload.TopicIDs,
+			}))
+		default:
+			t.Fatalf("unexpected method: %s", r.Method)
+		}
+	}))
+	t.Cleanup(server.Close)
+
+	client := newTestClient(t, WithBaseURL(server.URL), WithHTTPClient(server.Client()))
+	getResp, err := client.GetNotificationTopicSubscriptions(context.Background(), &GetNotificationTopicSubscriptionsRequest{
+		Category:  "news",
+		TopicType: "source",
+	})
+	require.NoError(t, err)
+	require.Equal(t, []string{"source-1"}, getResp.TopicIDs)
+
+	updateResp, err := client.UpdateNotificationTopicSubscriptions(context.Background(), &UpdateNotificationTopicSubscriptionsRequest{
+		Category:  "news",
+		TopicType: "source",
+		TopicIDs:  []string{"source-1"},
+	})
+	require.NoError(t, err)
+	require.Equal(t, []string{"source-1"}, updateResp.TopicIDs)
+}
+
 func TestClientListInbox(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		require.Equal(t, http.MethodGet, r.Method)

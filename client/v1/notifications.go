@@ -51,6 +51,14 @@ type NotificationPreference struct {
 	EmailEnabled bool   `json:"emailEnabled,omitempty"`
 }
 
+// NotificationTopicSubscription represents a category/topic subscription.
+type NotificationTopicSubscription struct {
+	Category  string     `json:"category,omitempty"`
+	TopicType string     `json:"topicType,omitempty"`
+	TopicID   string     `json:"topicId,omitempty"`
+	CreatedAt *time.Time `json:"createdAt,omitempty"`
+}
+
 // CreateMessageRequest submits a producer message for a target user inbox.
 type CreateMessageRequest struct {
 	TargetUserID   string               `json:"targetUserId,omitempty"`
@@ -130,6 +138,41 @@ type UpdateNotificationPreferencesResponse struct {
 }
 
 func (r *UpdateNotificationPreferencesResponse) setMetadata(metadata ResponseMetadata) {
+	r.Metadata = metadata
+}
+
+// GetNotificationTopicSubscriptionsRequest filters topic subscriptions.
+type GetNotificationTopicSubscriptionsRequest struct {
+	Category  string
+	TopicType string
+}
+
+// GetNotificationTopicSubscriptionsResponse returns topic subscriptions.
+type GetNotificationTopicSubscriptionsResponse struct {
+	TopicIDs      []string                        `json:"topicIds,omitempty"`
+	Subscriptions []NotificationTopicSubscription `json:"subscriptions,omitempty"`
+	Metadata      ResponseMetadata                `json:"-"`
+}
+
+func (r *GetNotificationTopicSubscriptionsResponse) setMetadata(metadata ResponseMetadata) {
+	r.Metadata = metadata
+}
+
+// UpdateNotificationTopicSubscriptionsRequest replaces topic subscriptions.
+type UpdateNotificationTopicSubscriptionsRequest struct {
+	Category  string   `json:"category,omitempty"`
+	TopicType string   `json:"topicType,omitempty"`
+	TopicIDs  []string `json:"topicIds,omitempty"`
+}
+
+// UpdateNotificationTopicSubscriptionsResponse returns updated topic subscriptions.
+type UpdateNotificationTopicSubscriptionsResponse struct {
+	TopicIDs      []string                        `json:"topicIds,omitempty"`
+	Subscriptions []NotificationTopicSubscription `json:"subscriptions,omitempty"`
+	Metadata      ResponseMetadata                `json:"-"`
+}
+
+func (r *UpdateNotificationTopicSubscriptionsResponse) setMetadata(metadata ResponseMetadata) {
 	r.Metadata = metadata
 }
 
@@ -338,6 +381,59 @@ func (c *Client) UpdateNotificationPreferences(ctx context.Context, request *Upd
 	req.Header.Set("Content-Type", "application/json")
 
 	response := &UpdateNotificationPreferencesResponse{}
+	if err := c.do(req, response, opts...); err != nil {
+		return nil, err
+	}
+	return response, nil
+}
+
+// GetNotificationTopicSubscriptions returns topic subscriptions.
+func (c *Client) GetNotificationTopicSubscriptions(ctx context.Context, request *GetNotificationTopicSubscriptionsRequest, opts ...RequestOpt) (*GetNotificationTopicSubscriptionsResponse, error) {
+	if request == nil {
+		request = &GetNotificationTopicSubscriptionsRequest{}
+	}
+
+	req, err := c.newRequest(ctx, http.MethodGet, "/v1/notifications/topic-subscriptions", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	query := req.URL.Query()
+	setQueryString(query, "category", request.Category)
+	setQueryString(query, "topicType", request.TopicType)
+	req.URL.RawQuery = query.Encode()
+
+	response := &GetNotificationTopicSubscriptionsResponse{}
+	if err := c.do(req, response, opts...); err != nil {
+		return nil, err
+	}
+	return response, nil
+}
+
+// UpdateNotificationTopicSubscriptions replaces topic subscriptions.
+func (c *Client) UpdateNotificationTopicSubscriptions(ctx context.Context, request *UpdateNotificationTopicSubscriptionsRequest, opts ...RequestOpt) (*UpdateNotificationTopicSubscriptionsResponse, error) {
+	if request == nil {
+		return nil, errors.New("request must not be nil")
+	}
+	if strings.TrimSpace(request.Category) == "" {
+		return nil, errors.New("category must not be empty")
+	}
+	if strings.TrimSpace(request.TopicType) == "" {
+		return nil, errors.New("topicType must not be empty")
+	}
+
+	body, err := jsonBody(request)
+	if err != nil {
+		return nil, fmt.Errorf("encode body: %w", err)
+	}
+
+	req, err := c.newRequest(ctx, http.MethodPut, "/v1/notifications/topic-subscriptions", body)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	response := &UpdateNotificationTopicSubscriptionsResponse{}
 	if err := c.do(req, response, opts...); err != nil {
 		return nil, err
 	}

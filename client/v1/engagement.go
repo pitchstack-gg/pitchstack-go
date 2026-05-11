@@ -32,10 +32,25 @@ const (
 	TrackableResourceTypeUserProfile TrackableResourceType = "TRACKABLE_RESOURCE_TYPE_USER_PROFILE"
 )
 
+// LikeableResourceType represents engagement.v1.LikeableResourceType.
+type LikeableResourceType string
+
+const (
+	LikeableResourceTypeUnspecified LikeableResourceType = "LIKEABLE_RESOURCE_TYPE_UNSPECIFIED"
+	LikeableResourceTypeDeck        LikeableResourceType = "LIKEABLE_RESOURCE_TYPE_DECK"
+	LikeableResourceTypeCollection  LikeableResourceType = "LIKEABLE_RESOURCE_TYPE_COLLECTION"
+)
+
 // EngagementResourceRef mirrors engagement.v1.ResourceRef.
 type EngagementResourceRef struct {
 	ResourceType TrackableResourceType `json:"resourceType,omitempty"`
 	ResourceID   string                `json:"resourceId,omitempty"`
+}
+
+// LikeableResourceRef mirrors engagement.v1.LikeableResourceRef.
+type LikeableResourceRef struct {
+	ResourceType LikeableResourceType `json:"resourceType,omitempty"`
+	ResourceID   string               `json:"resourceId,omitempty"`
 }
 
 // TrackViewRequest mirrors engagement.v1.TrackViewRequest.
@@ -180,6 +195,139 @@ func (r *BatchGetViewCountsResponse) setMetadata(metadata ResponseMetadata) {
 	r.Metadata = metadata
 }
 
+// LikeResourceRequest likes a resource.
+type LikeResourceRequest struct {
+	Resource *LikeableResourceRef `json:"resource,omitempty"`
+}
+
+// LikeResourceResponse returns like state after a like operation.
+type LikeResourceResponse struct {
+	Resource   *LikeableResourceRef `json:"resource,omitempty"`
+	Liked      bool                 `json:"liked,omitempty"`
+	TotalLikes int64                `json:"totalLikes,omitempty"`
+	Changed    bool                 `json:"changed,omitempty"`
+	Metadata   ResponseMetadata     `json:"-"`
+}
+
+func (r *LikeResourceResponse) setMetadata(metadata ResponseMetadata) {
+	r.Metadata = metadata
+}
+
+func (r *LikeResourceResponse) UnmarshalJSON(data []byte) error {
+	type rawLikeResourceResponse struct {
+		Resource   *LikeableResourceRef `json:"resource,omitempty"`
+		Liked      bool                 `json:"liked,omitempty"`
+		TotalLikes json.RawMessage      `json:"totalLikes,omitempty"`
+		Changed    bool                 `json:"changed,omitempty"`
+	}
+
+	var raw rawLikeResourceResponse
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	totalLikes, err := parseFlexibleInt64(raw.TotalLikes)
+	if err != nil {
+		return fmt.Errorf("totalLikes: %w", err)
+	}
+	r.Resource = raw.Resource
+	r.Liked = raw.Liked
+	r.TotalLikes = totalLikes
+	r.Changed = raw.Changed
+	return nil
+}
+
+// UnlikeResourceRequest unlikes a resource.
+type UnlikeResourceRequest struct {
+	Resource *LikeableResourceRef `json:"resource,omitempty"`
+}
+
+// UnlikeResourceResponse returns like state after an unlike operation.
+type UnlikeResourceResponse struct {
+	Resource   *LikeableResourceRef `json:"resource,omitempty"`
+	Liked      bool                 `json:"liked,omitempty"`
+	TotalLikes int64                `json:"totalLikes,omitempty"`
+	Changed    bool                 `json:"changed,omitempty"`
+	Metadata   ResponseMetadata     `json:"-"`
+}
+
+func (r *UnlikeResourceResponse) setMetadata(metadata ResponseMetadata) {
+	r.Metadata = metadata
+}
+
+func (r *UnlikeResourceResponse) UnmarshalJSON(data []byte) error {
+	var like LikeResourceResponse
+	if err := json.Unmarshal(data, &like); err != nil {
+		return err
+	}
+	r.Resource = like.Resource
+	r.Liked = like.Liked
+	r.TotalLikes = like.TotalLikes
+	r.Changed = like.Changed
+	return nil
+}
+
+// BatchGetLikeCountsRequest fetches like counts for resources.
+type BatchGetLikeCountsRequest struct {
+	Resources []LikeableResourceRef `json:"resources,omitempty"`
+}
+
+// ResourceLikeCount mirrors engagement.v1.ResourceLikeCount.
+type ResourceLikeCount struct {
+	Resource   *LikeableResourceRef `json:"resource,omitempty"`
+	TotalLikes int64                `json:"totalLikes,omitempty"`
+}
+
+func (r *ResourceLikeCount) UnmarshalJSON(data []byte) error {
+	type rawResourceLikeCount struct {
+		Resource   *LikeableResourceRef `json:"resource,omitempty"`
+		TotalLikes json.RawMessage      `json:"totalLikes,omitempty"`
+	}
+
+	var raw rawResourceLikeCount
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	totalLikes, err := parseFlexibleInt64(raw.TotalLikes)
+	if err != nil {
+		return fmt.Errorf("totalLikes: %w", err)
+	}
+	r.Resource = raw.Resource
+	r.TotalLikes = totalLikes
+	return nil
+}
+
+// BatchGetLikeCountsResponse returns like counts.
+type BatchGetLikeCountsResponse struct {
+	Counts   []ResourceLikeCount `json:"counts,omitempty"`
+	Metadata ResponseMetadata    `json:"-"`
+}
+
+func (r *BatchGetLikeCountsResponse) setMetadata(metadata ResponseMetadata) {
+	r.Metadata = metadata
+}
+
+// BatchGetViewerLikesRequest fetches viewer like states for resources.
+type BatchGetViewerLikesRequest struct {
+	Resources []LikeableResourceRef `json:"resources,omitempty"`
+}
+
+// ViewerLike mirrors engagement.v1.ViewerLike.
+type ViewerLike struct {
+	Resource *LikeableResourceRef `json:"resource,omitempty"`
+	Liked    bool                 `json:"liked,omitempty"`
+	LikedAt  *time.Time           `json:"likedAt,omitempty"`
+}
+
+// BatchGetViewerLikesResponse returns viewer like states.
+type BatchGetViewerLikesResponse struct {
+	Likes    []ViewerLike     `json:"likes,omitempty"`
+	Metadata ResponseMetadata `json:"-"`
+}
+
+func (r *BatchGetViewerLikesResponse) setMetadata(metadata ResponseMetadata) {
+	r.Metadata = metadata
+}
+
 // TrackView records a single resource view event.
 func (c *Client) TrackView(ctx context.Context, request *TrackViewRequest, opts ...RequestOpt) (*TrackViewResponse, error) {
 	if request == nil {
@@ -303,11 +451,144 @@ func (c *Client) BatchGetViewCounts(ctx context.Context, request *BatchGetViewCo
 	return response, nil
 }
 
+// LikeResource idempotently likes a resource.
+func (c *Client) LikeResource(ctx context.Context, request *LikeResourceRequest, opts ...RequestOpt) (*LikeResourceResponse, error) {
+	if request == nil {
+		return nil, errors.New("request must not be nil")
+	}
+	if err := validateLikeableResourceRef(request.Resource); err != nil {
+		return nil, err
+	}
+
+	body, err := jsonBody(request)
+	if err != nil {
+		return nil, fmt.Errorf("encode body: %w", err)
+	}
+
+	req, err := c.newRequest(ctx, http.MethodPost, "/v1/engagement/likes:like", body)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	response := &LikeResourceResponse{}
+	if err := c.do(req, response, opts...); err != nil {
+		return nil, err
+	}
+	return response, nil
+}
+
+// UnlikeResource idempotently removes a like from a resource.
+func (c *Client) UnlikeResource(ctx context.Context, request *UnlikeResourceRequest, opts ...RequestOpt) (*UnlikeResourceResponse, error) {
+	if request == nil {
+		return nil, errors.New("request must not be nil")
+	}
+	if err := validateLikeableResourceRef(request.Resource); err != nil {
+		return nil, err
+	}
+
+	body, err := jsonBody(request)
+	if err != nil {
+		return nil, fmt.Errorf("encode body: %w", err)
+	}
+
+	req, err := c.newRequest(ctx, http.MethodPost, "/v1/engagement/likes:unlike", body)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	response := &UnlikeResourceResponse{}
+	if err := c.do(req, response, opts...); err != nil {
+		return nil, err
+	}
+	return response, nil
+}
+
+// BatchGetLikeCounts retrieves aggregate like counts for multiple resources.
+func (c *Client) BatchGetLikeCounts(ctx context.Context, request *BatchGetLikeCountsRequest, opts ...RequestOpt) (*BatchGetLikeCountsResponse, error) {
+	if request == nil {
+		return nil, errors.New("request must not be nil")
+	}
+	if len(request.Resources) == 0 {
+		return nil, errors.New("resources must not be empty")
+	}
+	for i := range request.Resources {
+		ref := request.Resources[i]
+		if err := validateLikeableResourceRef(&ref); err != nil {
+			return nil, fmt.Errorf("resources[%d]: %w", i, err)
+		}
+	}
+
+	body, err := jsonBody(request)
+	if err != nil {
+		return nil, fmt.Errorf("encode body: %w", err)
+	}
+
+	req, err := c.newRequest(ctx, http.MethodPost, "/v1/engagement/likes:batchGetCounts", body)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	response := &BatchGetLikeCountsResponse{}
+	if err := c.do(req, response, opts...); err != nil {
+		return nil, err
+	}
+	return response, nil
+}
+
+// BatchGetViewerLikes retrieves whether the authenticated viewer liked resources.
+func (c *Client) BatchGetViewerLikes(ctx context.Context, request *BatchGetViewerLikesRequest, opts ...RequestOpt) (*BatchGetViewerLikesResponse, error) {
+	if request == nil {
+		return nil, errors.New("request must not be nil")
+	}
+	if len(request.Resources) == 0 {
+		return nil, errors.New("resources must not be empty")
+	}
+	for i := range request.Resources {
+		ref := request.Resources[i]
+		if err := validateLikeableResourceRef(&ref); err != nil {
+			return nil, fmt.Errorf("resources[%d]: %w", i, err)
+		}
+	}
+
+	body, err := jsonBody(request)
+	if err != nil {
+		return nil, fmt.Errorf("encode body: %w", err)
+	}
+
+	req, err := c.newRequest(ctx, http.MethodPost, "/v1/engagement/likes:batchGetViewerLikes", body)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	response := &BatchGetViewerLikesResponse{}
+	if err := c.do(req, response, opts...); err != nil {
+		return nil, err
+	}
+	return response, nil
+}
+
 func validateEngagementResourceRef(resource *EngagementResourceRef) error {
 	if resource == nil {
 		return errors.New("resource must be provided")
 	}
 	if strings.TrimSpace(string(resource.ResourceType)) == "" || resource.ResourceType == TrackableResourceTypeUnspecified {
+		return errors.New("resource.resourceType must be specified")
+	}
+	if strings.TrimSpace(resource.ResourceID) == "" {
+		return errors.New("resource.resourceID must not be empty")
+	}
+	return nil
+}
+
+func validateLikeableResourceRef(resource *LikeableResourceRef) error {
+	if resource == nil {
+		return errors.New("resource must be provided")
+	}
+	if strings.TrimSpace(string(resource.ResourceType)) == "" || resource.ResourceType == LikeableResourceTypeUnspecified {
 		return errors.New("resource.resourceType must be specified")
 	}
 	if strings.TrimSpace(resource.ResourceID) == "" {

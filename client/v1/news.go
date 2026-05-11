@@ -69,6 +69,7 @@ type NewsSource struct {
 	LastModified        string           `json:"lastModified,omitempty"`
 	CreatedAt           *time.Time       `json:"createdAt,omitempty"`
 	UpdatedAt           *time.Time       `json:"updatedAt,omitempty"`
+	SourceKey           string           `json:"sourceKey,omitempty"`
 }
 
 // NewsArticleOverride mirrors news.v1.NewsArticleOverride.
@@ -126,6 +127,16 @@ type ListRecommendedArticlesResponse struct {
 }
 
 func (r *ListRecommendedArticlesResponse) setMetadata(metadata ResponseMetadata) {
+	r.Metadata = metadata
+}
+
+// ListNewsSourcesResponse returns active news sources.
+type ListNewsSourcesResponse struct {
+	Sources  []NewsSource     `json:"sources,omitempty"`
+	Metadata ResponseMetadata `json:"-"`
+}
+
+func (r *ListNewsSourcesResponse) setMetadata(metadata ResponseMetadata) {
 	r.Metadata = metadata
 }
 
@@ -361,6 +372,20 @@ func (c *Client) ListRecommendedArticles(ctx context.Context, request *ListRecom
 		return nil, err
 	}
 
+	return response, nil
+}
+
+// ListNewsSources lists active news sources.
+func (c *Client) ListNewsSources(ctx context.Context, opts ...RequestOpt) (*ListNewsSourcesResponse, error) {
+	req, err := c.newRequest(ctx, http.MethodGet, "/v1/news/sources", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListNewsSourcesResponse{}
+	if err := c.do(req, response, opts...); err != nil {
+		return nil, err
+	}
 	return response, nil
 }
 

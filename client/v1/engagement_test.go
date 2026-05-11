@@ -160,4 +160,53 @@ func TestClientEngagement(t *testing.T) {
 		require.Len(t, resp.Resources, 1)
 		require.Equal(t, int64(7), resp.Resources[0].ViewCount)
 	})
+
+	t.Run("likes", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			switch r.URL.Path {
+			case "/v1/engagement/likes:like":
+				require.Equal(t, http.MethodPost, r.Method)
+				require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
+					"resource":   map[string]any{"resourceType": string(LikeableResourceTypeDeck), "resourceId": "d-1"},
+					"liked":      true,
+					"totalLikes": "4",
+					"changed":    true,
+				}))
+			case "/v1/engagement/likes:unlike":
+				require.Equal(t, http.MethodPost, r.Method)
+				require.NoError(t, json.NewEncoder(w).Encode(map[string]any{"liked": false, "totalLikes": "3", "changed": true}))
+			case "/v1/engagement/likes:batchGetCounts":
+				require.Equal(t, http.MethodPost, r.Method)
+				require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
+					"counts": []map[string]any{{"resource": map[string]any{"resourceType": string(LikeableResourceTypeDeck), "resourceId": "d-1"}, "totalLikes": "4"}},
+				}))
+			case "/v1/engagement/likes:batchGetViewerLikes":
+				require.Equal(t, http.MethodPost, r.Method)
+				require.NoError(t, json.NewEncoder(w).Encode(BatchGetViewerLikesResponse{
+					Likes: []ViewerLike{{Resource: &LikeableResourceRef{ResourceType: LikeableResourceTypeDeck, ResourceID: "d-1"}, Liked: true}},
+				}))
+			default:
+				t.Fatalf("unexpected path: %s", r.URL.Path)
+			}
+		}))
+		t.Cleanup(server.Close)
+
+		client := newTestClient(t, WithBaseURL(server.URL), WithHTTPClient(server.Client()))
+		resource := LikeableResourceRef{ResourceType: LikeableResourceTypeDeck, ResourceID: "d-1"}
+		likeResp, err := client.LikeResource(context.Background(), &LikeResourceRequest{Resource: &resource})
+		require.NoError(t, err)
+		require.Equal(t, int64(4), likeResp.TotalLikes)
+
+		unlikeResp, err := client.UnlikeResource(context.Background(), &UnlikeResourceRequest{Resource: &resource})
+		require.NoError(t, err)
+		require.Equal(t, int64(3), unlikeResp.TotalLikes)
+
+		countsResp, err := client.BatchGetLikeCounts(context.Background(), &BatchGetLikeCountsRequest{Resources: []LikeableResourceRef{resource}})
+		require.NoError(t, err)
+		require.Equal(t, int64(4), countsResp.Counts[0].TotalLikes)
+
+		viewerResp, err := client.BatchGetViewerLikes(context.Background(), &BatchGetViewerLikesRequest{Resources: []LikeableResourceRef{resource}})
+		require.NoError(t, err)
+		require.True(t, viewerResp.Likes[0].Liked)
+	})
 }
