@@ -280,11 +280,11 @@ type AuthMethodType string
 
 const (
 	AuthMethodTypeUnspecified  AuthMethodType = "AUTH_METHOD_TYPE_UNSPECIFIED"
-	AuthMethodTypePassword     AuthMethodType = "AUTH_METHOD_TYPE_PASSWORD"
+	AuthMethodTypePassword     AuthMethodType = "AUTH_METHOD_TYPE_PASSWORD" // #nosec G101 -- enum value, not a credential.
 	AuthMethodTypeOAuthGoogle  AuthMethodType = "AUTH_METHOD_TYPE_OAUTH_GOOGLE"
 	AuthMethodTypeOAuthDiscord AuthMethodType = "AUTH_METHOD_TYPE_OAUTH_DISCORD"
 	AuthMethodTypeOAuthApple   AuthMethodType = "AUTH_METHOD_TYPE_OAUTH_APPLE"
-	AuthMethodTypePasskey      AuthMethodType = "AUTH_METHOD_TYPE_PASSKEY"
+	AuthMethodTypePasskey      AuthMethodType = "AUTH_METHOD_TYPE_PASSKEY" // #nosec G101 -- enum value, not a credential.
 )
 
 // AuthMethod represents v1AuthMethod.
