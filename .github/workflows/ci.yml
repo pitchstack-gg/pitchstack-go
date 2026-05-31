@@ -28,7 +28,7 @@ jobs:
           args: ./...
 
       - name: Security Scan
-        uses: securego/gosec@v2.22.10
+        uses: securego/gosec@v2.26.1
         with:
           args: ./...
 
