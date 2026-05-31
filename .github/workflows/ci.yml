@@ -37,7 +37,7 @@ jobs:
 
       - name: Integration Tests
         env:
-          PITCHSTACK_API_BASE_URL: https://api-gamma.pitchstack.gg:8443
+          PITCHSTACK_API_BASE_URL: https://api.pitchstack.gg
           PITCHSTACK_API_TOKEN: TEST
           PITCHSTACK_CARD_ID: sink-below-r
           PITCHSTACK_CARD_SEARCH_TERM: sink
