@@ -107,7 +107,7 @@ func (c *Client) do(req *http.Request, out any, opts ...RequestOpt) error {
 		}
 	}
 
-	resp, err := c.httpClient.Do(req)
+	resp, err := c.httpClient.Do(req) // #nosec G704 -- SDK requests are constrained by the configured base URL and typed endpoint paths.
 	if err != nil {
 		return fmt.Errorf("execute http request: %w", err)
 	}
