@@ -98,6 +98,31 @@ type ProductPriceWatch struct {
 	LastNotifiedPriceEntryID string     `json:"lastNotifiedPriceEntryId,omitempty"`
 }
 
+// ProductPriceWatchList represents a named group of price watches.
+type ProductPriceWatchList struct {
+	ListID      string     `json:"listId,omitempty"`
+	Name        string     `json:"name,omitempty"`
+	Description string     `json:"description,omitempty"`
+	IsDefault   bool       `json:"isDefault,omitempty"`
+	CreatedAt   *time.Time `json:"createdAt,omitempty"`
+	UpdatedAt   *time.Time `json:"updatedAt,omitempty"`
+}
+
+// ProductPriceWatchListItem links a price watch to a watch list.
+type ProductPriceWatchListItem struct {
+	ItemID    string             `json:"itemId,omitempty"`
+	ListID    string             `json:"listId,omitempty"`
+	Watch     *ProductPriceWatch `json:"watch,omitempty"`
+	CreatedAt *time.Time         `json:"createdAt,omitempty"`
+}
+
+// BatchAddProductPriceWatchFailure describes a product that could not be added.
+type BatchAddProductPriceWatchFailure struct {
+	ProductID string `json:"productId,omitempty"`
+	Code      string `json:"code,omitempty"`
+	Message   string `json:"message,omitempty"`
+}
+
 // CreateProductPriceWatchRequest creates or replaces a price watch.
 type CreateProductPriceWatchRequest struct {
 	ProductID      string   `json:"productId,omitempty"`
@@ -165,6 +190,141 @@ type ListProductPriceWatchesResponse struct {
 }
 
 func (r *ListProductPriceWatchesResponse) setMetadata(metadata ResponseMetadata) {
+	r.Metadata = metadata
+}
+
+// ListProductPriceWatchListsRequest lists the authenticated user's watch lists.
+type ListProductPriceWatchListsRequest struct{}
+
+// ListProductPriceWatchListsResponse returns price watch lists.
+type ListProductPriceWatchListsResponse struct {
+	Lists    []ProductPriceWatchList `json:"lists,omitempty"`
+	Metadata ResponseMetadata        `json:"-"`
+}
+
+func (r *ListProductPriceWatchListsResponse) setMetadata(metadata ResponseMetadata) {
+	r.Metadata = metadata
+}
+
+// CreateProductPriceWatchListRequest creates a price watch list.
+type CreateProductPriceWatchListRequest struct {
+	Name        string `json:"name,omitempty"`
+	Description string `json:"description,omitempty"`
+}
+
+// CreateProductPriceWatchListResponse returns the created watch list.
+type CreateProductPriceWatchListResponse struct {
+	List     *ProductPriceWatchList `json:"list,omitempty"`
+	Metadata ResponseMetadata       `json:"-"`
+}
+
+func (r *CreateProductPriceWatchListResponse) setMetadata(metadata ResponseMetadata) {
+	r.Metadata = metadata
+}
+
+// UpdateProductPriceWatchListRequest updates a price watch list.
+type UpdateProductPriceWatchListRequest struct {
+	ListID      string  `json:"-"`
+	Name        *string `json:"name,omitempty"`
+	Description *string `json:"description,omitempty"`
+}
+
+// UpdateProductPriceWatchListResponse returns the updated watch list.
+type UpdateProductPriceWatchListResponse struct {
+	List     *ProductPriceWatchList `json:"list,omitempty"`
+	Metadata ResponseMetadata       `json:"-"`
+}
+
+func (r *UpdateProductPriceWatchListResponse) setMetadata(metadata ResponseMetadata) {
+	r.Metadata = metadata
+}
+
+// DeleteProductPriceWatchListRequest identifies a price watch list to delete.
+type DeleteProductPriceWatchListRequest struct {
+	ListID string `json:"-"`
+}
+
+// DeleteProductPriceWatchListResponse captures metadata for delete operations.
+type DeleteProductPriceWatchListResponse struct {
+	Metadata ResponseMetadata `json:"-"`
+}
+
+func (r *DeleteProductPriceWatchListResponse) setMetadata(metadata ResponseMetadata) {
+	r.Metadata = metadata
+}
+
+// ListProductPriceWatchListItemsRequest lists items for a price watch list.
+type ListProductPriceWatchListItemsRequest struct {
+	ListID     string `json:"-"`
+	ActiveOnly *bool
+}
+
+// ListProductPriceWatchListItemsResponse returns price watch list items.
+type ListProductPriceWatchListItemsResponse struct {
+	Items    []ProductPriceWatchListItem `json:"items,omitempty"`
+	Metadata ResponseMetadata            `json:"-"`
+}
+
+func (r *ListProductPriceWatchListItemsResponse) setMetadata(metadata ResponseMetadata) {
+	r.Metadata = metadata
+}
+
+// AddProductPriceWatchListItemRequest adds a watch or product watch config to a list.
+type AddProductPriceWatchListItemRequest struct {
+	ListID         string   `json:"-"`
+	WatchID        string   `json:"watchId,omitempty"`
+	ProductID      string   `json:"productId,omitempty"`
+	Source         string   `json:"source,omitempty"`
+	Direction      string   `json:"direction,omitempty"`
+	AbsoluteChange *float64 `json:"absoluteChange,omitempty"`
+	PercentChange  *float64 `json:"percentChange,omitempty"`
+	Period         string   `json:"period,omitempty"`
+}
+
+// AddProductPriceWatchListItemResponse returns the added list item.
+type AddProductPriceWatchListItemResponse struct {
+	Item     *ProductPriceWatchListItem `json:"item,omitempty"`
+	Metadata ResponseMetadata           `json:"-"`
+}
+
+func (r *AddProductPriceWatchListItemResponse) setMetadata(metadata ResponseMetadata) {
+	r.Metadata = metadata
+}
+
+// RemoveProductPriceWatchListItemRequest identifies a watch to remove from a list.
+type RemoveProductPriceWatchListItemRequest struct {
+	ListID  string `json:"-"`
+	WatchID string `json:"-"`
+}
+
+// RemoveProductPriceWatchListItemResponse captures metadata for remove operations.
+type RemoveProductPriceWatchListItemResponse struct {
+	Metadata ResponseMetadata `json:"-"`
+}
+
+func (r *RemoveProductPriceWatchListItemResponse) setMetadata(metadata ResponseMetadata) {
+	r.Metadata = metadata
+}
+
+// BatchAddProductsToProductPriceWatchListRequest adds many product watches to a list.
+type BatchAddProductsToProductPriceWatchListRequest struct {
+	ListID         string   `json:"-"`
+	ProductIDs     []string `json:"productIds,omitempty"`
+	Source         string   `json:"source,omitempty"`
+	Direction      string   `json:"direction,omitempty"`
+	AbsoluteChange *float64 `json:"absoluteChange,omitempty"`
+	PercentChange  *float64 `json:"percentChange,omitempty"`
+	Period         string   `json:"period,omitempty"`
+}
+
+// BatchAddProductsToProductPriceWatchListResponse returns added items and per-product failures.
+type BatchAddProductsToProductPriceWatchListResponse struct {
+	Items    []ProductPriceWatchListItem        `json:"items,omitempty"`
+	Failures []BatchAddProductPriceWatchFailure `json:"failures,omitempty"`
+	Metadata ResponseMetadata                   `json:"-"`
+}
+
+func (r *BatchAddProductsToProductPriceWatchListResponse) setMetadata(metadata ResponseMetadata) {
 	r.Metadata = metadata
 }
 
@@ -396,6 +556,247 @@ func (c *Client) ListProductPriceWatches(ctx context.Context, request *ListProdu
 	req.URL.RawQuery = query.Encode()
 
 	response := &ListProductPriceWatchesResponse{}
+	if err := c.do(req, response, opts...); err != nil {
+		return nil, err
+	}
+	return response, nil
+}
+
+// ListProductPriceWatchLists lists price watch lists for the authenticated user.
+func (c *Client) ListProductPriceWatchLists(ctx context.Context, request *ListProductPriceWatchListsRequest, opts ...RequestOpt) (*ListProductPriceWatchListsResponse, error) {
+	req, err := c.newRequest(ctx, http.MethodGet, "/v1/price-watch-lists", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListProductPriceWatchListsResponse{}
+	if err := c.do(req, response, opts...); err != nil {
+		return nil, err
+	}
+	return response, nil
+}
+
+// CreateProductPriceWatchList creates a price watch list.
+func (c *Client) CreateProductPriceWatchList(ctx context.Context, request *CreateProductPriceWatchListRequest, opts ...RequestOpt) (*CreateProductPriceWatchListResponse, error) {
+	if request == nil {
+		return nil, errors.New("request must not be nil")
+	}
+
+	body, err := jsonBody(request)
+	if err != nil {
+		return nil, fmt.Errorf("encode body: %w", err)
+	}
+
+	req, err := c.newRequest(ctx, http.MethodPost, "/v1/price-watch-lists", body)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	response := &CreateProductPriceWatchListResponse{}
+	if err := c.do(req, response, opts...); err != nil {
+		return nil, err
+	}
+	return response, nil
+}
+
+// UpdateProductPriceWatchList updates a price watch list.
+func (c *Client) UpdateProductPriceWatchList(ctx context.Context, request *UpdateProductPriceWatchListRequest, opts ...RequestOpt) (*UpdateProductPriceWatchListResponse, error) {
+	if request == nil {
+		return nil, errors.New("request must not be nil")
+	}
+	listID := strings.TrimSpace(request.ListID)
+	if listID == "" {
+		return nil, errors.New("listID must not be empty")
+	}
+
+	body, err := jsonBody(struct {
+		Name        *string `json:"name,omitempty"`
+		Description *string `json:"description,omitempty"`
+	}{
+		Name:        request.Name,
+		Description: request.Description,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("encode body: %w", err)
+	}
+
+	path := fmt.Sprintf("/v1/price-watch-lists/%s", url.PathEscape(listID))
+	req, err := c.newRequest(ctx, http.MethodPatch, path, body)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	response := &UpdateProductPriceWatchListResponse{}
+	if err := c.do(req, response, opts...); err != nil {
+		return nil, err
+	}
+	return response, nil
+}
+
+// DeleteProductPriceWatchList deletes a price watch list.
+func (c *Client) DeleteProductPriceWatchList(ctx context.Context, request *DeleteProductPriceWatchListRequest, opts ...RequestOpt) (*DeleteProductPriceWatchListResponse, error) {
+	if request == nil {
+		return nil, errors.New("request must not be nil")
+	}
+	listID := strings.TrimSpace(request.ListID)
+	if listID == "" {
+		return nil, errors.New("listID must not be empty")
+	}
+
+	path := fmt.Sprintf("/v1/price-watch-lists/%s", url.PathEscape(listID))
+	req, err := c.newRequest(ctx, http.MethodDelete, path, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DeleteProductPriceWatchListResponse{}
+	if err := c.do(req, response, opts...); err != nil {
+		return nil, err
+	}
+	return response, nil
+}
+
+// ListProductPriceWatchListItems lists items for a price watch list.
+func (c *Client) ListProductPriceWatchListItems(ctx context.Context, request *ListProductPriceWatchListItemsRequest, opts ...RequestOpt) (*ListProductPriceWatchListItemsResponse, error) {
+	if request == nil {
+		return nil, errors.New("request must not be nil")
+	}
+	listID := strings.TrimSpace(request.ListID)
+	if listID == "" {
+		return nil, errors.New("listID must not be empty")
+	}
+
+	path := fmt.Sprintf("/v1/price-watch-lists/%s/items", url.PathEscape(listID))
+	req, err := c.newRequest(ctx, http.MethodGet, path, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	query := req.URL.Query()
+	setQueryBool(query, "activeOnly", request.ActiveOnly)
+	req.URL.RawQuery = query.Encode()
+
+	response := &ListProductPriceWatchListItemsResponse{}
+	if err := c.do(req, response, opts...); err != nil {
+		return nil, err
+	}
+	return response, nil
+}
+
+// AddProductPriceWatchListItem adds a watch or product watch config to a list.
+func (c *Client) AddProductPriceWatchListItem(ctx context.Context, request *AddProductPriceWatchListItemRequest, opts ...RequestOpt) (*AddProductPriceWatchListItemResponse, error) {
+	if request == nil {
+		return nil, errors.New("request must not be nil")
+	}
+	listID := strings.TrimSpace(request.ListID)
+	if listID == "" {
+		return nil, errors.New("listID must not be empty")
+	}
+
+	body, err := jsonBody(struct {
+		WatchID        string   `json:"watchId,omitempty"`
+		ProductID      string   `json:"productId,omitempty"`
+		Source         string   `json:"source,omitempty"`
+		Direction      string   `json:"direction,omitempty"`
+		AbsoluteChange *float64 `json:"absoluteChange,omitempty"`
+		PercentChange  *float64 `json:"percentChange,omitempty"`
+		Period         string   `json:"period,omitempty"`
+	}{
+		WatchID:        strings.TrimSpace(request.WatchID),
+		ProductID:      strings.TrimSpace(request.ProductID),
+		Source:         strings.TrimSpace(request.Source),
+		Direction:      strings.TrimSpace(request.Direction),
+		AbsoluteChange: request.AbsoluteChange,
+		PercentChange:  request.PercentChange,
+		Period:         strings.TrimSpace(request.Period),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("encode body: %w", err)
+	}
+
+	path := fmt.Sprintf("/v1/price-watch-lists/%s/items", url.PathEscape(listID))
+	req, err := c.newRequest(ctx, http.MethodPost, path, body)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	response := &AddProductPriceWatchListItemResponse{}
+	if err := c.do(req, response, opts...); err != nil {
+		return nil, err
+	}
+	return response, nil
+}
+
+// RemoveProductPriceWatchListItem removes a watch from a price watch list.
+func (c *Client) RemoveProductPriceWatchListItem(ctx context.Context, request *RemoveProductPriceWatchListItemRequest, opts ...RequestOpt) (*RemoveProductPriceWatchListItemResponse, error) {
+	if request == nil {
+		return nil, errors.New("request must not be nil")
+	}
+	listID := strings.TrimSpace(request.ListID)
+	if listID == "" {
+		return nil, errors.New("listID must not be empty")
+	}
+	watchID := strings.TrimSpace(request.WatchID)
+	if watchID == "" {
+		return nil, errors.New("watchID must not be empty")
+	}
+
+	path := fmt.Sprintf("/v1/price-watch-lists/%s/items/%s", url.PathEscape(listID), url.PathEscape(watchID))
+	req, err := c.newRequest(ctx, http.MethodDelete, path, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	response := &RemoveProductPriceWatchListItemResponse{}
+	if err := c.do(req, response, opts...); err != nil {
+		return nil, err
+	}
+	return response, nil
+}
+
+// BatchAddProductsToProductPriceWatchList adds many product watches to a list.
+func (c *Client) BatchAddProductsToProductPriceWatchList(ctx context.Context, request *BatchAddProductsToProductPriceWatchListRequest, opts ...RequestOpt) (*BatchAddProductsToProductPriceWatchListResponse, error) {
+	if request == nil {
+		return nil, errors.New("request must not be nil")
+	}
+	listID := strings.TrimSpace(request.ListID)
+	if listID == "" {
+		return nil, errors.New("listID must not be empty")
+	}
+	if len(request.ProductIDs) == 0 {
+		return nil, errors.New("productIDs must not be empty")
+	}
+
+	body, err := jsonBody(struct {
+		ProductIDs     []string `json:"productIds,omitempty"`
+		Source         string   `json:"source,omitempty"`
+		Direction      string   `json:"direction,omitempty"`
+		AbsoluteChange *float64 `json:"absoluteChange,omitempty"`
+		PercentChange  *float64 `json:"percentChange,omitempty"`
+		Period         string   `json:"period,omitempty"`
+	}{
+		ProductIDs:     request.ProductIDs,
+		Source:         strings.TrimSpace(request.Source),
+		Direction:      strings.TrimSpace(request.Direction),
+		AbsoluteChange: request.AbsoluteChange,
+		PercentChange:  request.PercentChange,
+		Period:         strings.TrimSpace(request.Period),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("encode body: %w", err)
+	}
+
+	path := fmt.Sprintf("/v1/price-watch-lists/%s/items:batchAddProducts", url.PathEscape(listID))
+	req, err := c.newRequest(ctx, http.MethodPost, path, body)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	response := &BatchAddProductsToProductPriceWatchListResponse{}
 	if err := c.do(req, response, opts...); err != nil {
 		return nil, err
 	}

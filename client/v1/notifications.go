@@ -240,6 +240,19 @@ func (r *MarkReadResponse) setMetadata(metadata ResponseMetadata) {
 	r.Metadata = metadata
 }
 
+// MarkAllReadRequest marks all matching notifications as read.
+type MarkAllReadRequest struct{}
+
+// MarkAllReadResponse returns the number of notifications marked read.
+type MarkAllReadResponse struct {
+	MarkedReadCount int64            `json:"markedReadCount,omitempty,string"`
+	Metadata        ResponseMetadata `json:"-"`
+}
+
+func (r *MarkAllReadResponse) setMetadata(metadata ResponseMetadata) {
+	r.Metadata = metadata
+}
+
 // ArchiveMessageRequest identifies the notification to archive.
 type ArchiveMessageRequest struct {
 	MessageID string
@@ -552,6 +565,30 @@ func (c *Client) MarkRead(ctx context.Context, request *MarkReadRequest, opts ..
 	req.Header.Set("Content-Type", "application/json")
 
 	response := &MarkReadResponse{}
+	if err := c.do(req, response, opts...); err != nil {
+		return nil, err
+	}
+	return response, nil
+}
+
+// MarkAllRead marks all notifications as read for the authenticated user.
+func (c *Client) MarkAllRead(ctx context.Context, request *MarkAllReadRequest, opts ...RequestOpt) (*MarkAllReadResponse, error) {
+	if request == nil {
+		request = &MarkAllReadRequest{}
+	}
+
+	body, err := jsonBody(request)
+	if err != nil {
+		return nil, fmt.Errorf("encode body: %w", err)
+	}
+
+	req, err := c.newRequest(ctx, http.MethodPost, "/v1/notifications:markAllRead", body)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	response := &MarkAllReadResponse{}
 	if err := c.do(req, response, opts...); err != nil {
 		return nil, err
 	}

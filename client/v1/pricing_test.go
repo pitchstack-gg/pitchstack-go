@@ -197,3 +197,112 @@ func TestClientProductPriceWatches(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, http.StatusOK, deleteResp.Metadata.StatusCode)
 }
+
+func TestClientProductPriceWatchLists(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/price-watch-lists":
+			require.NoError(t, json.NewEncoder(w).Encode(ListProductPriceWatchListsResponse{
+				Lists: []ProductPriceWatchList{{ListID: "list-1", Name: "Deals"}},
+			}))
+		case r.Method == http.MethodPost && r.URL.Path == "/v1/price-watch-lists":
+			var payload CreateProductPriceWatchListRequest
+			require.NoError(t, json.NewDecoder(r.Body).Decode(&payload))
+			require.Equal(t, "Deals", payload.Name)
+			require.Equal(t, "cards to watch", payload.Description)
+			require.NoError(t, json.NewEncoder(w).Encode(CreateProductPriceWatchListResponse{
+				List: &ProductPriceWatchList{ListID: "list-1", Name: payload.Name},
+			}))
+		case r.Method == http.MethodPatch && r.URL.Path == "/v1/price-watch-lists/list-1":
+			var payload UpdateProductPriceWatchListRequest
+			require.NoError(t, json.NewDecoder(r.Body).Decode(&payload))
+			require.NotNil(t, payload.Name)
+			require.Equal(t, "Updated", *payload.Name)
+			require.NoError(t, json.NewEncoder(w).Encode(UpdateProductPriceWatchListResponse{
+				List: &ProductPriceWatchList{ListID: "list-1", Name: *payload.Name},
+			}))
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/price-watch-lists/list-1/items":
+			require.Equal(t, "true", r.URL.Query().Get("activeOnly"))
+			require.NoError(t, json.NewEncoder(w).Encode(ListProductPriceWatchListItemsResponse{
+				Items: []ProductPriceWatchListItem{{ItemID: "item-1", ListID: "list-1", Watch: &ProductPriceWatch{WatchID: "watch-1"}}},
+			}))
+		case r.Method == http.MethodPost && r.URL.Path == "/v1/price-watch-lists/list-1/items":
+			var payload AddProductPriceWatchListItemRequest
+			require.NoError(t, json.NewDecoder(r.Body).Decode(&payload))
+			require.Equal(t, "watch-1", payload.WatchID)
+			require.NoError(t, json.NewEncoder(w).Encode(AddProductPriceWatchListItemResponse{
+				Item: &ProductPriceWatchListItem{ItemID: "item-1", ListID: "list-1"},
+			}))
+		case r.Method == http.MethodPost && r.URL.Path == "/v1/price-watch-lists/list-1/items:batchAddProducts":
+			var payload BatchAddProductsToProductPriceWatchListRequest
+			require.NoError(t, json.NewDecoder(r.Body).Decode(&payload))
+			require.Equal(t, []string{"prod-1", "prod-2"}, payload.ProductIDs)
+			require.Equal(t, "TCGPlayer", payload.Source)
+			require.NoError(t, json.NewEncoder(w).Encode(BatchAddProductsToProductPriceWatchListResponse{
+				Items:    []ProductPriceWatchListItem{{ItemID: "item-2"}},
+				Failures: []BatchAddProductPriceWatchFailure{{ProductID: "prod-3", Code: "not_found"}},
+			}))
+		case r.Method == http.MethodDelete && r.URL.Path == "/v1/price-watch-lists/list-1/items/watch-1":
+			w.Header().Set("X-Request-Id", "req-remove")
+			w.WriteHeader(http.StatusOK)
+		case r.Method == http.MethodDelete && r.URL.Path == "/v1/price-watch-lists/list-1":
+			w.Header().Set("X-Request-Id", "req-delete")
+			w.WriteHeader(http.StatusOK)
+		default:
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.Path)
+		}
+	}))
+	t.Cleanup(server.Close)
+
+	client := newTestClient(t, WithBaseURL(server.URL), WithHTTPClient(server.Client()))
+	listsResp, err := client.ListProductPriceWatchLists(context.Background(), nil)
+	require.NoError(t, err)
+	require.Equal(t, "list-1", listsResp.Lists[0].ListID)
+
+	createResp, err := client.CreateProductPriceWatchList(context.Background(), &CreateProductPriceWatchListRequest{
+		Name:        "Deals",
+		Description: "cards to watch",
+	})
+	require.NoError(t, err)
+	require.Equal(t, "Deals", createResp.List.Name)
+
+	name := "Updated"
+	updateResp, err := client.UpdateProductPriceWatchList(context.Background(), &UpdateProductPriceWatchListRequest{
+		ListID: "list-1",
+		Name:   &name,
+	})
+	require.NoError(t, err)
+	require.Equal(t, "Updated", updateResp.List.Name)
+
+	activeOnly := true
+	itemsResp, err := client.ListProductPriceWatchListItems(context.Background(), &ListProductPriceWatchListItemsRequest{
+		ListID:     "list-1",
+		ActiveOnly: &activeOnly,
+	})
+	require.NoError(t, err)
+	require.Equal(t, "watch-1", itemsResp.Items[0].Watch.WatchID)
+
+	addResp, err := client.AddProductPriceWatchListItem(context.Background(), &AddProductPriceWatchListItemRequest{
+		ListID:  "list-1",
+		WatchID: "watch-1",
+	})
+	require.NoError(t, err)
+	require.Equal(t, "item-1", addResp.Item.ItemID)
+
+	batchResp, err := client.BatchAddProductsToProductPriceWatchList(context.Background(), &BatchAddProductsToProductPriceWatchListRequest{
+		ListID:     "list-1",
+		ProductIDs: []string{"prod-1", "prod-2"},
+		Source:     "TCGPlayer",
+	})
+	require.NoError(t, err)
+	require.Len(t, batchResp.Items, 1)
+	require.Equal(t, "prod-3", batchResp.Failures[0].ProductID)
+
+	removeResp, err := client.RemoveProductPriceWatchListItem(context.Background(), &RemoveProductPriceWatchListItemRequest{ListID: "list-1", WatchID: "watch-1"})
+	require.NoError(t, err)
+	require.Equal(t, "req-remove", removeResp.Metadata.RequestID)
+
+	deleteResp, err := client.DeleteProductPriceWatchList(context.Background(), &DeleteProductPriceWatchListRequest{ListID: "list-1"})
+	require.NoError(t, err)
+	require.Equal(t, "req-delete", deleteResp.Metadata.RequestID)
+}

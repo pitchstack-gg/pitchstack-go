@@ -293,6 +293,43 @@ func TestClientUpdateCollectionVisibility(t *testing.T) {
 	})
 }
 
+func TestClientUpdateCollectionArt(t *testing.T) {
+	t.Run("when art update is provided, then targeted update is sent", func(t *testing.T) {
+		handler := func(w http.ResponseWriter, r *http.Request) {
+			require.Equal(t, http.MethodPut, r.Method)
+			require.Equal(t, "/v1/collections/col-1/art", r.URL.Path)
+			require.Equal(t, "application/json", r.Header.Get("Content-Type"))
+
+			var payload UpdateCollectionArtRequest
+			require.NoError(t, json.NewDecoder(r.Body).Decode(&payload))
+			require.Equal(t, "printing-1", payload.SelectedArtPrintingID)
+			require.False(t, payload.ClearSelectedArt)
+
+			require.NoError(t, json.NewEncoder(w).Encode(UpdateCollectionArtResponse{
+				Collection: &Collection{ID: "col-1", SelectedArtPrintingID: "printing-1"},
+			}))
+		}
+
+		server := httptest.NewServer(http.HandlerFunc(handler))
+		t.Cleanup(server.Close)
+
+		client := newTestClient(t, WithBaseURL(server.URL), WithHTTPClient(server.Client()))
+		resp, err := client.UpdateCollectionArt(context.Background(), &UpdateCollectionArtRequest{
+			CollectionID:          "col-1",
+			SelectedArtPrintingID: "printing-1",
+		})
+		require.NoError(t, err)
+		require.Equal(t, "printing-1", resp.Collection.SelectedArtPrintingID)
+	})
+
+	t.Run("when id missing, then returns error", func(t *testing.T) {
+		client := newTestClient(t)
+		resp, err := client.UpdateCollectionArt(context.Background(), &UpdateCollectionArtRequest{})
+		require.Error(t, err)
+		require.Nil(t, resp)
+	})
+}
+
 func TestClientDeleteCollection(t *testing.T) {
 	t.Run("when id provided, then delete is issued", func(t *testing.T) {
 		handler := func(w http.ResponseWriter, r *http.Request) {
@@ -401,6 +438,37 @@ func TestClientGetCollectionValuation(t *testing.T) {
 		require.Error(t, err)
 		require.Nil(t, resp)
 	})
+}
+
+func TestClientListTradeItems(t *testing.T) {
+	pageSize := int32(25)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, http.MethodGet, r.Method)
+		require.Equal(t, "/v1/trade_items", r.URL.Path)
+		require.Equal(t, "user-1", r.URL.Query().Get("userId"))
+		require.Equal(t, "25", r.URL.Query().Get("pageSize"))
+		require.Equal(t, "token", r.URL.Query().Get("nextToken"))
+
+		require.NoError(t, json.NewEncoder(w).Encode(ListTradeItemsResponse{
+			Items: []TradeItem{{
+				Item:             &CollectionItem{ID: "item-1", TradeQuantity: 2, Notes: "foil"},
+				SourceCollection: &Collection{ID: "col-1"},
+			}},
+			NextToken: "next",
+		}))
+	}))
+	t.Cleanup(server.Close)
+
+	client := newTestClient(t, WithBaseURL(server.URL), WithHTTPClient(server.Client()))
+	resp, err := client.ListTradeItems(context.Background(), &ListTradeItemsRequest{
+		UserID:    "user-1",
+		PageSize:  &pageSize,
+		NextToken: "token",
+	})
+	require.NoError(t, err)
+	require.Equal(t, "item-1", resp.Items[0].Item.ID)
+	require.Equal(t, int32(2), resp.Items[0].Item.TradeQuantity)
+	require.Equal(t, "next", resp.NextToken)
 }
 
 func TestClientGrantCollectionAccess(t *testing.T) {

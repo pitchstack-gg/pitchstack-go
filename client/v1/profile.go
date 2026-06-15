@@ -23,15 +23,22 @@ const (
 
 // UserProfile represents a user's public profile details.
 type UserProfile struct {
-	Username             string `json:"username,omitempty"`
-	Name                 string `json:"name,omitempty"`
-	AvatarURL            string `json:"avatarUrl,omitempty"`
-	Bio                  string `json:"bio,omitempty"`
-	Location             string `json:"location,omitempty"`
-	Pronouns             string `json:"pronouns,omitempty"`
-	GemID                string `json:"gemId,omitempty"`
-	ProfileColor         string `json:"profileColor,omitempty"`
-	ProfileBackgroundURL string `json:"profileBackgroundUrl,omitempty"`
+	Username             string             `json:"username,omitempty"`
+	Name                 string             `json:"name,omitempty"`
+	AvatarURL            string             `json:"avatarUrl,omitempty"`
+	Bio                  string             `json:"bio,omitempty"`
+	Location             string             `json:"location,omitempty"`
+	Pronouns             string             `json:"pronouns,omitempty"`
+	GemID                string             `json:"gemId,omitempty"`
+	ProfileColor         string             `json:"profileColor,omitempty"`
+	ProfileBackgroundURL string             `json:"profileBackgroundUrl,omitempty"`
+	Badges               []UserProfileBadge `json:"badges,omitempty"`
+}
+
+// UserProfileBadge represents a public role or entitlement badge.
+type UserProfileBadge struct {
+	Key   string `json:"key,omitempty"`
+	Label string `json:"label,omitempty"`
 }
 
 // UserSearchResult represents a compact search result for a user.
@@ -203,14 +210,17 @@ func (r *SearchUsersResponse) setMetadata(metadata ResponseMetadata) {
 
 // PrivacyConsent represents account-level privacy consent state.
 type PrivacyConsent struct {
-	AnalyticsAllowed bool       `json:"analyticsAllowed,omitempty"`
-	ConsentVersion   int32      `json:"consentVersion,omitempty"`
-	Source           string     `json:"source,omitempty"`
-	Platform         string     `json:"platform,omitempty"`
-	AppVersion       string     `json:"appVersion,omitempty"`
-	DeviceIDHash     string     `json:"deviceIdHash,omitempty"`
-	UpdatedAt        *time.Time `json:"updatedAt,omitempty"`
-	ClientActionAt   *time.Time `json:"clientActionAt,omitempty"`
+	AnalyticsAllowed       bool       `json:"analyticsAllowed,omitempty"`
+	ConsentVersion         int32      `json:"consentVersion,omitempty"`
+	Source                 string     `json:"source,omitempty"`
+	Platform               string     `json:"platform,omitempty"`
+	AppVersion             string     `json:"appVersion,omitempty"`
+	DeviceIDHash           string     `json:"deviceIdHash,omitempty"`
+	UpdatedAt              *time.Time `json:"updatedAt,omitempty"`
+	ClientActionAt         *time.Time `json:"clientActionAt,omitempty"`
+	AdConsentProvider      string     `json:"adConsentProvider,omitempty"`
+	AdConsentRegionApplies bool       `json:"adConsentRegionApplies,omitempty"`
+	AdConsentLastSeenAt    *time.Time `json:"adConsentLastSeenAt,omitempty"`
 }
 
 // GetPrivacyConsentResponse returns account-level privacy consent.
@@ -225,13 +235,16 @@ func (r *GetPrivacyConsentResponse) setMetadata(metadata ResponseMetadata) {
 
 // UpdatePrivacyConsentRequest updates account-level privacy consent.
 type UpdatePrivacyConsentRequest struct {
-	AnalyticsAllowed bool       `json:"analyticsAllowed,omitempty"`
-	ConsentVersion   int32      `json:"consentVersion,omitempty"`
-	Source           string     `json:"source,omitempty"`
-	Platform         string     `json:"platform,omitempty"`
-	AppVersion       string     `json:"appVersion,omitempty"`
-	DeviceIDHash     string     `json:"deviceIdHash,omitempty"`
-	ClientActionAt   *time.Time `json:"clientActionAt,omitempty"`
+	AnalyticsAllowed       bool       `json:"analyticsAllowed,omitempty"`
+	ConsentVersion         int32      `json:"consentVersion,omitempty"`
+	Source                 string     `json:"source,omitempty"`
+	Platform               string     `json:"platform,omitempty"`
+	AppVersion             string     `json:"appVersion,omitempty"`
+	DeviceIDHash           string     `json:"deviceIdHash,omitempty"`
+	ClientActionAt         *time.Time `json:"clientActionAt,omitempty"`
+	AdConsentProvider      string     `json:"adConsentProvider,omitempty"`
+	AdConsentRegionApplies bool       `json:"adConsentRegionApplies,omitempty"`
+	AdConsentLastSeenAt    *time.Time `json:"adConsentLastSeenAt,omitempty"`
 }
 
 // UpdatePrivacyConsentResponse returns updated account-level privacy consent.

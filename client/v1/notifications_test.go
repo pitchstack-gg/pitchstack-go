@@ -234,6 +234,24 @@ func TestClientMarkRead(t *testing.T) {
 	require.Equal(t, "req-mark", resp.Metadata.RequestID)
 }
 
+func TestClientMarkAllRead(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, http.MethodPost, r.Method)
+		require.Equal(t, "/v1/notifications:markAllRead", r.URL.Path)
+		require.Equal(t, "application/json", r.Header.Get("Content-Type"))
+		var payload map[string]any
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&payload))
+		require.Len(t, payload, 0)
+		_, _ = w.Write([]byte(`{"markedReadCount":"3"}`))
+	}))
+	t.Cleanup(server.Close)
+
+	client := newTestClient(t, WithBaseURL(server.URL), WithHTTPClient(server.Client()))
+	resp, err := client.MarkAllRead(context.Background(), nil)
+	require.NoError(t, err)
+	require.Equal(t, int64(3), resp.MarkedReadCount)
+}
+
 func TestClientArchiveMessage(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		require.Equal(t, http.MethodPost, r.Method)

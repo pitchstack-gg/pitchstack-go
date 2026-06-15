@@ -53,14 +53,16 @@ const (
 
 // Collection mirrors v1Collection from the API definition.
 type Collection struct {
-	ID             string          `json:"id,omitempty"`
-	Name           string          `json:"name,omitempty"`
-	Description    string          `json:"description,omitempty"`
-	OwnerID        string          `json:"ownerId,omitempty"`
-	CollectionType CollectionType  `json:"collectionType,omitempty"`
-	Visibility     VisibilityLevel `json:"visibility,omitempty"`
-	CreatedAt      *time.Time      `json:"createdAt,omitempty"`
-	UpdatedAt      *time.Time      `json:"updatedAt,omitempty"`
+	ID                    string          `json:"id,omitempty"`
+	Name                  string          `json:"name,omitempty"`
+	Description           string          `json:"description,omitempty"`
+	OwnerID               string          `json:"ownerId,omitempty"`
+	CollectionType        CollectionType  `json:"collectionType,omitempty"`
+	Visibility            VisibilityLevel `json:"visibility,omitempty"`
+	CreatedAt             *time.Time      `json:"createdAt,omitempty"`
+	UpdatedAt             *time.Time      `json:"updatedAt,omitempty"`
+	SelectedArtPrintingID string          `json:"selectedArtPrintingId,omitempty"`
+	ArtPrintingID         string          `json:"artPrintingId,omitempty"`
 }
 
 // CollectionStats captures aggregate metrics for a collection.
@@ -99,19 +101,23 @@ const (
 
 // CollectionHistoryItemChange describes one item-level history change.
 type CollectionHistoryItemChange struct {
-	ItemID            string                               `json:"itemId,omitempty"`
-	ProductID         string                               `json:"productId,omitempty"`
-	Operation         CollectionHistoryItemChangeOperation `json:"operation,omitempty"`
-	PreviousQuantity  int32                                `json:"previousQuantity,omitempty"`
-	NewQuantity       int32                                `json:"newQuantity,omitempty"`
-	PreviousCondition Condition                            `json:"previousCondition,omitempty"`
-	NewCondition      Condition                            `json:"newCondition,omitempty"`
-	PreviousValue     float64                              `json:"previousValue,omitempty"`
-	NewValue          float64                              `json:"newValue,omitempty"`
-	PreviousPinned    bool                                 `json:"previousPinned,omitempty"`
-	NewPinned         bool                                 `json:"newPinned,omitempty"`
-	FromCollectionID  string                               `json:"fromCollectionId,omitempty"`
-	ToCollectionID    string                               `json:"toCollectionId,omitempty"`
+	ItemID                string                               `json:"itemId,omitempty"`
+	ProductID             string                               `json:"productId,omitempty"`
+	Operation             CollectionHistoryItemChangeOperation `json:"operation,omitempty"`
+	PreviousQuantity      int32                                `json:"previousQuantity,omitempty"`
+	NewQuantity           int32                                `json:"newQuantity,omitempty"`
+	PreviousCondition     Condition                            `json:"previousCondition,omitempty"`
+	NewCondition          Condition                            `json:"newCondition,omitempty"`
+	PreviousValue         float64                              `json:"previousValue,omitempty"`
+	NewValue              float64                              `json:"newValue,omitempty"`
+	PreviousPinned        bool                                 `json:"previousPinned,omitempty"`
+	NewPinned             bool                                 `json:"newPinned,omitempty"`
+	FromCollectionID      string                               `json:"fromCollectionId,omitempty"`
+	ToCollectionID        string                               `json:"toCollectionId,omitempty"`
+	PreviousTradeQuantity int32                                `json:"previousTradeQuantity,omitempty"`
+	NewTradeQuantity      int32                                `json:"newTradeQuantity,omitempty"`
+	PreviousNotes         string                               `json:"previousNotes,omitempty"`
+	NewNotes              string                               `json:"newNotes,omitempty"`
 }
 
 // CollectionHistoryChange describes a collection history event.
@@ -233,6 +239,23 @@ func (r *UpdateCollectionVisibilityResponse) setMetadata(metadata ResponseMetada
 	r.Metadata = metadata
 }
 
+// UpdateCollectionArtRequest updates the preferred artwork for a collection.
+type UpdateCollectionArtRequest struct {
+	CollectionID          string `json:"-"`
+	SelectedArtPrintingID string `json:"selectedArtPrintingId,omitempty"`
+	ClearSelectedArt      bool   `json:"clearSelectedArt,omitempty"`
+}
+
+// UpdateCollectionArtResponse returns the updated collection.
+type UpdateCollectionArtResponse struct {
+	Collection *Collection      `json:"collection,omitempty"`
+	Metadata   ResponseMetadata `json:"-"`
+}
+
+func (r *UpdateCollectionArtResponse) setMetadata(metadata ResponseMetadata) {
+	r.Metadata = metadata
+}
+
 // DeleteCollectionRequest identifies the collection to delete.
 type DeleteCollectionRequest struct {
 	CollectionID string `json:"-"`
@@ -285,12 +308,14 @@ func (r *ExportCollectionResponse) setMetadata(metadata ResponseMetadata) {
 
 // ImportCollectionItem describes an item in an import request.
 type ImportCollectionItem struct {
-	ItemID    string     `json:"itemId,omitempty"`
-	ProductID string     `json:"productId,omitempty"`
-	Quantity  int32      `json:"quantity,omitempty"`
-	Condition Condition  `json:"condition,omitempty"`
-	Value     *float64   `json:"value,omitempty"`
-	CreatedAt *time.Time `json:"createdAt,omitempty"`
+	ItemID        string     `json:"itemId,omitempty"`
+	ProductID     string     `json:"productId,omitempty"`
+	Quantity      int32      `json:"quantity,omitempty"`
+	Condition     Condition  `json:"condition,omitempty"`
+	Value         *float64   `json:"value,omitempty"`
+	CreatedAt     *time.Time `json:"createdAt,omitempty"`
+	TradeQuantity int32      `json:"tradeQuantity,omitempty"`
+	Notes         string     `json:"notes,omitempty"`
 }
 
 // ImportCollectionRequest imports a collection snapshot.
@@ -421,6 +446,30 @@ type GetCollectionValuationResponse struct {
 }
 
 func (r *GetCollectionValuationResponse) setMetadata(metadata ResponseMetadata) {
+	r.Metadata = metadata
+}
+
+// TradeItem pairs a tradable collection item with its source collection.
+type TradeItem struct {
+	Item             *CollectionItem `json:"item,omitempty"`
+	SourceCollection *Collection     `json:"sourceCollection,omitempty"`
+}
+
+// ListTradeItemsRequest captures filters for listing trade items.
+type ListTradeItemsRequest struct {
+	UserID    string
+	PageSize  *int32
+	NextToken string
+}
+
+// ListTradeItemsResponse returns paginated trade items.
+type ListTradeItemsResponse struct {
+	Items     []TradeItem      `json:"items,omitempty"`
+	NextToken string           `json:"nextToken,omitempty"`
+	Metadata  ResponseMetadata `json:"-"`
+}
+
+func (r *ListTradeItemsResponse) setMetadata(metadata ResponseMetadata) {
 	r.Metadata = metadata
 }
 
@@ -611,6 +660,44 @@ func (c *Client) UpdateCollectionVisibility(ctx context.Context, request *Update
 	return response, nil
 }
 
+// UpdateCollectionArt updates the preferred artwork for a collection.
+func (c *Client) UpdateCollectionArt(ctx context.Context, request *UpdateCollectionArtRequest, opts ...RequestOpt) (*UpdateCollectionArtResponse, error) {
+	if request == nil {
+		return nil, errors.New("request must not be nil")
+	}
+	collectionID := strings.TrimSpace(request.CollectionID)
+	if collectionID == "" {
+		return nil, errors.New("collectionID must not be empty")
+	}
+
+	body, err := jsonBody(struct {
+		SelectedArtPrintingID string `json:"selectedArtPrintingId,omitempty"`
+		ClearSelectedArt      bool   `json:"clearSelectedArt,omitempty"`
+	}{
+		SelectedArtPrintingID: strings.TrimSpace(request.SelectedArtPrintingID),
+		ClearSelectedArt:      request.ClearSelectedArt,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("encode body: %w", err)
+	}
+
+	path := fmt.Sprintf("/v1/collections/%s/art", url.PathEscape(collectionID))
+	req, err := c.newRequest(ctx, http.MethodPut, path, body)
+	if err != nil {
+		return nil, err
+	}
+	if body != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
+
+	response := &UpdateCollectionArtResponse{}
+	if err := c.do(req, response, opts...); err != nil {
+		return nil, err
+	}
+
+	return response, nil
+}
+
 // DeleteCollection removes a collection by ID.
 func (c *Client) DeleteCollection(ctx context.Context, request *DeleteCollectionRequest, opts ...RequestOpt) (*DeleteCollectionResponse, error) {
 	if request == nil {
@@ -743,6 +830,33 @@ func (c *Client) GetCollectionValuation(ctx context.Context, request *GetCollect
 	req.URL.RawQuery = query.Encode()
 
 	response := &GetCollectionValuationResponse{}
+	if err := c.do(req, response, opts...); err != nil {
+		return nil, err
+	}
+
+	return response, nil
+}
+
+// ListTradeItems lists collection items marked for trade.
+func (c *Client) ListTradeItems(ctx context.Context, request *ListTradeItemsRequest, opts ...RequestOpt) (*ListTradeItemsResponse, error) {
+	if request == nil {
+		request = &ListTradeItemsRequest{}
+	}
+
+	req, err := c.newRequest(ctx, http.MethodGet, "/v1/trade_items", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	query := req.URL.Query()
+	setQueryString(query, "userId", request.UserID)
+	if request.PageSize != nil && *request.PageSize > 0 {
+		query.Set("pageSize", strconv.Itoa(int(*request.PageSize)))
+	}
+	setQueryString(query, "nextToken", request.NextToken)
+	req.URL.RawQuery = query.Encode()
+
+	response := &ListTradeItemsResponse{}
 	if err := c.do(req, response, opts...); err != nil {
 		return nil, err
 	}

@@ -145,8 +145,9 @@ func (r *LogoutResponse) setMetadata(metadata ResponseMetadata) {
 
 // MeResponse returns information about the current user.
 type MeResponse struct {
-	User     *User            `json:"user,omitempty"`
-	Metadata ResponseMetadata `json:"-"`
+	User          *User            `json:"user,omitempty"`
+	AccessProfile *AccessProfile   `json:"accessProfile,omitempty"`
+	Metadata      ResponseMetadata `json:"-"`
 }
 
 func (r *MeResponse) setMetadata(metadata ResponseMetadata) {
@@ -214,6 +215,18 @@ type User struct {
 	CreatedAt        *time.Time `json:"createdAt,omitempty"`
 	UpdatedAt        *time.Time `json:"updatedAt,omitempty"`
 	LastLoginAt      *time.Time `json:"lastLoginAt,omitempty"`
+}
+
+// AccessProfile describes roles, entitlements, limits, and capabilities for a user.
+type AccessProfile struct {
+	UserID       string            `json:"userId,omitempty"`
+	Roles        []string          `json:"roles,omitempty"`
+	Entitlements []string          `json:"entitlements,omitempty"`
+	Limits       map[string]string `json:"limits,omitempty"`
+	Version      int64             `json:"version,omitempty,string"`
+	Capabilities []string          `json:"capabilities,omitempty"`
+	AllAccess    bool              `json:"allAccess,omitempty"`
+	Tier         string            `json:"tier,omitempty"`
 }
 
 // Login authenticates a user using supplied credentials.

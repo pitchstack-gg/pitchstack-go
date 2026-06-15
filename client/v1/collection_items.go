@@ -38,6 +38,8 @@ type CollectionItem struct {
 	PrintingID     string     `json:"printingId,omitempty"`
 	BackCardID     string     `json:"backCardId,omitempty"`
 	BackPrintingID string     `json:"backPrintingId,omitempty"`
+	TradeQuantity  int32      `json:"tradeQuantity,omitempty"`
+	Notes          string     `json:"notes,omitempty"`
 }
 
 // ListCollectionItemsRequest captures filters for listing items.
@@ -78,12 +80,14 @@ func (r *GetCollectionItemResponse) setMetadata(metadata ResponseMetadata) {
 
 // CreateCollectionItemRequest creates an item within a collection.
 type CreateCollectionItemRequest struct {
-	CollectionID string    `json:"collectionId,omitempty"`
-	ProductID    string    `json:"productId,omitempty"`
-	Quantity     int32     `json:"quantity,omitempty"`
-	Condition    Condition `json:"condition,omitempty"`
-	Value        *float64  `json:"value,omitempty"`
-	ItemID       string    `json:"itemId,omitempty"`
+	CollectionID  string    `json:"collectionId,omitempty"`
+	ProductID     string    `json:"productId,omitempty"`
+	Quantity      int32     `json:"quantity,omitempty"`
+	Condition     Condition `json:"condition,omitempty"`
+	Value         *float64  `json:"value,omitempty"`
+	ItemID        string    `json:"itemId,omitempty"`
+	TradeQuantity int32     `json:"tradeQuantity,omitempty"`
+	Notes         string    `json:"notes,omitempty"`
 }
 
 // CreateCollectionItemResponse returns the created item.
@@ -125,6 +129,8 @@ type UpdateCollectionItemRequest struct {
 	Pinned            *bool      `json:"pinned,omitempty"`
 	ExpectedUpdatedAt *time.Time `json:"expectedUpdatedAt,omitempty"`
 	ClientMutationID  string     `json:"clientMutationId,omitempty"`
+	TradeQuantity     *int32     `json:"tradeQuantity,omitempty"`
+	Notes             *string    `json:"notes,omitempty"`
 }
 
 // UpdateCollectionItemResponse returns the updated item.
@@ -324,6 +330,8 @@ func (c *Client) UpdateCollectionItem(ctx context.Context, request *UpdateCollec
 		Pinned            *bool      `json:"pinned,omitempty"`
 		ExpectedUpdatedAt *time.Time `json:"expectedUpdatedAt,omitempty"`
 		ClientMutationID  string     `json:"clientMutationId,omitempty"`
+		TradeQuantity     *int32     `json:"tradeQuantity,omitempty"`
+		Notes             *string    `json:"notes,omitempty"`
 	}{
 		Quantity:          request.Quantity,
 		Condition:         request.Condition,
@@ -331,6 +339,8 @@ func (c *Client) UpdateCollectionItem(ctx context.Context, request *UpdateCollec
 		Pinned:            request.Pinned,
 		ExpectedUpdatedAt: request.ExpectedUpdatedAt,
 		ClientMutationID:  strings.TrimSpace(request.ClientMutationID),
+		TradeQuantity:     request.TradeQuantity,
+		Notes:             request.Notes,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("encode body: %w", err)

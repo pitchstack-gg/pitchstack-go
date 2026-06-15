@@ -88,8 +88,10 @@ func TestClientCreateCollectionItem(t *testing.T) {
 			require.NotNil(t, body.Value)
 			require.InEpsilon(t, 9.99, *body.Value, 1e-9)
 			require.Equal(t, "item-client-1", body.ItemID)
+			require.Equal(t, int32(1), body.TradeQuantity)
+			require.Equal(t, "trade note", body.Notes)
 
-			resp := CreateCollectionItemResponse{Item: &CollectionItem{ID: "item-1"}}
+			resp := CreateCollectionItemResponse{Item: &CollectionItem{ID: "item-1", TradeQuantity: 1, Notes: "trade note"}}
 			w.Header().Set("Content-Type", "application/json")
 			_ = json.NewEncoder(w).Encode(resp)
 		}
@@ -100,15 +102,19 @@ func TestClientCreateCollectionItem(t *testing.T) {
 		client := newTestClient(t, WithBaseURL(server.URL), WithHTTPClient(server.Client()))
 		value := 9.99
 		resp, err := client.CreateCollectionItem(context.Background(), &CreateCollectionItemRequest{
-			CollectionID: "col-1",
-			ProductID:    "product-1",
-			Quantity:     3,
-			Condition:    ConditionNearMint,
-			Value:        &value,
-			ItemID:       "item-client-1",
+			CollectionID:  "col-1",
+			ProductID:     "product-1",
+			Quantity:      3,
+			Condition:     ConditionNearMint,
+			Value:         &value,
+			ItemID:        "item-client-1",
+			TradeQuantity: 1,
+			Notes:         "trade note",
 		})
 		require.NoError(t, err)
 		require.Equal(t, "item-1", resp.Item.ID)
+		require.Equal(t, int32(1), resp.Item.TradeQuantity)
+		require.Equal(t, "trade note", resp.Item.Notes)
 	})
 
 	t.Run("when request is nil, then returns error", func(t *testing.T) {
@@ -173,8 +179,10 @@ func TestClientUpdateCollectionItem(t *testing.T) {
 			require.Equal(t, string(ConditionLightlyPlayed), body["condition"])
 			require.EqualValues(t, 12.5, body["value"])
 			require.Equal(t, true, body["pinned"])
+			require.EqualValues(t, 2, body["tradeQuantity"])
+			require.Equal(t, "updated note", body["notes"])
 
-			resp := UpdateCollectionItemResponse{Item: &CollectionItem{ID: "item-1", Quantity: 5, Value: 12.5}}
+			resp := UpdateCollectionItemResponse{Item: &CollectionItem{ID: "item-1", Quantity: 5, Value: 12.5, TradeQuantity: 2, Notes: "updated note"}}
 			w.Header().Set("Content-Type", "application/json")
 			_ = json.NewEncoder(w).Encode(resp)
 		}
@@ -185,19 +193,25 @@ func TestClientUpdateCollectionItem(t *testing.T) {
 		quantity := int32(5)
 		condition := ConditionLightlyPlayed
 		value := 12.5
+		tradeQuantity := int32(2)
+		notes := "updated note"
 
 		client := newTestClient(t, WithBaseURL(server.URL), WithHTTPClient(server.Client()))
 		pinned := true
 		resp, err := client.UpdateCollectionItem(context.Background(), &UpdateCollectionItemRequest{
-			ItemID:    "item-1",
-			Quantity:  &quantity,
-			Condition: &condition,
-			Value:     &value,
-			Pinned:    &pinned,
+			ItemID:        "item-1",
+			Quantity:      &quantity,
+			Condition:     &condition,
+			Value:         &value,
+			Pinned:        &pinned,
+			TradeQuantity: &tradeQuantity,
+			Notes:         &notes,
 		})
 		require.NoError(t, err)
 		require.Equal(t, int32(5), resp.Item.Quantity)
 		require.InEpsilon(t, 12.5, resp.Item.Value, 1e-9)
+		require.Equal(t, int32(2), resp.Item.TradeQuantity)
+		require.Equal(t, "updated note", resp.Item.Notes)
 	})
 
 	t.Run("when id missing, then returns error", func(t *testing.T) {
