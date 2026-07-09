@@ -101,32 +101,124 @@ type CardLegalitySummary struct {
 
 // CardSummary mirrors v1CardSummary.
 type CardSummary struct {
-	Identifier               string               `json:"identifier,omitempty"`
-	Name                     string               `json:"name,omitempty"`
-	Cost                     string               `json:"cost,omitempty"`
-	Pitch                    string               `json:"pitch,omitempty"`
-	Power                    string               `json:"power,omitempty"`
-	Defense                  string               `json:"defense,omitempty"`
-	Health                   string               `json:"health,omitempty"`
-	Intelligence             string               `json:"intelligence,omitempty"`
-	ColorIdentity            ColorIdentity        `json:"colorIdentity,omitempty"`
-	Arcane                   string               `json:"arcane,omitempty"`
-	Types                    []string             `json:"types,omitempty"`
-	Keywords                 []string             `json:"keywords,omitempty"`
-	AbilitiesAndEffects      []string             `json:"abilitiesAndEffects,omitempty"`
-	AbilityAndEffectKeywords []string             `json:"abilityAndEffectKeywords,omitempty"`
-	GrantedKeywords          []string             `json:"grantedKeywords,omitempty"`
-	RemovedKeywords          []string             `json:"removedKeywords,omitempty"`
-	InteractsWithKeywords    []string             `json:"interactsWithKeywords,omitempty"`
-	FunctionalText           string               `json:"functionalText,omitempty"`
-	IsDoubleFacedCard        bool                 `json:"isDoubleFacedCard,omitempty"`
-	IsDoubleFacedFront       bool                 `json:"isDoubleFacedFront,omitempty"`
-	DoubleFacedOtherID       string               `json:"doubleFacedOtherId,omitempty"`
-	DefaultImageURL          string               `json:"defaultImageUrl,omitempty"`
-	PitchSiblingIDs          []string             `json:"pitchSiblingIds,omitempty"`
-	ReferencedCards          []string             `json:"referencedCards,omitempty"`
-	CardsReferencedBy        []string             `json:"cardsReferencedBy,omitempty"`
-	Legality                 *CardLegalitySummary `json:"legality,omitempty"`
+	Identity          *CardIdentitySummary          `json:"identity,omitempty"`
+	SelectedCore      *CardCoreSummary              `json:"selectedCore,omitempty"`
+	Facets            *CardFacetSummary             `json:"facets,omitempty"`
+	PreferredPrinting *CardPreferredPrintingSummary `json:"preferredPrinting,omitempty"`
+	Layout            *CardLayoutSummary            `json:"layout,omitempty"`
+	Relationships     *CardRelationshipSummary      `json:"relationships,omitempty"`
+	LegalitySummary   *CardLegalitySummary          `json:"legalitySummary,omitempty"`
+}
+
+// CardIdentitySummary mirrors v1CardIdentitySummary.
+type CardIdentitySummary struct {
+	CardID            string   `json:"cardId,omitempty"`
+	CardType          string   `json:"cardType,omitempty"`
+	ObjectType        string   `json:"objectType,omitempty"`
+	Name              string   `json:"name,omitempty"`
+	FaceNames         []string `json:"faceNames,omitempty"`
+	IsDoubleFacedCard bool     `json:"isDoubleFacedCard,omitempty"`
+}
+
+// CardCoreSummary mirrors v1CardCoreSummary.
+type CardCoreSummary struct {
+	CoreIndex         int32         `json:"coreIndex,omitempty"`
+	Name              string        `json:"name,omitempty"`
+	Pitch             string        `json:"pitch,omitempty"`
+	PitchValue        int32         `json:"pitchValue,omitempty"`
+	Chi               string        `json:"chi,omitempty"`
+	Cost              string        `json:"cost,omitempty"`
+	CostValue         int32         `json:"costValue,omitempty"`
+	Power             string        `json:"power,omitempty"`
+	PowerValue        int32         `json:"powerValue,omitempty"`
+	Defense           string        `json:"defense,omitempty"`
+	DefenseValue      int32         `json:"defenseValue,omitempty"`
+	Intelligence      string        `json:"intelligence,omitempty"`
+	IntelligenceValue int32         `json:"intelligenceValue,omitempty"`
+	Health            string        `json:"health,omitempty"`
+	HealthValue       int32         `json:"healthValue,omitempty"`
+	ColorIdentity     ColorIdentity `json:"colorIdentity,omitempty"`
+	FunctionalText    string        `json:"functionalText,omitempty"`
+	TypeLine          string        `json:"typeLine,omitempty"`
+	TraitLine         string        `json:"traitLine,omitempty"`
+}
+
+// CardFacetSummary mirrors v1CardFacetSummary.
+type CardFacetSummary struct {
+	Classes   []string `json:"classes,omitempty"`
+	Talents   []string `json:"talents,omitempty"`
+	BaseTypes []string `json:"baseTypes,omitempty"`
+	Subtypes  []string `json:"subtypes,omitempty"`
+	Types     []string `json:"types,omitempty"`
+	Keywords  []string `json:"keywords,omitempty"`
+}
+
+// CardImageSummary mirrors v1CardImageSummary.
+type CardImageSummary struct {
+	ImageURL           string         `json:"imageUrl,omitempty"`
+	ImageSmallURL      string         `json:"imageSmallUrl,omitempty"`
+	ImageMediumURL     string         `json:"imageMediumUrl,omitempty"`
+	ImageLargeURL      string         `json:"imageLargeUrl,omitempty"`
+	ImageCropURL       string         `json:"imageCropUrl,omitempty"`
+	ImageCropSmallURL  string         `json:"imageCropSmallUrl,omitempty"`
+	ImageCropMediumURL string         `json:"imageCropMediumUrl,omitempty"`
+	ImageCropXlargeURL string         `json:"imageCropXlargeUrl,omitempty"`
+	ImagePrimaryColor  string         `json:"imagePrimaryColor,omitempty"`
+	ImageCropColor     map[string]any `json:"imageCropColor,omitempty"`
+	ImageCropMetadata  string         `json:"imageCropMetadata,omitempty"`
+}
+
+// CardPreferredPrintingSummary mirrors v1CardPreferredPrintingSummary.
+type CardPreferredPrintingSummary struct {
+	PrintingID    string            `json:"printingId,omitempty"`
+	SetCode       string            `json:"setCode,omitempty"`
+	Rarity        string            `json:"rarity,omitempty"`
+	Language      string            `json:"language,omitempty"`
+	RankingReason string            `json:"rankingReason,omitempty"`
+	RankingScore  int32             `json:"rankingScore,omitempty"`
+	Image         *CardImageSummary `json:"image,omitempty"`
+}
+
+// CardLayoutSummary mirrors v1CardLayoutSummary.
+type CardLayoutSummary struct {
+	Kind        string            `json:"kind,omitempty"`
+	Orientation string            `json:"orientation,omitempty"`
+	DefaultFace string            `json:"defaultFace,omitempty"`
+	Faces       []CardFaceSummary `json:"faces,omitempty"`
+}
+
+// CardFaceSummary mirrors v1CardFaceSummary.
+type CardFaceSummary struct {
+	Slot                 string            `json:"slot,omitempty"`
+	FaceID               string            `json:"faceId,omitempty"`
+	CardID               string            `json:"cardId,omitempty"`
+	CoreIndex            int32             `json:"coreIndex,omitempty"`
+	Name                 string            `json:"name,omitempty"`
+	TypeLine             string            `json:"typeLine,omitempty"`
+	FunctionalText       string            `json:"functionalText,omitempty"`
+	PrintedText          string            `json:"printedText,omitempty"`
+	FlavorText           string            `json:"flavorText,omitempty"`
+	Pitch                string            `json:"pitch,omitempty"`
+	PitchValue           int32             `json:"pitchValue,omitempty"`
+	Cost                 string            `json:"cost,omitempty"`
+	CostValue            int32             `json:"costValue,omitempty"`
+	Power                string            `json:"power,omitempty"`
+	PowerValue           int32             `json:"powerValue,omitempty"`
+	Defense              string            `json:"defense,omitempty"`
+	DefenseValue         int32             `json:"defenseValue,omitempty"`
+	Intelligence         string            `json:"intelligence,omitempty"`
+	IntelligenceValue    int32             `json:"intelligenceValue,omitempty"`
+	Health               string            `json:"health,omitempty"`
+	HealthValue          int32             `json:"healthValue,omitempty"`
+	Image                *CardImageSummary `json:"image,omitempty"`
+	ImageRotationDegrees int32             `json:"imageRotationDegrees,omitempty"`
+}
+
+// CardRelationshipSummary mirrors v1CardRelationshipSummary.
+type CardRelationshipSummary struct {
+	PitchSiblingIDs   []string `json:"pitchSiblingIds,omitempty"`
+	ReferencedCards   []string `json:"referencedCards,omitempty"`
+	CardsReferencedBy []string `json:"cardsReferencedBy,omitempty"`
 }
 
 // TCGPlayerSummary mirrors v1TCGPlayerSummary.
@@ -135,25 +227,85 @@ type TCGPlayerSummary struct {
 	URL       string `json:"url,omitempty"`
 }
 
+// ProductGroupSummary mirrors v1ProductGroupSummary.
+type ProductGroupSummary struct {
+	Identifier     string            `json:"identifier,omitempty"`
+	SetCode        string            `json:"setCode,omitempty"`
+	SetCodes       []string          `json:"setCodes,omitempty"`
+	SetName        string            `json:"setName,omitempty"`
+	SetReleaseDate string            `json:"setReleaseDate,omitempty"`
+	Name           string            `json:"name,omitempty"`
+	SubHeader      string            `json:"subHeader,omitempty"`
+	Type           string            `json:"type,omitempty"`
+	ReleaseDate    string            `json:"releaseDate,omitempty"`
+	CreatedAt      string            `json:"createdAt,omitempty"`
+	UpdatedAt      string            `json:"updatedAt,omitempty"`
+	Logo           string            `json:"logo,omitempty"`
+	LogoSmall      string            `json:"logoSmall,omitempty"`
+	LogoMedium     string            `json:"logoMedium,omitempty"`
+	LogoLarge      string            `json:"logoLarge,omitempty"`
+	Banner         string            `json:"banner,omitempty"`
+	BannerSmall    string            `json:"bannerSmall,omitempty"`
+	BannerMedium   string            `json:"bannerMedium,omitempty"`
+	BannerLarge    string            `json:"bannerLarge,omitempty"`
+	AccentColor    string            `json:"accentColor,omitempty"`
+	SourceURL      string            `json:"sourceUrl,omitempty"`
+	PullRates      map[string]string `json:"pullRates,omitempty"`
+	CardsPerPack   int32             `json:"cardsPerPack,omitempty"`
+	PacksPerBox    int32             `json:"packsPerBox,omitempty"`
+	BoxesPerCase   int32             `json:"boxesPerCase,omitempty"`
+}
+
+// ProductEstimatedValueSummary mirrors v1ProductEstimatedValueSummary.
+type ProductEstimatedValueSummary struct {
+	Price1              float64          `json:"price1,omitempty"`
+	Price2              float64          `json:"price2,omitempty"`
+	Price3              float64          `json:"price3,omitempty"`
+	Currency            string           `json:"currency,omitempty"`
+	Confidence          string           `json:"confidence,omitempty"`
+	SourcePackProductID string           `json:"sourcePackProductId,omitempty"`
+	SourceBoxProductID  string           `json:"sourceBoxProductId,omitempty"`
+	PackCount           int32            `json:"packCount,omitempty"`
+	Coverage            map[string]any   `json:"coverage,omitempty"`
+	Breakdown           []map[string]any `json:"breakdown,omitempty"`
+}
+
 // ProductSummary mirrors v1ProductSummary.
 type ProductSummary struct {
-	Identifier      string `json:"identifier,omitempty"`
-	FrontCardID     string `json:"frontCardId,omitempty"`
-	FrontPrintingID string `json:"frontPrintingId,omitempty"`
-	BackCardID      string `json:"backCardId,omitempty"`
-	BackPrintingID  string `json:"backPrintingId,omitempty"`
-	IsDFC           bool   `json:"isDfc,omitempty"`
-	Type            string `json:"type,omitempty"`
-	CardID          string `json:"cardId,omitempty"`
-	PrintingID      string `json:"printingId,omitempty"`
-	ProductGroupID  string `json:"productGroupId,omitempty"`
-	Name            string `json:"name,omitempty"`
-	Slug            string `json:"slug,omitempty"`
-	PrintedDate     string `json:"printedDate,omitempty"`
-	PrintedLanguage string `json:"printedLanguage,omitempty"`
-	ReleaseDate     string `json:"releaseDate,omitempty"`
-	Description     string `json:"description,omitempty"`
-	Quantity        int32  `json:"quantity,omitempty"`
+	Identifier              string                        `json:"identifier,omitempty"`
+	FrontCardID             string                        `json:"frontCardId,omitempty"`
+	FrontPrintingID         string                        `json:"frontPrintingId,omitempty"`
+	BackCardID              string                        `json:"backCardId,omitempty"`
+	BackPrintingID          string                        `json:"backPrintingId,omitempty"`
+	IsDFC                   bool                          `json:"isDfc,omitempty"`
+	Type                    string                        `json:"type,omitempty"`
+	CardID                  string                        `json:"cardId,omitempty"`
+	PrintingID              string                        `json:"printingId,omitempty"`
+	ProductGroupID          string                        `json:"productGroupId,omitempty"`
+	Name                    string                        `json:"name,omitempty"`
+	Slug                    string                        `json:"slug,omitempty"`
+	PrintedDate             string                        `json:"printedDate,omitempty"`
+	PrintedLanguage         string                        `json:"printedLanguage,omitempty"`
+	ReleaseDate             string                        `json:"releaseDate,omitempty"`
+	Description             string                        `json:"description,omitempty"`
+	Quantity                int32                         `json:"quantity,omitempty"`
+	ProductGroupName        string                        `json:"productGroupName,omitempty"`
+	ProductGroupType        string                        `json:"productGroupType,omitempty"`
+	ProductGroupReleaseDate string                        `json:"productGroupReleaseDate,omitempty"`
+	PullRates               map[string]string             `json:"pullRates,omitempty"`
+	ImageURL                string                        `json:"imageUrl,omitempty"`
+	ImageSmallURL           string                        `json:"imageSmallUrl,omitempty"`
+	ImageMediumURL          string                        `json:"imageMediumUrl,omitempty"`
+	ImageLargeURL           string                        `json:"imageLargeUrl,omitempty"`
+	TCGPlayerURL            string                        `json:"tcgPlayerUrl,omitempty"`
+	TCGPlayerProductID      string                        `json:"tcgPlayerProductId,omitempty"`
+	TCGPlayerProductName    string                        `json:"tcgPlayerProductName,omitempty"`
+	EstimatedValue          *ProductEstimatedValueSummary `json:"estimatedValue,omitempty"`
+	SetCode                 string                        `json:"setCode,omitempty"`
+	SetName                 string                        `json:"setName,omitempty"`
+	SetReleaseDate          string                        `json:"setReleaseDate,omitempty"`
+	ProductGroup            *ProductGroupSummary          `json:"productGroup,omitempty"`
+	Set                     *SetSummary                   `json:"set,omitempty"`
 }
 
 // SetSummary mirrors v1SetSummary.
@@ -165,22 +317,33 @@ type SetSummary struct {
 
 // PrintingSummary mirrors v1PrintingSummary.
 type PrintingSummary struct {
-	Identifier      string            `json:"identifier,omitempty"`
-	CardID          string            `json:"cardId,omitempty"`
-	SetPrintingID   string            `json:"setPrintingId,omitempty"`
-	PrintingName    string            `json:"printingName,omitempty"`
-	Artists         []string          `json:"artists,omitempty"`
-	ArtVariations   []string          `json:"artVariations,omitempty"`
-	FlavorText      string            `json:"flavorText,omitempty"`
-	ImageURL        string            `json:"imageUrl,omitempty"`
-	SetID           string            `json:"setId,omitempty"`
-	SetName         string            `json:"setName,omitempty"`
-	Edition         Edition           `json:"edition,omitempty"`
-	IsExpansionSlot bool              `json:"isExpansionSlot,omitempty"`
-	Foiling         Foiling           `json:"foiling,omitempty"`
-	Rarity          Rarity            `json:"rarity,omitempty"`
-	TCGPlayer       *TCGPlayerSummary `json:"tcgPlayer,omitempty"`
-	Products        []ProductSummary  `json:"products,omitempty"`
+	Identifier         string            `json:"identifier,omitempty"`
+	CardID             string            `json:"cardId,omitempty"`
+	SetPrintingID      string            `json:"setPrintingId,omitempty"`
+	PrintingName       string            `json:"printingName,omitempty"`
+	Artists            []string          `json:"artists,omitempty"`
+	ArtVariations      []string          `json:"artVariations,omitempty"`
+	FlavorText         string            `json:"flavorText,omitempty"`
+	ImageURL           string            `json:"imageUrl,omitempty"`
+	SetID              string            `json:"setId,omitempty"`
+	SetName            string            `json:"setName,omitempty"`
+	Edition            Edition           `json:"edition,omitempty"`
+	IsExpansionSlot    bool              `json:"isExpansionSlot,omitempty"`
+	Foiling            Foiling           `json:"foiling,omitempty"`
+	Rarity             Rarity            `json:"rarity,omitempty"`
+	TCGPlayer          *TCGPlayerSummary `json:"tcgPlayer,omitempty"`
+	Products           []ProductSummary  `json:"products,omitempty"`
+	ImageCropURL       string            `json:"imageCropUrl,omitempty"`
+	ImageCropSmallURL  string            `json:"imageCropSmallUrl,omitempty"`
+	ImageCropMediumURL string            `json:"imageCropMediumUrl,omitempty"`
+	ImageCropXlargeURL string            `json:"imageCropXlargeUrl,omitempty"`
+	ImagePrimaryColor  string            `json:"imagePrimaryColor,omitempty"`
+	ImageSmallURL      string            `json:"imageSmallUrl,omitempty"`
+	ImageMediumURL     string            `json:"imageMediumUrl,omitempty"`
+	ImageLargeURL      string            `json:"imageLargeUrl,omitempty"`
+	ImageCropColor     map[string]any    `json:"imageCropColor,omitempty"`
+	ImageCropMetadata  string            `json:"imageCropMetadata,omitempty"`
+	Language           string            `json:"language,omitempty"`
 }
 
 // DataSnapshotFile mirrors v1DataSnapshotFile.
@@ -238,6 +401,13 @@ type SearchCardsRequest struct {
 	IsDoubleFaced        *bool
 	PageSize             *int32
 	NextToken            string
+	Keyword              string
+	SetCode              string
+	Rarity               string
+	Language             string
+	Artist               string
+	SortBy               string
+	SortOrder            string
 }
 
 // SearchCardsResponse mirrors v1SearchCardsResponse.
@@ -263,6 +433,24 @@ type GetCardResponse struct {
 }
 
 func (r *GetCardResponse) setMetadata(metadata ResponseMetadata) {
+	r.Metadata = metadata
+}
+
+// ListCardIdentifiersRequest enumerates card IDs with keyset pagination.
+type ListCardIdentifiersRequest struct {
+	PageSize  *int32
+	NextToken string
+}
+
+// ListCardIdentifiersResponse returns card IDs ordered by identifier.
+type ListCardIdentifiersResponse struct {
+	Identifiers []string         `json:"identifiers,omitempty"`
+	NextToken   string           `json:"nextToken,omitempty"`
+	TotalSize   int32            `json:"totalSize,omitempty"`
+	Metadata    ResponseMetadata `json:"-"`
+}
+
+func (r *ListCardIdentifiersResponse) setMetadata(metadata ResponseMetadata) {
 	r.Metadata = metadata
 }
 
@@ -516,6 +704,13 @@ func (c *Client) SearchCards(ctx context.Context, request *SearchCardsRequest, o
 		query.Set("pageSize", strconv.Itoa(int(*request.PageSize)))
 	}
 	setQueryString(query, "nextToken", request.NextToken)
+	setQueryString(query, "keyword", request.Keyword)
+	setQueryString(query, "setCode", request.SetCode)
+	setQueryString(query, "rarity", request.Rarity)
+	setQueryString(query, "language", request.Language)
+	setQueryString(query, "artist", request.Artist)
+	setQueryString(query, "sortBy", request.SortBy)
+	setQueryString(query, "sortOrder", request.SortOrder)
 	req.URL.RawQuery = query.Encode()
 
 	response := &SearchCardsResponse{}
@@ -542,6 +737,32 @@ func (c *Client) GetCard(ctx context.Context, request *GetCardRequest, opts ...R
 	}
 
 	response := &GetCardResponse{}
+	if err := c.do(req, response, opts...); err != nil {
+		return nil, err
+	}
+
+	return response, nil
+}
+
+// ListCardIdentifiers enumerates card IDs with stable keyset pagination.
+func (c *Client) ListCardIdentifiers(ctx context.Context, request *ListCardIdentifiersRequest, opts ...RequestOpt) (*ListCardIdentifiersResponse, error) {
+	if request == nil {
+		request = &ListCardIdentifiersRequest{}
+	}
+
+	req, err := c.newRequest(ctx, http.MethodGet, "/v1/cards:identifiers", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	query := req.URL.Query()
+	if request.PageSize != nil && *request.PageSize > 0 {
+		query.Set("pageSize", strconv.Itoa(int(*request.PageSize)))
+	}
+	setQueryString(query, "nextToken", request.NextToken)
+	req.URL.RawQuery = query.Encode()
+
+	response := &ListCardIdentifiersResponse{}
 	if err := c.do(req, response, opts...); err != nil {
 		return nil, err
 	}

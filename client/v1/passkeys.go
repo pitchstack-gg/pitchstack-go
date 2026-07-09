@@ -45,6 +45,45 @@ func (r *CompletePasskeyRegistrationResponse) setMetadata(metadata ResponseMetad
 	r.Metadata = metadata
 }
 
+// InitiatePasskeySignupRequest starts passwordless signup.
+type InitiatePasskeySignupRequest struct {
+	Email       string `json:"email,omitempty"`
+	DisplayName string `json:"displayName,omitempty"`
+}
+
+// InitiatePasskeySignupResponse contains WebAuthn creation options for signup.
+type InitiatePasskeySignupResponse struct {
+	PublicKeyCreationOptions string           `json:"publicKeyCreationOptions,omitempty"`
+	SessionID                string           `json:"sessionId,omitempty"`
+	Metadata                 ResponseMetadata `json:"-"`
+}
+
+func (r *InitiatePasskeySignupResponse) setMetadata(metadata ResponseMetadata) {
+	r.Metadata = metadata
+}
+
+// CompletePasskeySignupRequest completes passwordless signup.
+type CompletePasskeySignupRequest struct {
+	SessionID         string `json:"sessionId,omitempty"`
+	ClientDataJSON    string `json:"clientDataJson,omitempty"`
+	AttestationObject string `json:"attestationObject,omitempty"`
+}
+
+// CompletePasskeySignupResponse returns credentials for a new passkey account.
+type CompletePasskeySignupResponse struct {
+	UserID               string           `json:"userId,omitempty"`
+	AccessToken          string           `json:"accessToken,omitempty"`
+	RefreshToken         string           `json:"refreshToken,omitempty"`
+	AccessTokenExpiresAt *time.Time       `json:"accessTokenExpiresAt,omitempty"`
+	Roles                []string         `json:"roles,omitempty"`
+	CredentialID         string           `json:"credentialId,omitempty"`
+	Metadata             ResponseMetadata `json:"-"`
+}
+
+func (r *CompletePasskeySignupResponse) setMetadata(metadata ResponseMetadata) {
+	r.Metadata = metadata
+}
+
 // InitiatePasskeyAuthenticationRequest starts passkey authentication.
 type InitiatePasskeyAuthenticationRequest struct {
 	Email string `json:"email,omitempty"`
@@ -77,6 +116,7 @@ type Passkey struct {
 	CreatedAt    *time.Time `json:"createdAt,omitempty"`
 	LastUsedAt   *time.Time `json:"lastUsedAt,omitempty"`
 	Transports   []string   `json:"transports,omitempty"`
+	DisplayName  string     `json:"displayName,omitempty"`
 }
 
 // ListUserPasskeysRequest identifies the user to inspect.
@@ -106,6 +146,32 @@ type DeletePasskeyResponse struct {
 }
 
 func (r *DeletePasskeyResponse) setMetadata(metadata ResponseMetadata) {
+	r.Metadata = metadata
+}
+
+// UpdatePasskeyRequest renames a passkey.
+type UpdatePasskeyRequest struct {
+	UserID       string `json:"-"`
+	CredentialID string `json:"-"`
+	DisplayName  string `json:"displayName,omitempty"`
+}
+
+// UpdatePasskeyResponse returns the updated passkey.
+type UpdatePasskeyResponse struct {
+	Passkey  *Passkey         `json:"-"`
+	Metadata ResponseMetadata `json:"-"`
+}
+
+func (r *UpdatePasskeyResponse) setMetadata(metadata ResponseMetadata) {
+	r.Metadata = metadata
+}
+
+type updatePasskeyWireResponse struct {
+	Passkey
+	Metadata ResponseMetadata `json:"-"`
+}
+
+func (r *updatePasskeyWireResponse) setMetadata(metadata ResponseMetadata) {
 	r.Metadata = metadata
 }
 
@@ -166,6 +232,66 @@ func (c *Client) CompletePasskeyRegistration(ctx context.Context, request *Compl
 	req.Header.Set("Content-Type", "application/json")
 
 	response := &CompletePasskeyRegistrationResponse{}
+	if err := c.do(req, response, opts...); err != nil {
+		return nil, err
+	}
+	return response, nil
+}
+
+// InitiatePasskeySignup initiates passwordless signup.
+func (c *Client) InitiatePasskeySignup(ctx context.Context, request *InitiatePasskeySignupRequest, opts ...RequestOpt) (*InitiatePasskeySignupResponse, error) {
+	if request == nil {
+		return nil, errors.New("request must not be nil")
+	}
+	if strings.TrimSpace(request.Email) == "" {
+		return nil, errors.New("email must not be empty")
+	}
+
+	body, err := jsonBody(request)
+	if err != nil {
+		return nil, fmt.Errorf("encode body: %w", err)
+	}
+
+	req, err := c.newRequest(ctx, http.MethodPost, "/v1/auth/webauthn/signup/initiate", body)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	response := &InitiatePasskeySignupResponse{}
+	if err := c.do(req, response, opts...); err != nil {
+		return nil, err
+	}
+	return response, nil
+}
+
+// CompletePasskeySignup completes passwordless signup.
+func (c *Client) CompletePasskeySignup(ctx context.Context, request *CompletePasskeySignupRequest, opts ...RequestOpt) (*CompletePasskeySignupResponse, error) {
+	if request == nil {
+		return nil, errors.New("request must not be nil")
+	}
+	if strings.TrimSpace(request.SessionID) == "" {
+		return nil, errors.New("sessionID must not be empty")
+	}
+	if strings.TrimSpace(request.ClientDataJSON) == "" {
+		return nil, errors.New("clientDataJson must not be empty")
+	}
+	if strings.TrimSpace(request.AttestationObject) == "" {
+		return nil, errors.New("attestationObject must not be empty")
+	}
+
+	body, err := jsonBody(request)
+	if err != nil {
+		return nil, fmt.Errorf("encode body: %w", err)
+	}
+
+	req, err := c.newRequest(ctx, http.MethodPost, "/v1/auth/webauthn/signup/complete", body)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	response := &CompletePasskeySignupResponse{}
 	if err := c.do(req, response, opts...); err != nil {
 		return nil, err
 	}
@@ -259,6 +385,46 @@ func (c *Client) ListUserPasskeys(ctx context.Context, request *ListUserPasskeys
 		return nil, err
 	}
 	return response, nil
+}
+
+// UpdatePasskey renames a passkey credential for a user.
+func (c *Client) UpdatePasskey(ctx context.Context, request *UpdatePasskeyRequest, opts ...RequestOpt) (*UpdatePasskeyResponse, error) {
+	if request == nil {
+		return nil, errors.New("request must not be nil")
+	}
+	userID := strings.TrimSpace(request.UserID)
+	if userID == "" {
+		return nil, errors.New("userID must not be empty")
+	}
+	credentialID := strings.TrimSpace(request.CredentialID)
+	if credentialID == "" {
+		return nil, errors.New("credentialID must not be empty")
+	}
+	if strings.TrimSpace(request.DisplayName) == "" {
+		return nil, errors.New("displayName must not be empty")
+	}
+
+	body, err := jsonBody(struct {
+		DisplayName string `json:"displayName,omitempty"`
+	}{
+		DisplayName: strings.TrimSpace(request.DisplayName),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("encode body: %w", err)
+	}
+
+	path := fmt.Sprintf("/v1/auth/webauthn/users/%s/credentials/%s", url.PathEscape(userID), url.PathEscape(credentialID))
+	req, err := c.newRequest(ctx, http.MethodPatch, path, body)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	wire := &updatePasskeyWireResponse{}
+	if err := c.do(req, wire, opts...); err != nil {
+		return nil, err
+	}
+	return &UpdatePasskeyResponse{Passkey: &wire.Passkey, Metadata: wire.Metadata}, nil
 }
 
 // DeletePasskey deletes a passkey credential for a user.

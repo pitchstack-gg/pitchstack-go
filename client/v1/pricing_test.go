@@ -306,3 +306,52 @@ func TestClientProductPriceWatchLists(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "req-delete", deleteResp.Metadata.RequestID)
 }
+
+func TestClientGetProductPriceWatchDigest(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/v1/price-watch-digests/digest-1":
+			require.Equal(t, http.MethodGet, r.Method)
+			require.NoError(t, json.NewEncoder(w).Encode(GetProductPriceWatchDigestResponse{
+				Digest: &ProductPriceWatchDigest{
+					DigestID:       "digest-1",
+					DigestDate:     "2026-07-08",
+					ItemCount:      1,
+					WatchListCount: 1,
+					Groups: []ProductPriceWatchDigestGroup{{
+						ListID: "list-1",
+						Name:   "Deals",
+						Items: []ProductPriceWatchDigestItem{{
+							ItemID:        "item-1",
+							ProductID:     "prod-1",
+							CurrentPrice:  10,
+							BaselinePrice: 8,
+						}},
+					}},
+				},
+			}))
+		case "/v1/price-watch-digests/by-date/2026-07-08":
+			require.Equal(t, http.MethodGet, r.Method)
+			require.NoError(t, json.NewEncoder(w).Encode(GetProductPriceWatchDigestResponse{
+				Digest: &ProductPriceWatchDigest{DigestID: "digest-2", DigestDate: "2026-07-08"},
+			}))
+		default:
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.Path)
+		}
+	}))
+	t.Cleanup(server.Close)
+
+	client := newTestClient(t, WithBaseURL(server.URL), WithHTTPClient(server.Client()))
+	byID, err := client.GetProductPriceWatchDigest(context.Background(), &GetProductPriceWatchDigestRequest{DigestID: "digest-1"})
+	require.NoError(t, err)
+	require.Equal(t, "digest-1", byID.Digest.DigestID)
+	require.Equal(t, "prod-1", byID.Digest.Groups[0].Items[0].ProductID)
+
+	byDate, err := client.GetProductPriceWatchDigest(context.Background(), &GetProductPriceWatchDigestRequest{DigestDate: "2026-07-08"})
+	require.NoError(t, err)
+	require.Equal(t, "digest-2", byDate.Digest.DigestID)
+
+	resp, err := client.GetProductPriceWatchDigest(context.Background(), &GetProductPriceWatchDigestRequest{})
+	require.Error(t, err)
+	require.Nil(t, resp)
+}

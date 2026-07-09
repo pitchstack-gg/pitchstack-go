@@ -328,6 +328,62 @@ func (r *BatchAddProductsToProductPriceWatchListResponse) setMetadata(metadata R
 	r.Metadata = metadata
 }
 
+// ProductPriceWatchDigest summarizes one daily price-watch digest.
+type ProductPriceWatchDigest struct {
+	DigestID       string                         `json:"digestId,omitempty"`
+	DigestDate     string                         `json:"digestDate,omitempty"`
+	Status         string                         `json:"status,omitempty"`
+	ItemCount      int32                          `json:"itemCount,omitempty"`
+	WatchListCount int32                          `json:"watchListCount,omitempty"`
+	NotificationID string                         `json:"notificationId,omitempty"`
+	Groups         []ProductPriceWatchDigestGroup `json:"groups,omitempty"`
+	UngroupedItems []ProductPriceWatchDigestItem  `json:"ungroupedItems,omitempty"`
+	CreatedAt      *time.Time                     `json:"createdAt,omitempty"`
+	UpdatedAt      *time.Time                     `json:"updatedAt,omitempty"`
+	SentAt         *time.Time                     `json:"sentAt,omitempty"`
+}
+
+// ProductPriceWatchDigestGroup groups digest items by watch list.
+type ProductPriceWatchDigestGroup struct {
+	ListID    string                        `json:"listId,omitempty"`
+	Name      string                        `json:"name,omitempty"`
+	IsDefault bool                          `json:"isDefault,omitempty"`
+	Items     []ProductPriceWatchDigestItem `json:"items,omitempty"`
+}
+
+// ProductPriceWatchDigestItem describes one digest price movement.
+type ProductPriceWatchDigestItem struct {
+	ItemID         string     `json:"itemId,omitempty"`
+	WatchID        string     `json:"watchId,omitempty"`
+	PriceEntryID   string     `json:"priceEntryId,omitempty"`
+	ProductID      string     `json:"productId,omitempty"`
+	Source         string     `json:"source,omitempty"`
+	Period         string     `json:"period,omitempty"`
+	Direction      string     `json:"direction,omitempty"`
+	BaselinePrice  float64    `json:"baselinePrice,omitempty"`
+	CurrentPrice   float64    `json:"currentPrice,omitempty"`
+	AbsoluteChange float64    `json:"absoluteChange,omitempty"`
+	PercentChange  float64    `json:"percentChange,omitempty"`
+	RecordedAt     *time.Time `json:"recordedAt,omitempty"`
+	SourceURL      string     `json:"sourceUrl,omitempty"`
+}
+
+// GetProductPriceWatchDigestRequest identifies a digest by ID or date.
+type GetProductPriceWatchDigestRequest struct {
+	DigestID   string
+	DigestDate string
+}
+
+// GetProductPriceWatchDigestResponse returns a price-watch digest.
+type GetProductPriceWatchDigestResponse struct {
+	Digest   *ProductPriceWatchDigest `json:"digest,omitempty"`
+	Metadata ResponseMetadata         `json:"-"`
+}
+
+func (r *GetProductPriceWatchDigestResponse) setMetadata(metadata ResponseMetadata) {
+	r.Metadata = metadata
+}
+
 // GetPricingStatsResponse mirrors v1GetPricingStatsResponse.
 type GetPricingStatsResponse struct {
 	TotalCards        int32            `json:"totalCards,omitempty"`
@@ -797,6 +853,36 @@ func (c *Client) BatchAddProductsToProductPriceWatchList(ctx context.Context, re
 	req.Header.Set("Content-Type", "application/json")
 
 	response := &BatchAddProductsToProductPriceWatchListResponse{}
+	if err := c.do(req, response, opts...); err != nil {
+		return nil, err
+	}
+	return response, nil
+}
+
+// GetProductPriceWatchDigest reads a price-watch digest by ID or digest date.
+func (c *Client) GetProductPriceWatchDigest(ctx context.Context, request *GetProductPriceWatchDigestRequest, opts ...RequestOpt) (*GetProductPriceWatchDigestResponse, error) {
+	if request == nil {
+		return nil, errors.New("request must not be nil")
+	}
+	digestID := strings.TrimSpace(request.DigestID)
+	digestDate := strings.TrimSpace(request.DigestDate)
+	if digestID == "" && digestDate == "" {
+		return nil, errors.New("digestID or digestDate must not be empty")
+	}
+
+	var path string
+	if digestID != "" {
+		path = fmt.Sprintf("/v1/price-watch-digests/%s", url.PathEscape(digestID))
+	} else {
+		path = fmt.Sprintf("/v1/price-watch-digests/by-date/%s", url.PathEscape(digestDate))
+	}
+
+	req, err := c.newRequest(ctx, http.MethodGet, path, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetProductPriceWatchDigestResponse{}
 	if err := c.do(req, response, opts...); err != nil {
 		return nil, err
 	}

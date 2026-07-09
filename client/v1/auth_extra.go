@@ -157,6 +157,81 @@ func (r *ResendVerificationEmailResponse) setMetadata(metadata ResponseMetadata)
 	r.Metadata = metadata
 }
 
+// EmailChangeRequest describes a pending account email change.
+type EmailChangeRequest struct {
+	NewEmail  string     `json:"newEmail,omitempty"`
+	ExpiresAt *time.Time `json:"expiresAt,omitempty"`
+	CreatedAt *time.Time `json:"createdAt,omitempty"`
+}
+
+// GetEmailChangeStatusRequest fetches the authenticated user's pending email change.
+type GetEmailChangeStatusRequest struct{}
+
+// GetEmailChangeStatusResponse returns any pending email change.
+type GetEmailChangeStatusResponse struct {
+	PendingChange *EmailChangeRequest `json:"pendingChange,omitempty"`
+	Metadata      ResponseMetadata    `json:"-"`
+}
+
+func (r *GetEmailChangeStatusResponse) setMetadata(metadata ResponseMetadata) {
+	r.Metadata = metadata
+}
+
+// RequestEmailChangeRequest starts an account email change.
+type RequestEmailChangeRequest struct {
+	NewEmail string `json:"newEmail,omitempty"`
+}
+
+// RequestEmailChangeResponse returns the pending email change.
+type RequestEmailChangeResponse struct {
+	PendingChange *EmailChangeRequest `json:"pendingChange,omitempty"`
+	Metadata      ResponseMetadata    `json:"-"`
+}
+
+func (r *RequestEmailChangeResponse) setMetadata(metadata ResponseMetadata) {
+	r.Metadata = metadata
+}
+
+// ResendEmailChangeConfirmationRequest resends a pending email-change confirmation.
+type ResendEmailChangeConfirmationRequest struct{}
+
+// ResendEmailChangeConfirmationResponse captures metadata for resend operations.
+type ResendEmailChangeConfirmationResponse struct {
+	Metadata ResponseMetadata `json:"-"`
+}
+
+func (r *ResendEmailChangeConfirmationResponse) setMetadata(metadata ResponseMetadata) {
+	r.Metadata = metadata
+}
+
+// CancelEmailChangeRequest cancels a pending account email change.
+type CancelEmailChangeRequest struct{}
+
+// CancelEmailChangeResponse captures metadata for cancel operations.
+type CancelEmailChangeResponse struct {
+	Metadata ResponseMetadata `json:"-"`
+}
+
+func (r *CancelEmailChangeResponse) setMetadata(metadata ResponseMetadata) {
+	r.Metadata = metadata
+}
+
+// ConfirmEmailChangeRequest confirms an account email change.
+type ConfirmEmailChangeRequest struct {
+	UserID      string `json:"userId,omitempty"`
+	ChangeToken string `json:"changeToken,omitempty"`
+}
+
+// ConfirmEmailChangeResponse returns the updated user.
+type ConfirmEmailChangeResponse struct {
+	User     *User            `json:"user,omitempty"`
+	Metadata ResponseMetadata `json:"-"`
+}
+
+func (r *ConfirmEmailChangeResponse) setMetadata(metadata ResponseMetadata) {
+	r.Metadata = metadata
+}
+
 // VerifyEmailRequest verifies a user's email using a token.
 type VerifyEmailRequest struct {
 	UserID            string `json:"userId,omitempty"`
@@ -618,6 +693,115 @@ func (c *Client) VerifyEmail(ctx context.Context, request *VerifyEmailRequest, o
 	req.Header.Set("Content-Type", "application/json")
 
 	response := &VerifyEmailResponse{}
+	if err := c.do(req, response, opts...); err != nil {
+		return nil, err
+	}
+	return response, nil
+}
+
+// GetEmailChangeStatus fetches any pending account email change for the authenticated user.
+func (c *Client) GetEmailChangeStatus(ctx context.Context, request *GetEmailChangeStatusRequest, opts ...RequestOpt) (*GetEmailChangeStatusResponse, error) {
+	req, err := c.newRequest(ctx, http.MethodGet, "/v1/auth/email-change", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetEmailChangeStatusResponse{}
+	if err := c.do(req, response, opts...); err != nil {
+		return nil, err
+	}
+	return response, nil
+}
+
+// RequestEmailChange starts an account email change.
+func (c *Client) RequestEmailChange(ctx context.Context, request *RequestEmailChangeRequest, opts ...RequestOpt) (*RequestEmailChangeResponse, error) {
+	if request == nil {
+		return nil, errors.New("request must not be nil")
+	}
+	if strings.TrimSpace(request.NewEmail) == "" {
+		return nil, errors.New("newEmail must not be empty")
+	}
+
+	body, err := jsonBody(request)
+	if err != nil {
+		return nil, fmt.Errorf("encode body: %w", err)
+	}
+
+	req, err := c.newRequest(ctx, http.MethodPost, "/v1/auth/email-change", body)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	response := &RequestEmailChangeResponse{}
+	if err := c.do(req, response, opts...); err != nil {
+		return nil, err
+	}
+	return response, nil
+}
+
+// ResendEmailChangeConfirmation resends a pending email-change confirmation.
+func (c *Client) ResendEmailChangeConfirmation(ctx context.Context, request *ResendEmailChangeConfirmationRequest, opts ...RequestOpt) (*ResendEmailChangeConfirmationResponse, error) {
+	if request == nil {
+		request = &ResendEmailChangeConfirmationRequest{}
+	}
+
+	body, err := jsonBody(request)
+	if err != nil {
+		return nil, fmt.Errorf("encode body: %w", err)
+	}
+
+	req, err := c.newRequest(ctx, http.MethodPost, "/v1/auth/email-change/resend", body)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	response := &ResendEmailChangeConfirmationResponse{}
+	if err := c.do(req, response, opts...); err != nil {
+		return nil, err
+	}
+	return response, nil
+}
+
+// CancelEmailChange cancels a pending account email change.
+func (c *Client) CancelEmailChange(ctx context.Context, request *CancelEmailChangeRequest, opts ...RequestOpt) (*CancelEmailChangeResponse, error) {
+	req, err := c.newRequest(ctx, http.MethodDelete, "/v1/auth/email-change", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CancelEmailChangeResponse{}
+	if err := c.do(req, response, opts...); err != nil {
+		return nil, err
+	}
+	return response, nil
+}
+
+// ConfirmEmailChange confirms an account email change.
+func (c *Client) ConfirmEmailChange(ctx context.Context, request *ConfirmEmailChangeRequest, opts ...RequestOpt) (*ConfirmEmailChangeResponse, error) {
+	if request == nil {
+		return nil, errors.New("request must not be nil")
+	}
+	if strings.TrimSpace(request.UserID) == "" {
+		return nil, errors.New("userID must not be empty")
+	}
+	if strings.TrimSpace(request.ChangeToken) == "" {
+		return nil, errors.New("changeToken must not be empty")
+	}
+
+	body, err := jsonBody(request)
+	if err != nil {
+		return nil, fmt.Errorf("encode body: %w", err)
+	}
+
+	req, err := c.newRequest(ctx, http.MethodPost, "/v1/auth/email-change/confirm", body)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	response := &ConfirmEmailChangeResponse{}
 	if err := c.do(req, response, opts...); err != nil {
 		return nil, err
 	}

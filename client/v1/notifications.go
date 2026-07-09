@@ -141,6 +141,20 @@ func (r *UpdateNotificationPreferencesResponse) setMetadata(metadata ResponseMet
 	r.Metadata = metadata
 }
 
+// UnsubscribeEmailRequest disables an email notification category from an unsubscribe link.
+type UnsubscribeEmailRequest struct {
+	Token string
+}
+
+// UnsubscribeEmailResponse captures metadata for email unsubscribe operations.
+type UnsubscribeEmailResponse struct {
+	Metadata ResponseMetadata `json:"-"`
+}
+
+func (r *UnsubscribeEmailResponse) setMetadata(metadata ResponseMetadata) {
+	r.Metadata = metadata
+}
+
 // GetNotificationTopicSubscriptionsRequest filters topic subscriptions.
 type GetNotificationTopicSubscriptionsRequest struct {
 	Category  string
@@ -394,6 +408,32 @@ func (c *Client) UpdateNotificationPreferences(ctx context.Context, request *Upd
 	req.Header.Set("Content-Type", "application/json")
 
 	response := &UpdateNotificationPreferencesResponse{}
+	if err := c.do(req, response, opts...); err != nil {
+		return nil, err
+	}
+	return response, nil
+}
+
+// UnsubscribeEmail disables one email notification category using an unsubscribe token.
+func (c *Client) UnsubscribeEmail(ctx context.Context, request *UnsubscribeEmailRequest, opts ...RequestOpt) (*UnsubscribeEmailResponse, error) {
+	if request == nil {
+		return nil, errors.New("request must not be nil")
+	}
+	token := strings.TrimSpace(request.Token)
+	if token == "" {
+		return nil, errors.New("token must not be empty")
+	}
+
+	req, err := c.newRequest(ctx, http.MethodPost, "/v1/notifications/email:unsubscribe", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	query := req.URL.Query()
+	query.Set("token", token)
+	req.URL.RawQuery = query.Encode()
+
+	response := &UnsubscribeEmailResponse{}
 	if err := c.do(req, response, opts...); err != nil {
 		return nil, err
 	}

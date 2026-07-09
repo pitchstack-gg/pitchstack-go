@@ -41,7 +41,8 @@ func TestGetCardReturnsSummary(t *testing.T) {
 
 	ensureMetadata(t, resp.Metadata)
 
-	require.Equal(t, cardID, resp.Summary.Identifier, "expected identifier to match")
+	require.NotNil(t, resp.Summary.Identity, "expected identity in summary")
+	require.Equal(t, cardID, resp.Summary.Identity.CardID, "expected identifier to match")
 }
 
 func TestGetPrintingReturnsSummary(t *testing.T) {

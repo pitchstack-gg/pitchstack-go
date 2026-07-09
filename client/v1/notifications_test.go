@@ -100,6 +100,26 @@ func TestClientPushDevicesAndPreferences(t *testing.T) {
 	require.Equal(t, "social", updateResp.Preferences[0].Category)
 }
 
+func TestClientUnsubscribeEmail(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, http.MethodPost, r.Method)
+		require.Equal(t, "/v1/notifications/email:unsubscribe", r.URL.Path)
+		require.Equal(t, "unsubscribe-token", r.URL.Query().Get("token"))
+		w.Header().Set("X-Request-Id", "req-unsubscribe")
+		w.WriteHeader(http.StatusOK)
+	}))
+	t.Cleanup(server.Close)
+
+	client := newTestClient(t, WithBaseURL(server.URL), WithHTTPClient(server.Client()))
+	resp, err := client.UnsubscribeEmail(context.Background(), &UnsubscribeEmailRequest{Token: " unsubscribe-token "})
+	require.NoError(t, err)
+	require.Equal(t, "req-unsubscribe", resp.Metadata.RequestID)
+
+	resp, err = client.UnsubscribeEmail(context.Background(), &UnsubscribeEmailRequest{})
+	require.Error(t, err)
+	require.Nil(t, resp)
+}
+
 func TestClientNotificationTopicSubscriptions(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {

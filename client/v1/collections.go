@@ -442,6 +442,7 @@ type GetCollectionValuationResponse struct {
 	PricedItems         int32            `json:"pricedItems,omitempty"`
 	MissingPriceItems   int32            `json:"missingPriceItems,omitempty"`
 	ComputedAt          *time.Time       `json:"computedAt,omitempty"`
+	TotalQuantity       int32            `json:"totalQuantity,omitempty"`
 	Metadata            ResponseMetadata `json:"-"`
 }
 

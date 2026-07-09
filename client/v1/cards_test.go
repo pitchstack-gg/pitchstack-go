@@ -38,9 +38,20 @@ func TestClientSearchCards(t *testing.T) {
 			require.Equal(t, strconv.FormatBool(false), values.Get("ccBanned"))
 			require.Equal(t, "20", values.Get("pageSize"))
 			require.Equal(t, "token-123", values.Get("nextToken"))
+			require.Equal(t, "go again", values.Get("keyword"))
+			require.Equal(t, "WTR", values.Get("setCode"))
+			require.Equal(t, "MAJESTIC", values.Get("rarity"))
+			require.Equal(t, "en", values.Get("language"))
+			require.Equal(t, "Artist", values.Get("artist"))
+			require.Equal(t, "name", values.Get("sortBy"))
+			require.Equal(t, "asc", values.Get("sortOrder"))
 
 			resp := SearchCardsResponse{
-				Summaries: []CardSummary{{Identifier: "card-1"}},
+				Summaries: []CardSummary{{
+					Identity:     &CardIdentitySummary{CardID: "card-1", Name: "Azalea"},
+					SelectedCore: &CardCoreSummary{Pitch: "1", PitchValue: 1},
+					Facets:       &CardFacetSummary{Classes: []string{"Ranger"}},
+				}},
 				NextToken: "next-token",
 			}
 			w.Header().Set("Content-Type", "application/json")
@@ -70,6 +81,13 @@ func TestClientSearchCards(t *testing.T) {
 			CCBanned:      &boolFalse,
 			PageSize:      &pageSize,
 			NextToken:     "token-123",
+			Keyword:       "go again",
+			SetCode:       "WTR",
+			Rarity:        "MAJESTIC",
+			Language:      "en",
+			Artist:        "Artist",
+			SortBy:        "name",
+			SortOrder:     "asc",
 		})
 		require.NoError(t, err)
 		require.Len(t, resp.Summaries, 1)
@@ -98,7 +116,13 @@ func TestClientGetCard(t *testing.T) {
 	t.Run("when id provided, then card summary returned", func(t *testing.T) {
 		handler := func(w http.ResponseWriter, r *http.Request) {
 			require.Equal(t, "/v1/cards/card-1", r.URL.Path)
-			resp := GetCardResponse{Summary: &CardSummary{Identifier: "card-1"}}
+			resp := GetCardResponse{Summary: &CardSummary{
+				Identity: &CardIdentitySummary{CardID: "card-1", Name: "Azalea"},
+				PreferredPrinting: &CardPreferredPrintingSummary{
+					PrintingID: "printing-1",
+					Image:      &CardImageSummary{ImageURL: "https://cdn.example/card.jpg"},
+				},
+			}}
 			w.Header().Set("Content-Type", "application/json")
 			_ = json.NewEncoder(w).Encode(resp)
 		}
@@ -108,7 +132,9 @@ func TestClientGetCard(t *testing.T) {
 		client := newTestClient(t, WithBaseURL(server.URL), WithHTTPClient(server.Client()))
 		resp, err := client.GetCard(context.Background(), &GetCardRequest{CardID: "card-1"})
 		require.NoError(t, err)
-		require.Equal(t, "card-1", resp.Summary.Identifier)
+		require.Equal(t, "card-1", resp.Summary.Identity.CardID)
+		require.Equal(t, "printing-1", resp.Summary.PreferredPrinting.PrintingID)
+		require.Equal(t, "https://cdn.example/card.jpg", resp.Summary.PreferredPrinting.Image.ImageURL)
 	})
 
 	t.Run("when id missing, then returns error", func(t *testing.T) {
@@ -128,7 +154,7 @@ func TestClientBatchGetCards(t *testing.T) {
 			require.True(t, body.AllowPartial)
 
 			resp := BatchGetCardsResponse{
-				Cards:       map[string]CardSummary{"card-1": {Identifier: "card-1"}},
+				Cards:       map[string]CardSummary{"card-1": {Identity: &CardIdentitySummary{CardID: "card-1"}}},
 				NotFoundIDs: []string{"card-3"},
 			}
 			w.Header().Set("Content-Type", "application/json")
@@ -152,6 +178,39 @@ func TestClientBatchGetCards(t *testing.T) {
 		resp, err := client.BatchGetCards(context.Background(), nil)
 		require.Error(t, err)
 		require.Nil(t, resp)
+	})
+}
+
+func TestClientListCardIdentifiers(t *testing.T) {
+	t.Run("when pagination provided, then identifiers returned", func(t *testing.T) {
+		pageSize := int32(1000)
+		handler := func(w http.ResponseWriter, r *http.Request) {
+			require.Equal(t, http.MethodGet, r.Method)
+			require.Equal(t, "/v1/cards:identifiers", r.URL.Path)
+			require.Equal(t, "1000", r.URL.Query().Get("pageSize"))
+			require.Equal(t, "card-100", r.URL.Query().Get("nextToken"))
+
+			resp := ListCardIdentifiersResponse{
+				Identifiers: []string{"card-1", "card-2"},
+				NextToken:   "card-2",
+				TotalSize:   2,
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(resp)
+		}
+
+		server := httptest.NewServer(http.HandlerFunc(handler))
+		t.Cleanup(server.Close)
+
+		client := newTestClient(t, WithBaseURL(server.URL), WithHTTPClient(server.Client()))
+		resp, err := client.ListCardIdentifiers(context.Background(), &ListCardIdentifiersRequest{
+			PageSize:  &pageSize,
+			NextToken: "card-100",
+		})
+		require.NoError(t, err)
+		require.Equal(t, []string{"card-1", "card-2"}, resp.Identifiers)
+		require.Equal(t, "card-2", resp.NextToken)
+		require.Equal(t, int32(2), resp.TotalSize)
 	})
 }
 
@@ -226,7 +285,20 @@ func TestClientGetPrinting(t *testing.T) {
 	t.Run("when id provided, then printing returned", func(t *testing.T) {
 		handler := func(w http.ResponseWriter, r *http.Request) {
 			require.Equal(t, "/v1/printings/printing-1", r.URL.Path)
-			resp := GetPrintingResponse{Summary: &PrintingSummary{Identifier: "printing-1"}}
+			resp := GetPrintingResponse{Summary: &PrintingSummary{
+				Identifier:         "printing-1",
+				ImageCropURL:       "https://cdn.example/crop.jpg",
+				ImageCropSmallURL:  "https://cdn.example/crop-small.jpg",
+				ImageCropMediumURL: "https://cdn.example/crop-medium.jpg",
+				ImageCropXlargeURL: "https://cdn.example/crop-xlarge.jpg",
+				ImagePrimaryColor:  "#123456",
+				ImageSmallURL:      "https://cdn.example/small.jpg",
+				ImageMediumURL:     "https://cdn.example/medium.jpg",
+				ImageLargeURL:      "https://cdn.example/large.jpg",
+				ImageCropColor:     map[string]any{"hex": "#123456"},
+				ImageCropMetadata:  "meta",
+				Language:           "en",
+			}}
 			w.Header().Set("Content-Type", "application/json")
 			_ = json.NewEncoder(w).Encode(resp)
 		}
@@ -237,6 +309,17 @@ func TestClientGetPrinting(t *testing.T) {
 		resp, err := client.GetPrinting(context.Background(), &GetPrintingRequest{PrintingID: "printing-1"})
 		require.NoError(t, err)
 		require.Equal(t, "printing-1", resp.Summary.Identifier)
+		require.Equal(t, "https://cdn.example/crop.jpg", resp.Summary.ImageCropURL)
+		require.Equal(t, "https://cdn.example/crop-small.jpg", resp.Summary.ImageCropSmallURL)
+		require.Equal(t, "https://cdn.example/crop-medium.jpg", resp.Summary.ImageCropMediumURL)
+		require.Equal(t, "https://cdn.example/crop-xlarge.jpg", resp.Summary.ImageCropXlargeURL)
+		require.Equal(t, "#123456", resp.Summary.ImagePrimaryColor)
+		require.Equal(t, "https://cdn.example/small.jpg", resp.Summary.ImageSmallURL)
+		require.Equal(t, "https://cdn.example/medium.jpg", resp.Summary.ImageMediumURL)
+		require.Equal(t, "https://cdn.example/large.jpg", resp.Summary.ImageLargeURL)
+		require.Equal(t, "#123456", resp.Summary.ImageCropColor["hex"])
+		require.Equal(t, "meta", resp.Summary.ImageCropMetadata)
+		require.Equal(t, "en", resp.Summary.Language)
 	})
 
 	t.Run("when id missing, then returns error", func(t *testing.T) {

@@ -40,6 +40,19 @@ const (
 	DeckSourceKindTournamentResult DeckSourceKind = "DECK_SOURCE_KIND_TOURNAMENT_RESULT"
 )
 
+// SearchDecksOrder matches v1SearchDecksOrder.
+type SearchDecksOrder string
+
+const (
+	SearchDecksOrderUnspecified   SearchDecksOrder = "SEARCH_DECKS_ORDER_UNSPECIFIED"
+	SearchDecksOrderUpdatedAtDesc SearchDecksOrder = "SEARCH_DECKS_ORDER_UPDATED_AT_DESC"
+	SearchDecksOrderUpdatedAtAsc  SearchDecksOrder = "SEARCH_DECKS_ORDER_UPDATED_AT_ASC"
+	SearchDecksOrderCreatedAtDesc SearchDecksOrder = "SEARCH_DECKS_ORDER_CREATED_AT_DESC"
+	SearchDecksOrderCreatedAtAsc  SearchDecksOrder = "SEARCH_DECKS_ORDER_CREATED_AT_ASC"
+	SearchDecksOrderNameAsc       SearchDecksOrder = "SEARCH_DECKS_ORDER_NAME_ASC"
+	SearchDecksOrderNameDesc      SearchDecksOrder = "SEARCH_DECKS_ORDER_NAME_DESC"
+)
+
 // BoardType represents v1BoardType.
 type BoardType string
 
@@ -58,6 +71,16 @@ const (
 	SideboardGuideTargetTypeHero        SideboardGuideTargetType = "SIDEBOARD_GUIDE_TARGET_TYPE_HERO"
 	SideboardGuideTargetTypeClass       SideboardGuideTargetType = "SIDEBOARD_GUIDE_TARGET_TYPE_CLASS"
 	SideboardGuideTargetTypeArchetype   SideboardGuideTargetType = "SIDEBOARD_GUIDE_TARGET_TYPE_ARCHETYPE"
+)
+
+// SideboardGuidePlayOrder represents v1SideboardGuidePlayOrder.
+type SideboardGuidePlayOrder string
+
+const (
+	SideboardGuidePlayOrderUnspecified SideboardGuidePlayOrder = "SIDEBOARD_GUIDE_PLAY_ORDER_UNSPECIFIED"
+	SideboardGuidePlayOrderAny         SideboardGuidePlayOrder = "SIDEBOARD_GUIDE_PLAY_ORDER_ANY"
+	SideboardGuidePlayOrderFirst       SideboardGuidePlayOrder = "SIDEBOARD_GUIDE_PLAY_ORDER_FIRST"
+	SideboardGuidePlayOrderSecond      SideboardGuidePlayOrder = "SIDEBOARD_GUIDE_PLAY_ORDER_SECOND"
 )
 
 // DeckPermission mirrors authzv1Permission for decks.
@@ -83,6 +106,7 @@ type Deck struct {
 	DeckKind            DeckKind             `json:"deckKind,omitempty"`
 	SourceKind          DeckSourceKind       `json:"sourceKind,omitempty"`
 	SourceReference     string               `json:"sourceReference,omitempty"`
+	TournamentType      string               `json:"tournamentType,omitempty"`
 	CreatedAt           *time.Time           `json:"createdAt,omitempty"`
 	UpdatedAt           *time.Time           `json:"updatedAt,omitempty"`
 }
@@ -239,6 +263,8 @@ type SearchDecksRequest struct {
 	DeckKind        DeckKind
 	SourceKind      DeckSourceKind
 	SourceReference string
+	TournamentType  string
+	OrderBy         SearchDecksOrder
 }
 
 // SearchDecksResponse returns decks matching the search query.
@@ -579,11 +605,18 @@ func (r *UpdateDeckVersionNotesResponse) setMetadata(metadata ResponseMetadata) 
 
 // SideboardGuide mirrors v1SideboardGuide.
 type SideboardGuide struct {
-	TargetType    SideboardGuideTargetType   `json:"targetType,omitempty"`
-	Target        string                     `json:"target,omitempty"`
+	ID            string                     `json:"id,omitempty"`
+	Targets       []SideboardGuideTarget     `json:"targets,omitempty"`
 	Guide         string                     `json:"guide,omitempty"`
 	CardsToAdd    []SideboardGuideCardChange `json:"cardsToAdd,omitempty"`
 	CardsToRemove []SideboardGuideCardChange `json:"cardsToRemove,omitempty"`
+	PlayOrder     SideboardGuidePlayOrder    `json:"playOrder,omitempty"`
+}
+
+// SideboardGuideTarget mirrors v1SideboardGuideTarget.
+type SideboardGuideTarget struct {
+	TargetType SideboardGuideTargetType `json:"targetType,omitempty"`
+	Target     string                   `json:"target,omitempty"`
 }
 
 // SideboardGuideCardChange mirrors v1SideboardGuideCardChange.
@@ -610,11 +643,12 @@ func (r *ListDeckVersionSideboardGuidesResponse) setMetadata(metadata ResponseMe
 // UpsertDeckVersionSideboardGuideRequest creates or updates a sideboard guide.
 type UpsertDeckVersionSideboardGuideRequest struct {
 	DeckVersionID string                     `json:"-"`
-	TargetType    SideboardGuideTargetType   `json:"targetType,omitempty"`
-	Target        string                     `json:"target,omitempty"`
+	ID            string                     `json:"id,omitempty"`
+	Targets       []SideboardGuideTarget     `json:"targets,omitempty"`
 	Guide         string                     `json:"guide,omitempty"`
 	CardsToAdd    []SideboardGuideCardChange `json:"cardsToAdd,omitempty"`
 	CardsToRemove []SideboardGuideCardChange `json:"cardsToRemove,omitempty"`
+	PlayOrder     SideboardGuidePlayOrder    `json:"playOrder,omitempty"`
 }
 
 // UpsertDeckVersionSideboardGuideResponse returns the upserted guide.
@@ -632,6 +666,7 @@ type DeleteDeckVersionSideboardGuideRequest struct {
 	DeckVersionID string                   `json:"-"`
 	TargetType    SideboardGuideTargetType `json:"targetType,omitempty"`
 	Target        string                   `json:"target,omitempty"`
+	PlayOrder     SideboardGuidePlayOrder  `json:"playOrder,omitempty"`
 }
 
 // DeleteDeckVersionSideboardGuideResponse captures metadata for deletions.
@@ -889,6 +924,12 @@ func (c *Client) SearchDecks(ctx context.Context, request *SearchDecksRequest, o
 	}
 	if sourceReference := strings.TrimSpace(request.SourceReference); sourceReference != "" {
 		query.Set("sourceReference", sourceReference)
+	}
+	if tournamentType := strings.TrimSpace(request.TournamentType); tournamentType != "" {
+		query.Set("tournamentType", tournamentType)
+	}
+	if orderBy := strings.TrimSpace(string(request.OrderBy)); orderBy != "" && orderBy != string(SearchDecksOrderUnspecified) {
+		query.Set("orderBy", orderBy)
 	}
 	req.URL.RawQuery = query.Encode()
 
@@ -1430,27 +1471,25 @@ func (c *Client) UpsertDeckVersionSideboardGuide(ctx context.Context, request *U
 	if deckVersionID == "" {
 		return nil, errors.New("deckVersionID must not be empty")
 	}
-	targetType := strings.TrimSpace(string(request.TargetType))
-	if targetType == "" || targetType == string(SideboardGuideTargetTypeUnspecified) {
-		return nil, errors.New("targetType must not be empty")
-	}
-	target := strings.TrimSpace(request.Target)
-	if target == "" {
-		return nil, errors.New("target must not be empty")
+	targets, err := normalizeSideboardGuideTargets(request.Targets)
+	if err != nil {
+		return nil, err
 	}
 
 	body, err := jsonBody(struct {
-		TargetType    SideboardGuideTargetType   `json:"targetType,omitempty"`
-		Target        string                     `json:"target,omitempty"`
+		ID            string                     `json:"id,omitempty"`
+		Targets       []SideboardGuideTarget     `json:"targets,omitempty"`
 		Guide         string                     `json:"guide,omitempty"`
 		CardsToAdd    []SideboardGuideCardChange `json:"cardsToAdd,omitempty"`
 		CardsToRemove []SideboardGuideCardChange `json:"cardsToRemove,omitempty"`
+		PlayOrder     SideboardGuidePlayOrder    `json:"playOrder,omitempty"`
 	}{
-		TargetType:    request.TargetType,
-		Target:        target,
+		ID:            strings.TrimSpace(request.ID),
+		Targets:       targets,
 		Guide:         request.Guide,
 		CardsToAdd:    request.CardsToAdd,
 		CardsToRemove: request.CardsToRemove,
+		PlayOrder:     request.PlayOrder,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("encode body: %w", err)
@@ -1471,6 +1510,32 @@ func (c *Client) UpsertDeckVersionSideboardGuide(ctx context.Context, request *U
 	}
 
 	return response, nil
+}
+
+func normalizeSideboardGuideTargets(targets []SideboardGuideTarget) ([]SideboardGuideTarget, error) {
+	if len(targets) == 0 {
+		return nil, errors.New("targets must not be empty")
+	}
+
+	normalized := make([]SideboardGuideTarget, 0, len(targets))
+	for _, target := range targets {
+		targetType := strings.TrimSpace(string(target.TargetType))
+		if targetType == "" || targetType == string(SideboardGuideTargetTypeUnspecified) {
+			return nil, errors.New("targetType must not be empty")
+		}
+
+		value := strings.TrimSpace(target.Target)
+		if value == "" {
+			return nil, errors.New("target must not be empty")
+		}
+
+		normalized = append(normalized, SideboardGuideTarget{
+			TargetType: target.TargetType,
+			Target:     value,
+		})
+	}
+
+	return normalized, nil
 }
 
 // DeleteDeckVersionSideboardGuide removes a sideboard guide.
@@ -1501,6 +1566,9 @@ func (c *Client) DeleteDeckVersionSideboardGuide(ctx context.Context, request *D
 	query := req.URL.Query()
 	query.Set("targetType", targetType)
 	query.Set("target", target)
+	if playOrder := strings.TrimSpace(string(request.PlayOrder)); playOrder != "" && playOrder != string(SideboardGuidePlayOrderUnspecified) {
+		query.Set("playOrder", playOrder)
+	}
 	req.URL.RawQuery = query.Encode()
 
 	response := &DeleteDeckVersionSideboardGuideResponse{}

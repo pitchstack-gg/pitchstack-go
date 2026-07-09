@@ -207,6 +207,78 @@ func TestClientEmailVerificationFlow(t *testing.T) {
 	require.True(t, sawVerify)
 }
 
+func TestClientEmailChangeFlow(t *testing.T) {
+	var sawStatus, sawRequest, sawResend, sawCancel, sawConfirm bool
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/v1/auth/email-change":
+			switch r.Method {
+			case http.MethodGet:
+				sawStatus = true
+				require.NoError(t, json.NewEncoder(w).Encode(GetEmailChangeStatusResponse{
+					PendingChange: &EmailChangeRequest{NewEmail: "new@example.com"},
+				}))
+			case http.MethodPost:
+				sawRequest = true
+				var payload RequestEmailChangeRequest
+				require.NoError(t, json.NewDecoder(r.Body).Decode(&payload))
+				require.Equal(t, "new@example.com", payload.NewEmail)
+				require.NoError(t, json.NewEncoder(w).Encode(RequestEmailChangeResponse{
+					PendingChange: &EmailChangeRequest{NewEmail: "new@example.com"},
+				}))
+			case http.MethodDelete:
+				sawCancel = true
+				w.WriteHeader(http.StatusOK)
+			default:
+				t.Fatalf("unexpected method for email-change: %s", r.Method)
+			}
+		case "/v1/auth/email-change/resend":
+			sawResend = true
+			require.Equal(t, http.MethodPost, r.Method)
+			w.WriteHeader(http.StatusOK)
+		case "/v1/auth/email-change/confirm":
+			sawConfirm = true
+			require.Equal(t, http.MethodPost, r.Method)
+			var payload ConfirmEmailChangeRequest
+			require.NoError(t, json.NewDecoder(r.Body).Decode(&payload))
+			require.Equal(t, "user-1", payload.UserID)
+			require.Equal(t, "change-token", payload.ChangeToken)
+			require.NoError(t, json.NewEncoder(w).Encode(ConfirmEmailChangeResponse{
+				User: &User{UserID: "user-1", Email: "new@example.com"},
+			}))
+		default:
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+	}))
+	t.Cleanup(server.Close)
+
+	client := newTestClient(t, WithBaseURL(server.URL), WithHTTPClient(server.Client()))
+	statusResp, err := client.GetEmailChangeStatus(context.Background(), nil)
+	require.NoError(t, err)
+	require.Equal(t, "new@example.com", statusResp.PendingChange.NewEmail)
+
+	requestResp, err := client.RequestEmailChange(context.Background(), &RequestEmailChangeRequest{NewEmail: "new@example.com"})
+	require.NoError(t, err)
+	require.Equal(t, "new@example.com", requestResp.PendingChange.NewEmail)
+
+	_, err = client.ResendEmailChangeConfirmation(context.Background(), nil)
+	require.NoError(t, err)
+	_, err = client.CancelEmailChange(context.Background(), nil)
+	require.NoError(t, err)
+	confirmResp, err := client.ConfirmEmailChange(context.Background(), &ConfirmEmailChangeRequest{
+		UserID:      "user-1",
+		ChangeToken: "change-token",
+	})
+	require.NoError(t, err)
+	require.Equal(t, "new@example.com", confirmResp.User.Email)
+
+	require.True(t, sawStatus)
+	require.True(t, sawRequest)
+	require.True(t, sawResend)
+	require.True(t, sawCancel)
+	require.True(t, sawConfirm)
+}
+
 func TestClientValidateToken(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		require.Equal(t, http.MethodPost, r.Method)

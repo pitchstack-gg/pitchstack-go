@@ -414,6 +414,7 @@ func TestClientGetCollectionValuation(t *testing.T) {
 				CollectionID:        "col-1",
 				TotalEstimatedValue: 123.45,
 				ComputedAt:          &now,
+				TotalQuantity:       17,
 			}
 			w.Header().Set("Content-Type", "application/json")
 			_ = json.NewEncoder(w).Encode(resp)
@@ -429,6 +430,7 @@ func TestClientGetCollectionValuation(t *testing.T) {
 		})
 		require.NoError(t, err)
 		require.Equal(t, float64(123.45), resp.TotalEstimatedValue)
+		require.Equal(t, int32(17), resp.TotalQuantity)
 		require.NotNil(t, resp.ComputedAt)
 	})
 

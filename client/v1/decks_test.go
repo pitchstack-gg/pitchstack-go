@@ -144,6 +144,8 @@ func TestClientSearchDecks(t *testing.T) {
 		require.Equal(t, string(DeckKindReference), query.Get("deckKind"))
 		require.Equal(t, string(DeckSourceKindPrecon), query.Get("sourceKind"))
 		require.Equal(t, "precon-1", query.Get("sourceReference"))
+		require.Equal(t, "proquest", query.Get("tournamentType"))
+		require.Equal(t, string(SearchDecksOrderUpdatedAtAsc), query.Get("orderBy"))
 
 		require.NoError(t, json.NewEncoder(w).Encode(SearchDecksResponse{
 			Decks: []Deck{{
@@ -151,6 +153,7 @@ func TestClientSearchDecks(t *testing.T) {
 				DeckKind:        DeckKindReference,
 				SourceKind:      DeckSourceKindPrecon,
 				SourceReference: "precon-1",
+				TournamentType:  "proquest",
 			}},
 		}))
 	}))
@@ -167,10 +170,13 @@ func TestClientSearchDecks(t *testing.T) {
 		DeckKind:        DeckKindReference,
 		SourceKind:      DeckSourceKindPrecon,
 		SourceReference: "precon-1",
+		TournamentType:  "proquest",
+		OrderBy:         SearchDecksOrderUpdatedAtAsc,
 	})
 	require.NoError(t, err)
 	require.Len(t, resp.Decks, 1)
 	require.Equal(t, DeckKindReference, resp.Decks[0].DeckKind)
+	require.Equal(t, "proquest", resp.Decks[0].TournamentType)
 }
 
 func TestClientGetDeck(t *testing.T) {
@@ -556,9 +562,13 @@ func TestClientListDeckVersionSideboardGuides(t *testing.T) {
 		require.NoError(t, json.NewEncoder(w).Encode(ListDeckVersionSideboardGuidesResponse{
 			SideboardGuides: []SideboardGuide{
 				{
-					TargetType: SideboardGuideTargetTypeHero,
-					Target:     "Dorinthea",
-					Guide:      "Swap in 3x Sink Below.",
+					ID: "dvsg-1",
+					Targets: []SideboardGuideTarget{{
+						TargetType: SideboardGuideTargetTypeHero,
+						Target:     "Dorinthea",
+					}},
+					Guide:     "Swap in 3x Sink Below.",
+					PlayOrder: SideboardGuidePlayOrderFirst,
 				},
 			},
 		}))
@@ -571,7 +581,10 @@ func TestClientListDeckVersionSideboardGuides(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.Len(t, resp.SideboardGuides, 1)
-	require.Equal(t, SideboardGuideTargetTypeHero, resp.SideboardGuides[0].TargetType)
+	require.Equal(t, "dvsg-1", resp.SideboardGuides[0].ID)
+	require.Len(t, resp.SideboardGuides[0].Targets, 1)
+	require.Equal(t, SideboardGuideTargetTypeHero, resp.SideboardGuides[0].Targets[0].TargetType)
+	require.Equal(t, SideboardGuidePlayOrderFirst, resp.SideboardGuides[0].PlayOrder)
 }
 
 func TestClientUpsertDeckVersionSideboardGuide(t *testing.T) {
@@ -581,20 +594,30 @@ func TestClientUpsertDeckVersionSideboardGuide(t *testing.T) {
 		require.Equal(t, "application/json", r.Header.Get("Content-Type"))
 
 		var payload struct {
-			TargetType string `json:"targetType"`
-			Target     string `json:"target"`
-			Guide      string `json:"guide"`
+			ID        string                  `json:"id"`
+			Targets   []SideboardGuideTarget  `json:"targets"`
+			Guide     string                  `json:"guide"`
+			PlayOrder SideboardGuidePlayOrder `json:"playOrder"`
 		}
 		require.NoError(t, json.NewDecoder(r.Body).Decode(&payload))
-		require.Equal(t, string(SideboardGuideTargetTypeClass), payload.TargetType)
-		require.Equal(t, "Warrior", payload.Target)
+		require.Equal(t, "dvsg-1", payload.ID)
+		require.Len(t, payload.Targets, 2)
+		require.Equal(t, SideboardGuideTargetTypeClass, payload.Targets[0].TargetType)
+		require.Equal(t, "Warrior", payload.Targets[0].Target)
+		require.Equal(t, SideboardGuideTargetTypeArchetype, payload.Targets[1].TargetType)
+		require.Equal(t, "Fatigue", payload.Targets[1].Target)
 		require.Equal(t, "Prioritize armor.", payload.Guide)
+		require.Equal(t, SideboardGuidePlayOrderSecond, payload.PlayOrder)
 
 		require.NoError(t, json.NewEncoder(w).Encode(UpsertDeckVersionSideboardGuideResponse{
 			SideboardGuide: &SideboardGuide{
-				TargetType: SideboardGuideTargetTypeClass,
-				Target:     "Warrior",
-				Guide:      "Prioritize armor.",
+				ID: "dvsg-1",
+				Targets: []SideboardGuideTarget{{
+					TargetType: SideboardGuideTargetTypeClass,
+					Target:     "Warrior",
+				}},
+				Guide:     "Prioritize armor.",
+				PlayOrder: SideboardGuidePlayOrderSecond,
 			},
 		}))
 	}))
@@ -603,12 +626,18 @@ func TestClientUpsertDeckVersionSideboardGuide(t *testing.T) {
 	client := newTestClient(t, WithBaseURL(server.URL), WithHTTPClient(server.Client()))
 	resp, err := client.UpsertDeckVersionSideboardGuide(context.Background(), &UpsertDeckVersionSideboardGuideRequest{
 		DeckVersionID: "dv-1",
-		TargetType:    SideboardGuideTargetTypeClass,
-		Target:        "Warrior",
-		Guide:         "Prioritize armor.",
+		ID:            "dvsg-1",
+		Targets: []SideboardGuideTarget{
+			{TargetType: SideboardGuideTargetTypeClass, Target: "Warrior"},
+			{TargetType: SideboardGuideTargetTypeArchetype, Target: " Fatigue "},
+		},
+		Guide:     "Prioritize armor.",
+		PlayOrder: SideboardGuidePlayOrderSecond,
 	})
 	require.NoError(t, err)
-	require.Equal(t, "Warrior", resp.SideboardGuide.Target)
+	require.Equal(t, "dvsg-1", resp.SideboardGuide.ID)
+	require.Equal(t, "Warrior", resp.SideboardGuide.Targets[0].Target)
+	require.Equal(t, SideboardGuidePlayOrderSecond, resp.SideboardGuide.PlayOrder)
 }
 
 func TestClientDeleteDeckVersionSideboardGuide(t *testing.T) {
@@ -617,6 +646,7 @@ func TestClientDeleteDeckVersionSideboardGuide(t *testing.T) {
 		require.Equal(t, "/v1/deck_versions/dv-1/sideboard_guides", r.URL.Path)
 		require.Equal(t, string(SideboardGuideTargetTypeArchetype), r.URL.Query().Get("targetType"))
 		require.Equal(t, "Fatigue", r.URL.Query().Get("target"))
+		require.Equal(t, string(SideboardGuidePlayOrderSecond), r.URL.Query().Get("playOrder"))
 
 		w.Header().Set("X-Request-Id", "req-delete-guide")
 		_, _ = w.Write([]byte(`{}`))
@@ -628,6 +658,7 @@ func TestClientDeleteDeckVersionSideboardGuide(t *testing.T) {
 		DeckVersionID: "dv-1",
 		TargetType:    SideboardGuideTargetTypeArchetype,
 		Target:        "Fatigue",
+		PlayOrder:     SideboardGuidePlayOrderSecond,
 	})
 	require.NoError(t, err)
 	require.Equal(t, "req-delete-guide", resp.Metadata.RequestID)
@@ -803,9 +834,12 @@ func TestClientExportDeck(t *testing.T) {
 					SideboardCards:  []DeckCard{{CardID: "card-2", Quantity: 1}},
 					MaybeboardCards: []DeckCard{{CardID: "card-3", Quantity: 2}},
 					SideboardGuides: []SideboardGuide{{
-						TargetType: SideboardGuideTargetTypeHero,
-						Target:     "Dorinthea",
-						Guide:      "Swap in 3x Sink Below.",
+						ID: "dvsg-1",
+						Targets: []SideboardGuideTarget{{
+							TargetType: SideboardGuideTargetTypeHero,
+							Target:     "Dorinthea",
+						}},
+						Guide: "Swap in 3x Sink Below.",
 					}},
 				},
 			},
@@ -869,9 +903,12 @@ func TestClientImportDeck(t *testing.T) {
 				Notes:          "notes",
 				MainboardCards: []DeckCard{{CardID: "card-1", Quantity: 3}},
 				SideboardGuides: []SideboardGuide{{
-					TargetType: SideboardGuideTargetTypeHero,
-					Target:     "Dorinthea",
-					Guide:      "Swap in 3x Sink Below.",
+					ID: "dvsg-1",
+					Targets: []SideboardGuideTarget{{
+						TargetType: SideboardGuideTargetTypeHero,
+						Target:     "Dorinthea",
+					}},
+					Guide: "Swap in 3x Sink Below.",
 				}},
 			},
 		},

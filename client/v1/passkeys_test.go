@@ -11,7 +11,7 @@ import (
 )
 
 func TestClientPasskeysFlow(t *testing.T) {
-	var sawInitReg, sawCompleteReg, sawInitAuth, sawCompleteAuth, sawList, sawDelete bool
+	var sawInitReg, sawCompleteReg, sawInitSignup, sawCompleteSignup, sawInitAuth, sawCompleteAuth, sawList, sawUpdate, sawDelete bool
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/v1/auth/webauthn/registration/initiate":
@@ -28,6 +28,21 @@ func TestClientPasskeysFlow(t *testing.T) {
 			require.NoError(t, json.NewDecoder(r.Body).Decode(&payload))
 			require.Equal(t, "sess", payload.SessionID)
 			require.NoError(t, json.NewEncoder(w).Encode(CompletePasskeyRegistrationResponse{CredentialID: "cred"}))
+		case "/v1/auth/webauthn/signup/initiate":
+			sawInitSignup = true
+			require.Equal(t, http.MethodPost, r.Method)
+			var payload InitiatePasskeySignupRequest
+			require.NoError(t, json.NewDecoder(r.Body).Decode(&payload))
+			require.Equal(t, "new@example.com", payload.Email)
+			require.Equal(t, "New User", payload.DisplayName)
+			require.NoError(t, json.NewEncoder(w).Encode(InitiatePasskeySignupResponse{SessionID: "signup-sess"}))
+		case "/v1/auth/webauthn/signup/complete":
+			sawCompleteSignup = true
+			require.Equal(t, http.MethodPost, r.Method)
+			var payload CompletePasskeySignupRequest
+			require.NoError(t, json.NewDecoder(r.Body).Decode(&payload))
+			require.Equal(t, "signup-sess", payload.SessionID)
+			require.NoError(t, json.NewEncoder(w).Encode(CompletePasskeySignupResponse{UserID: "user-2", CredentialID: "cred-2"}))
 		case "/v1/auth/webauthn/authentication/initiate":
 			sawInitAuth = true
 			require.Equal(t, http.MethodPost, r.Method)
@@ -46,11 +61,21 @@ func TestClientPasskeysFlow(t *testing.T) {
 		case "/v1/auth/webauthn/users/user-1/credentials":
 			sawList = true
 			require.Equal(t, http.MethodGet, r.Method)
-			require.NoError(t, json.NewEncoder(w).Encode(ListUserPasskeysResponse{Credentials: []Passkey{{CredentialID: "cred"}}}))
+			require.NoError(t, json.NewEncoder(w).Encode(ListUserPasskeysResponse{Credentials: []Passkey{{CredentialID: "cred", DisplayName: "Work laptop"}}}))
 		case "/v1/auth/webauthn/users/user-1/credentials/cred":
-			sawDelete = true
-			require.Equal(t, http.MethodDelete, r.Method)
-			w.WriteHeader(http.StatusOK)
+			switch r.Method {
+			case http.MethodPatch:
+				sawUpdate = true
+				var payload UpdatePasskeyRequest
+				require.NoError(t, json.NewDecoder(r.Body).Decode(&payload))
+				require.Equal(t, "Phone", payload.DisplayName)
+				require.NoError(t, json.NewEncoder(w).Encode(Passkey{CredentialID: "cred", DisplayName: "Phone"}))
+			case http.MethodDelete:
+				sawDelete = true
+				w.WriteHeader(http.StatusOK)
+			default:
+				t.Fatalf("unexpected method for passkey: %s", r.Method)
+			}
 		default:
 			t.Fatalf("unexpected path: %s", r.URL.Path)
 		}
@@ -67,6 +92,18 @@ func TestClientPasskeysFlow(t *testing.T) {
 		AttestationObject: "ao",
 	})
 	require.NoError(t, err)
+	_, err = client.InitiatePasskeySignup(context.Background(), &InitiatePasskeySignupRequest{
+		Email:       "new@example.com",
+		DisplayName: "New User",
+	})
+	require.NoError(t, err)
+	signupResp, err := client.CompletePasskeySignup(context.Background(), &CompletePasskeySignupRequest{
+		SessionID:         "signup-sess",
+		ClientDataJSON:    "cd",
+		AttestationObject: "ao",
+	})
+	require.NoError(t, err)
+	require.Equal(t, "cred-2", signupResp.CredentialID)
 	_, err = client.InitiatePasskeyAuthentication(context.Background(), &InitiatePasskeyAuthenticationRequest{Email: "user@example.com"})
 	require.NoError(t, err)
 	_, err = client.CompletePasskeyAuthentication(context.Background(), &CompletePasskeyAuthenticationRequest{
@@ -79,13 +116,23 @@ func TestClientPasskeysFlow(t *testing.T) {
 	require.NoError(t, err)
 	_, err = client.ListUserPasskeys(context.Background(), &ListUserPasskeysRequest{UserID: "user-1"})
 	require.NoError(t, err)
+	updateResp, err := client.UpdatePasskey(context.Background(), &UpdatePasskeyRequest{
+		UserID:       "user-1",
+		CredentialID: "cred",
+		DisplayName:  "Phone",
+	})
+	require.NoError(t, err)
+	require.Equal(t, "Phone", updateResp.Passkey.DisplayName)
 	_, err = client.DeletePasskey(context.Background(), &DeletePasskeyRequest{UserID: "user-1", CredentialID: "cred"})
 	require.NoError(t, err)
 
 	require.True(t, sawInitReg)
 	require.True(t, sawCompleteReg)
+	require.True(t, sawInitSignup)
+	require.True(t, sawCompleteSignup)
 	require.True(t, sawInitAuth)
 	require.True(t, sawCompleteAuth)
 	require.True(t, sawList)
+	require.True(t, sawUpdate)
 	require.True(t, sawDelete)
 }

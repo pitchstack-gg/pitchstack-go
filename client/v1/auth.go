@@ -219,14 +219,14 @@ type User struct {
 
 // AccessProfile describes roles, entitlements, limits, and capabilities for a user.
 type AccessProfile struct {
-	UserID       string            `json:"userId,omitempty"`
-	Roles        []string          `json:"roles,omitempty"`
-	Entitlements []string          `json:"entitlements,omitempty"`
-	Limits       map[string]string `json:"limits,omitempty"`
-	Version      int64             `json:"version,omitempty,string"`
-	Capabilities []string          `json:"capabilities,omitempty"`
-	AllAccess    bool              `json:"allAccess,omitempty"`
-	Tier         string            `json:"tier,omitempty"`
+	UserID       string           `json:"userId,omitempty"`
+	Roles        []string         `json:"roles,omitempty"`
+	Entitlements []string         `json:"entitlements,omitempty"`
+	Limits       map[string]int64 `json:"limits,omitempty"`
+	Version      int64            `json:"version,omitempty"`
+	Capabilities []string         `json:"capabilities,omitempty"`
+	AllAccess    bool             `json:"allAccess,omitempty"`
+	Tier         string           `json:"tier,omitempty"`
 }
 
 // Login authenticates a user using supplied credentials.
