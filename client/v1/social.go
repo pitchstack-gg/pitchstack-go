@@ -152,6 +152,7 @@ type ListActivityFeedRequest struct {
 	PageSize  *int32
 	NextToken string
 	Scopes    []ActivityScope
+	GroupID   string
 }
 
 // ListActivityFeedResponse returns feed items.
@@ -354,6 +355,9 @@ func (c *Client) ListActivityFeed(ctx context.Context, request *ListActivityFeed
 			continue
 		}
 		query.Add("scopes", string(scope))
+	}
+	if groupID := strings.TrimSpace(request.GroupID); groupID != "" {
+		query.Set("groupId", groupID)
 	}
 	req.URL.RawQuery = query.Encode()
 

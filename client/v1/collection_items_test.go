@@ -338,3 +338,64 @@ func TestClientBatchGetCollectionItems(t *testing.T) {
 		require.Nil(t, resp)
 	})
 }
+
+func TestClientBatchUpdateCollectionItems(t *testing.T) {
+	tradeQuantity := int32(2)
+	handler := func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, http.MethodPost, r.Method)
+		require.Equal(t, "/v1/collection_items:batchUpdate", r.URL.Path)
+		var body struct {
+			CollectionID string `json:"collectionId"`
+			Requests     []struct {
+				ItemID        string `json:"itemId"`
+				TradeQuantity *int32 `json:"tradeQuantity"`
+			} `json:"requests"`
+		}
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+		require.Equal(t, "c-1", body.CollectionID)
+		require.Equal(t, "ci-1", body.Requests[0].ItemID)
+		require.Equal(t, tradeQuantity, *body.Requests[0].TradeQuantity)
+		_ = json.NewEncoder(w).Encode(BatchUpdateCollectionItemsResponse{Items: []CollectionItem{{ID: "ci-1"}}, Failures: []BatchCollectionItemFailure{{Index: 1, ItemID: "ci-2", Code: "ABORTED", Message: "conflict"}}})
+	}
+	server := httptest.NewServer(http.HandlerFunc(handler))
+	t.Cleanup(server.Close)
+	client := newTestClient(t, WithBaseURL(server.URL), WithHTTPClient(server.Client()))
+	resp, err := client.BatchUpdateCollectionItems(context.Background(), &BatchUpdateCollectionItemsRequest{CollectionID: "c-1", Requests: []UpdateCollectionItemRequest{{ItemID: "ci-1", TradeQuantity: &tradeQuantity}}})
+	require.NoError(t, err)
+	require.Len(t, resp.Items, 1)
+	require.Equal(t, "ABORTED", resp.Failures[0].Code)
+}
+
+func TestClientBatchDeleteCollectionItems(t *testing.T) {
+	handler := func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, "/v1/collection_items:batchDelete", r.URL.Path)
+		var body BatchDeleteCollectionItemsRequest
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+		require.Equal(t, "c-1", body.CollectionID)
+		require.Equal(t, []string{"ci-1", "ci-2"}, body.ItemIDs)
+		_ = json.NewEncoder(w).Encode(BatchDeleteCollectionItemsResponse{DeletedItemIDs: []string{"ci-1"}})
+	}
+	server := httptest.NewServer(http.HandlerFunc(handler))
+	t.Cleanup(server.Close)
+	client := newTestClient(t, WithBaseURL(server.URL), WithHTTPClient(server.Client()))
+	resp, err := client.BatchDeleteCollectionItems(context.Background(), &BatchDeleteCollectionItemsRequest{CollectionID: "c-1", ItemIDs: []string{"ci-1", "ci-2"}})
+	require.NoError(t, err)
+	require.Equal(t, []string{"ci-1"}, resp.DeletedItemIDs)
+}
+
+func TestClientBatchTransferCollectionItems(t *testing.T) {
+	handler := func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, "/v1/collection_items:batchTransfer", r.URL.Path)
+		var body BatchTransferCollectionItemsRequest
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+		require.Equal(t, "c-source", body.SourceCollectionID)
+		require.Equal(t, "c-destination", body.DestinationCollectionID)
+		_ = json.NewEncoder(w).Encode(BatchTransferCollectionItemsResponse{Items: []CollectionItem{{ID: "ci-1", CollectionID: "c-destination"}}})
+	}
+	server := httptest.NewServer(http.HandlerFunc(handler))
+	t.Cleanup(server.Close)
+	client := newTestClient(t, WithBaseURL(server.URL), WithHTTPClient(server.Client()))
+	resp, err := client.BatchTransferCollectionItems(context.Background(), &BatchTransferCollectionItemsRequest{SourceCollectionID: "c-source", DestinationCollectionID: "c-destination", ItemIDs: []string{"ci-1"}})
+	require.NoError(t, err)
+	require.Equal(t, "c-destination", resp.Items[0].CollectionID)
+}

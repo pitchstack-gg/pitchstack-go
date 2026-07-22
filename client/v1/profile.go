@@ -186,6 +186,21 @@ type GetProfileResponse struct {
 	Metadata ResponseMetadata `json:"-"`
 }
 
+type BatchProfile struct {
+	UserID  string       `json:"userId,omitempty"`
+	Profile *UserProfile `json:"profile,omitempty"`
+}
+type BatchGetProfilesRequest struct {
+	UserIDs []string `json:"userIds,omitempty"`
+}
+type BatchGetProfilesResponse struct {
+	Profiles       []BatchProfile   `json:"profiles,omitempty"`
+	MissingUserIDs []string         `json:"missingUserIds,omitempty"`
+	Metadata       ResponseMetadata `json:"-"`
+}
+
+func (r *BatchGetProfilesResponse) setMetadata(metadata ResponseMetadata) { r.Metadata = metadata }
+
 func (r *GetProfileResponse) setMetadata(metadata ResponseMetadata) {
 	r.Metadata = metadata
 }
@@ -817,6 +832,20 @@ func (c *Client) GetProfile(ctx context.Context, request *GetProfileRequest, opt
 
 	response := &GetProfileResponse{}
 	if err := c.do(req, response, opts...); err != nil {
+		return nil, err
+	}
+	return response, nil
+}
+
+func (c *Client) BatchGetProfiles(ctx context.Context, request *BatchGetProfilesRequest, opts ...RequestOpt) (*BatchGetProfilesResponse, error) {
+	if request == nil || len(request.UserIDs) == 0 {
+		return nil, errors.New("userIDs must not be empty")
+	}
+	if len(request.UserIDs) > 100 {
+		return nil, errors.New("at most 100 userIDs are allowed")
+	}
+	response := &BatchGetProfilesResponse{}
+	if err := c.doGroupJSON(ctx, http.MethodPost, "/v1/users/profiles:batchGet", request, response, opts...); err != nil {
 		return nil, err
 	}
 	return response, nil

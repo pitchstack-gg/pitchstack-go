@@ -190,6 +190,60 @@ func (r *BatchGetCollectionItemsResponse) setMetadata(metadata ResponseMetadata)
 	r.Metadata = metadata
 }
 
+// BatchCollectionItemFailure describes one item that was not mutated.
+type BatchCollectionItemFailure struct {
+	Index   int32  `json:"index,omitempty"`
+	ItemID  string `json:"itemId,omitempty"`
+	Code    string `json:"code,omitempty"`
+	Message string `json:"message,omitempty"`
+}
+
+type BatchUpdateCollectionItemsRequest struct {
+	CollectionID string                        `json:"collectionId,omitempty"`
+	Requests     []UpdateCollectionItemRequest `json:"-"`
+}
+
+type BatchUpdateCollectionItemsResponse struct {
+	Items    []CollectionItem             `json:"items,omitempty"`
+	Failures []BatchCollectionItemFailure `json:"failures,omitempty"`
+	Metadata ResponseMetadata             `json:"-"`
+}
+
+func (r *BatchUpdateCollectionItemsResponse) setMetadata(metadata ResponseMetadata) {
+	r.Metadata = metadata
+}
+
+type BatchDeleteCollectionItemsRequest struct {
+	CollectionID string   `json:"collectionId,omitempty"`
+	ItemIDs      []string `json:"itemIds,omitempty"`
+}
+
+type BatchDeleteCollectionItemsResponse struct {
+	DeletedItemIDs []string                     `json:"deletedItemIds,omitempty"`
+	Failures       []BatchCollectionItemFailure `json:"failures,omitempty"`
+	Metadata       ResponseMetadata             `json:"-"`
+}
+
+func (r *BatchDeleteCollectionItemsResponse) setMetadata(metadata ResponseMetadata) {
+	r.Metadata = metadata
+}
+
+type BatchTransferCollectionItemsRequest struct {
+	SourceCollectionID      string   `json:"sourceCollectionId,omitempty"`
+	DestinationCollectionID string   `json:"destinationCollectionId,omitempty"`
+	ItemIDs                 []string `json:"itemIds,omitempty"`
+}
+
+type BatchTransferCollectionItemsResponse struct {
+	Items    []CollectionItem             `json:"items,omitempty"`
+	Failures []BatchCollectionItemFailure `json:"failures,omitempty"`
+	Metadata ResponseMetadata             `json:"-"`
+}
+
+func (r *BatchTransferCollectionItemsResponse) setMetadata(metadata ResponseMetadata) {
+	r.Metadata = metadata
+}
+
 // ListCollectionItems enumerates collection items with optional filters.
 func (c *Client) ListCollectionItems(ctx context.Context, request *ListCollectionItemsRequest, opts ...RequestOpt) (*ListCollectionItemsResponse, error) {
 	if request == nil {
@@ -448,5 +502,109 @@ func (c *Client) BatchGetCollectionItems(ctx context.Context, request *BatchGetC
 		return nil, err
 	}
 
+	return response, nil
+}
+
+// BatchUpdateCollectionItems patches collection items from one source collection.
+func (c *Client) BatchUpdateCollectionItems(ctx context.Context, request *BatchUpdateCollectionItemsRequest, opts ...RequestOpt) (*BatchUpdateCollectionItemsResponse, error) {
+	if request == nil {
+		return nil, errors.New("request must not be nil")
+	}
+	collectionID := strings.TrimSpace(request.CollectionID)
+	if collectionID == "" {
+		return nil, errors.New("collectionID must not be empty")
+	}
+	if len(request.Requests) == 0 {
+		return nil, errors.New("requests must not be empty")
+	}
+
+	type updateWire struct {
+		ItemID            string     `json:"itemId,omitempty"`
+		Quantity          *int32     `json:"quantity,omitempty"`
+		Condition         *Condition `json:"condition,omitempty"`
+		Value             *float64   `json:"value,omitempty"`
+		Pinned            *bool      `json:"pinned,omitempty"`
+		ExpectedUpdatedAt *time.Time `json:"expectedUpdatedAt,omitempty"`
+		ClientMutationID  string     `json:"clientMutationId,omitempty"`
+		TradeQuantity     *int32     `json:"tradeQuantity,omitempty"`
+		Notes             *string    `json:"notes,omitempty"`
+	}
+	wires := make([]updateWire, len(request.Requests))
+	for index, item := range request.Requests {
+		wires[index] = updateWire{ItemID: strings.TrimSpace(item.ItemID), Quantity: item.Quantity, Condition: item.Condition, Value: item.Value, Pinned: item.Pinned, ExpectedUpdatedAt: item.ExpectedUpdatedAt, ClientMutationID: strings.TrimSpace(item.ClientMutationID), TradeQuantity: item.TradeQuantity, Notes: item.Notes}
+	}
+	body, err := jsonBody(struct {
+		CollectionID string       `json:"collectionId"`
+		Requests     []updateWire `json:"requests"`
+	}{CollectionID: collectionID, Requests: wires})
+	if err != nil {
+		return nil, fmt.Errorf("encode body: %w", err)
+	}
+	req, err := c.newRequest(ctx, http.MethodPost, "/v1/collection_items:batchUpdate", body)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	response := &BatchUpdateCollectionItemsResponse{}
+	if err := c.do(req, response, opts...); err != nil {
+		return nil, err
+	}
+	return response, nil
+}
+
+// BatchDeleteCollectionItems deletes collection items from one source collection.
+func (c *Client) BatchDeleteCollectionItems(ctx context.Context, request *BatchDeleteCollectionItemsRequest, opts ...RequestOpt) (*BatchDeleteCollectionItemsResponse, error) {
+	if request == nil {
+		return nil, errors.New("request must not be nil")
+	}
+	if strings.TrimSpace(request.CollectionID) == "" {
+		return nil, errors.New("collectionID must not be empty")
+	}
+	if len(request.ItemIDs) == 0 {
+		return nil, errors.New("itemIDs must not be empty")
+	}
+	body, err := jsonBody(request)
+	if err != nil {
+		return nil, fmt.Errorf("encode body: %w", err)
+	}
+	req, err := c.newRequest(ctx, http.MethodPost, "/v1/collection_items:batchDelete", body)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	response := &BatchDeleteCollectionItemsResponse{}
+	if err := c.do(req, response, opts...); err != nil {
+		return nil, err
+	}
+	return response, nil
+}
+
+// BatchTransferCollectionItems transfers collection items between two collections.
+func (c *Client) BatchTransferCollectionItems(ctx context.Context, request *BatchTransferCollectionItemsRequest, opts ...RequestOpt) (*BatchTransferCollectionItemsResponse, error) {
+	if request == nil {
+		return nil, errors.New("request must not be nil")
+	}
+	if strings.TrimSpace(request.SourceCollectionID) == "" {
+		return nil, errors.New("sourceCollectionID must not be empty")
+	}
+	if strings.TrimSpace(request.DestinationCollectionID) == "" {
+		return nil, errors.New("destinationCollectionID must not be empty")
+	}
+	if len(request.ItemIDs) == 0 {
+		return nil, errors.New("itemIDs must not be empty")
+	}
+	body, err := jsonBody(request)
+	if err != nil {
+		return nil, fmt.Errorf("encode body: %w", err)
+	}
+	req, err := c.newRequest(ctx, http.MethodPost, "/v1/collection_items:batchTransfer", body)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	response := &BatchTransferCollectionItemsResponse{}
+	if err := c.do(req, response, opts...); err != nil {
+		return nil, err
+	}
 	return response, nil
 }

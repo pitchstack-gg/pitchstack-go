@@ -13,10 +13,13 @@ import (
 
 // CreateGroupRequest provisions a new user group.
 type CreateGroupRequest struct {
-	Slug        string          `json:"slug,omitempty"`
-	Name        string          `json:"name,omitempty"`
-	Description string          `json:"description,omitempty"`
-	Visibility  VisibilityLevel `json:"visibility,omitempty"`
+	Slug                      string                         `json:"slug,omitempty"`
+	Name                      string                         `json:"name,omitempty"`
+	Description               string                         `json:"description,omitempty"`
+	Visibility                VisibilityLevel                `json:"visibility,omitempty"`
+	JoinPolicy                GroupJoinPolicy                `json:"joinPolicy,omitempty"`
+	MemberDirectoryVisibility GroupMemberDirectoryVisibility `json:"memberDirectoryVisibility,omitempty"`
+	BackgroundColor           string                         `json:"backgroundColor,omitempty"`
 }
 
 // CreateGroupResponse includes the created group.
@@ -31,10 +34,14 @@ func (r *CreateGroupResponse) setMetadata(metadata ResponseMetadata) {
 
 // UpdateGroupRequest modifies an existing group.
 type UpdateGroupRequest struct {
-	GroupID     string           `json:"-"`
-	Name        *string          `json:"name,omitempty"`
-	Description *string          `json:"description,omitempty"`
-	Visibility  *VisibilityLevel `json:"visibility,omitempty"`
+	GroupID                   string                          `json:"-"`
+	Name                      *string                         `json:"name,omitempty"`
+	Description               *string                         `json:"description,omitempty"`
+	Visibility                *VisibilityLevel                `json:"visibility,omitempty"`
+	JoinPolicy                *GroupJoinPolicy                `json:"joinPolicy,omitempty"`
+	MemberDirectoryVisibility *GroupMemberDirectoryVisibility `json:"memberDirectoryVisibility,omitempty"`
+	BackgroundColor           *string                         `json:"backgroundColor,omitempty"`
+	UpdateMask                string                          `json:"updateMask,omitempty"`
 }
 
 // UpdateGroupResponse contains the updated group.
@@ -132,17 +139,24 @@ func (r *ListGroupMembersResponse) setMetadata(metadata ResponseMetadata) {
 
 // UserGroup represents a user-defined group construct.
 type UserGroup struct {
-	GroupID         string          `json:"groupId,omitempty"`
-	Slug            string          `json:"slug,omitempty"`
-	Name            string          `json:"name,omitempty"`
-	Description     string          `json:"description,omitempty"`
-	OwnerID         string          `json:"ownerId,omitempty"`
-	Visibility      VisibilityLevel `json:"visibility,omitempty"`
-	IsActive        bool            `json:"isActive,omitempty"`
-	CreatedByUserID string          `json:"createdByUserId,omitempty"`
-	CreatedAt       *time.Time      `json:"createdAt,omitempty"`
-	UpdatedAt       *time.Time      `json:"updatedAt,omitempty"`
-	AvatarURL       string          `json:"avatarUrl,omitempty"`
+	GroupID                   string                         `json:"groupId,omitempty"`
+	Slug                      string                         `json:"slug,omitempty"`
+	Name                      string                         `json:"name,omitempty"`
+	Description               string                         `json:"description,omitempty"`
+	OwnerID                   string                         `json:"ownerId,omitempty"`
+	Visibility                VisibilityLevel                `json:"visibility,omitempty"`
+	IsActive                  bool                           `json:"isActive,omitempty"`
+	CreatedByUserID           string                         `json:"createdByUserId,omitempty"`
+	CreatedAt                 *time.Time                     `json:"createdAt,omitempty"`
+	UpdatedAt                 *time.Time                     `json:"updatedAt,omitempty"`
+	AvatarURL                 string                         `json:"avatarUrl,omitempty"`
+	OwnerUserID               string                         `json:"ownerUserId,omitempty"`
+	Status                    GroupStatus                    `json:"status,omitempty"`
+	JoinPolicy                GroupJoinPolicy                `json:"joinPolicy,omitempty"`
+	MemberDirectoryVisibility GroupMemberDirectoryVisibility `json:"memberDirectoryVisibility,omitempty"`
+	BackgroundColor           string                         `json:"backgroundColor,omitempty"`
+	BackgroundURL             string                         `json:"backgroundUrl,omitempty"`
+	MemberCount               int32                          `json:"memberCount,omitempty"`
 }
 
 // GroupLink represents v1GroupLink.
@@ -156,10 +170,11 @@ type GroupLink struct {
 
 // GroupMember captures membership details for a group.
 type GroupMember struct {
-	GroupID  string     `json:"groupId,omitempty"`
-	UserID   string     `json:"userId,omitempty"`
-	Role     string     `json:"role,omitempty"`
-	JoinedAt *time.Time `json:"joinedAt,omitempty"`
+	GroupID   string     `json:"groupId,omitempty"`
+	UserID    string     `json:"userId,omitempty"`
+	Role      string     `json:"role,omitempty"`
+	JoinedAt  *time.Time `json:"joinedAt,omitempty"`
+	RoleValue GroupRole  `json:"roleValue,omitempty"`
 }
 
 // GetGroupRequest identifies the group to retrieve.
@@ -169,9 +184,10 @@ type GetGroupRequest struct {
 
 // GetGroupResponse returns a group and related links.
 type GetGroupResponse struct {
-	Group    *UserGroup       `json:"group,omitempty"`
-	Links    []GroupLink      `json:"links,omitempty"`
-	Metadata ResponseMetadata `json:"-"`
+	Group         *UserGroup          `json:"group,omitempty"`
+	Links         []GroupLink         `json:"links,omitempty"`
+	ViewerContext *GroupViewerContext `json:"viewerContext,omitempty"`
+	Metadata      ResponseMetadata    `json:"-"`
 }
 
 func (r *GetGroupResponse) setMetadata(metadata ResponseMetadata) {
@@ -221,6 +237,7 @@ type GroupInvite struct {
 	Role          string     `json:"role,omitempty"`
 	ExpiresAt     *time.Time `json:"expiresAt,omitempty"`
 	CreatedAt     *time.Time `json:"createdAt,omitempty"`
+	RoleValue     GroupRole  `json:"roleValue,omitempty"`
 }
 
 // CreateGroupInviteRequest creates a group invite.
@@ -350,13 +367,21 @@ func (c *Client) UpdateGroup(ctx context.Context, request *UpdateGroupRequest, o
 	}
 
 	body, err := jsonBody(struct {
-		Name        *string          `json:"name,omitempty"`
-		Description *string          `json:"description,omitempty"`
-		Visibility  *VisibilityLevel `json:"visibility,omitempty"`
+		Name                      *string                         `json:"name,omitempty"`
+		Description               *string                         `json:"description,omitempty"`
+		Visibility                *VisibilityLevel                `json:"visibility,omitempty"`
+		JoinPolicy                *GroupJoinPolicy                `json:"joinPolicy,omitempty"`
+		MemberDirectoryVisibility *GroupMemberDirectoryVisibility `json:"memberDirectoryVisibility,omitempty"`
+		BackgroundColor           *string                         `json:"backgroundColor,omitempty"`
+		UpdateMask                string                          `json:"updateMask,omitempty"`
 	}{
-		Name:        request.Name,
-		Description: request.Description,
-		Visibility:  request.Visibility,
+		Name:                      request.Name,
+		Description:               request.Description,
+		Visibility:                request.Visibility,
+		JoinPolicy:                request.JoinPolicy,
+		MemberDirectoryVisibility: request.MemberDirectoryVisibility,
+		BackgroundColor:           request.BackgroundColor,
+		UpdateMask:                request.UpdateMask,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("encode body: %w", err)
@@ -409,19 +434,23 @@ func (c *Client) ListGroups(ctx context.Context, request *ListGroupsRequest, opt
 	if request == nil {
 		request = &ListGroupsRequest{}
 	}
-	listMyGroupsResponse, err := c.ListMyGroups(ctx, &ListMyGroupsRequest{
-		PageSize:  request.PageSize,
-		NextToken: request.NextToken,
-	}, opts...)
+	req, err := c.newRequest(ctx, http.MethodGet, "/v1/groups", nil)
 	if err != nil {
 		return nil, err
 	}
-
-	return &ListGroupsResponse{
-		Groups:    listMyGroupsResponse.Groups,
-		NextToken: listMyGroupsResponse.NextToken,
-		Metadata:  listMyGroupsResponse.Metadata,
-	}, nil
+	query := req.URL.Query()
+	if request.PageSize != nil && *request.PageSize > 0 {
+		query.Set("pageSize", strconv.Itoa(int(*request.PageSize)))
+	}
+	if token := strings.TrimSpace(request.NextToken); token != "" {
+		query.Set("nextToken", token)
+	}
+	req.URL.RawQuery = query.Encode()
+	response := &ListGroupsResponse{}
+	if err := c.do(req, response, opts...); err != nil {
+		return nil, err
+	}
+	return response, nil
 }
 
 // AddGroupMember grants membership to a user within a group.
