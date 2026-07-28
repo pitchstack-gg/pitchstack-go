@@ -2,6 +2,7 @@ package client
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -227,6 +228,43 @@ type AccessProfile struct {
 	Capabilities []string         `json:"capabilities,omitempty"`
 	AllAccess    bool             `json:"allAccess,omitempty"`
 	Tier         string           `json:"tier,omitempty"`
+}
+
+// UnmarshalJSON accepts both protobuf JSON string-encoded int64 values and
+// ordinary JSON numbers. The gateway uses the protobuf representation for
+// access-profile limits and versions.
+func (p *AccessProfile) UnmarshalJSON(data []byte) error {
+	var wire struct {
+		UserID       string                     `json:"userId,omitempty"`
+		Roles        []string                   `json:"roles,omitempty"`
+		Entitlements []string                   `json:"entitlements,omitempty"`
+		Limits       map[string]json.RawMessage `json:"limits,omitempty"`
+		Version      json.RawMessage            `json:"version,omitempty"`
+		Capabilities []string                   `json:"capabilities,omitempty"`
+		AllAccess    bool                       `json:"allAccess,omitempty"`
+		Tier         string                     `json:"tier,omitempty"`
+	}
+	if err := json.Unmarshal(data, &wire); err != nil {
+		return err
+	}
+	limits := make(map[string]int64, len(wire.Limits))
+	for name, raw := range wire.Limits {
+		value, err := parseFlexibleInt64(raw)
+		if err != nil {
+			return fmt.Errorf("decode access profile limit %q: %w", name, err)
+		}
+		limits[name] = value
+	}
+	version, err := parseFlexibleInt64(wire.Version)
+	if err != nil {
+		return fmt.Errorf("decode access profile version: %w", err)
+	}
+	*p = AccessProfile{
+		UserID: wire.UserID, Roles: wire.Roles, Entitlements: wire.Entitlements,
+		Limits: limits, Version: version, Capabilities: wire.Capabilities,
+		AllAccess: wire.AllAccess, Tier: wire.Tier,
+	}
+	return nil
 }
 
 // Login authenticates a user using supplied credentials.

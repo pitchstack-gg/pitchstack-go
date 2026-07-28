@@ -277,11 +277,7 @@ func TestClientMe(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		require.Equal(t, http.MethodGet, r.Method)
 		require.Equal(t, "/v1/me", r.URL.Path)
-		require.NoError(t, json.NewEncoder(w).Encode(MeResponse{
-			User: &User{
-				UserID: "user-1",
-			},
-		}))
+		_, _ = w.Write([]byte(`{"user":{"userId":"user-1"},"accessProfile":{"userId":"user-1","limits":{"groups":"10","decks":25},"version":"7"}}`))
 	}))
 	t.Cleanup(server.Close)
 
@@ -289,6 +285,8 @@ func TestClientMe(t *testing.T) {
 	resp, err := client.Me(context.Background())
 	require.NoError(t, err)
 	require.Equal(t, "user-1", resp.User.UserID)
+	require.Equal(t, map[string]int64{"groups": 10, "decks": 25}, resp.AccessProfile.Limits)
+	require.EqualValues(t, 7, resp.AccessProfile.Version)
 }
 
 func TestClientGetUser(t *testing.T) {

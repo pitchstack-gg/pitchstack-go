@@ -201,8 +201,10 @@ type GroupPinResponse struct {
 func (r *GroupPinResponse) setMetadata(m ResponseMetadata) { r.Metadata = m }
 
 type GroupReportResponse struct {
-	Report   *GroupReport     `json:"report,omitempty"`
-	Metadata ResponseMetadata `json:"-"`
+	// Report is retained for compatibility during the group-report migration.
+	Report   *GroupReport             `json:"report,omitempty"`
+	Receipt  *ModerationReportReceipt `json:"receipt,omitempty"`
+	Metadata ResponseMetadata         `json:"-"`
 }
 
 func (r *GroupReportResponse) setMetadata(m ResponseMetadata) { r.Metadata = m }
