@@ -62,11 +62,14 @@ func TestClientSearchUsers(t *testing.T) {
 		require.Equal(t, "token", query.Get("nextToken"))
 		require.NoError(t, json.NewEncoder(w).Encode(SearchUsersResponse{
 			Users: []UserSearchResult{{
-				UserID:       "u-00000000-0000-0000-0000-0000000000a1",
-				Username:     "alex",
-				Name:         "Alex Search",
-				AvatarURL:    "https://cdn.example.com/alex.png",
-				UserIDSuffix: "00a1",
+				UserID:               "u-00000000-0000-0000-0000-0000000000a1",
+				Username:             "alex",
+				Name:                 "Alex Search",
+				AvatarURL:            "https://cdn.example.com/alex.png",
+				UserIDSuffix:         "00a1",
+				ProfileColor:         "#AB12CD",
+				ProfileBackgroundURL: "https://cdn.example.com/alex-banner.jpg",
+				Badges:               []UserProfileBadge{{Key: "admin", Label: "Admin"}},
 			}},
 			NextToken: "next-page-token",
 		}))
@@ -84,6 +87,9 @@ func TestClientSearchUsers(t *testing.T) {
 	require.Len(t, resp.Users, 1)
 	require.Equal(t, "u-00000000-0000-0000-0000-0000000000a1", resp.Users[0].UserID)
 	require.Equal(t, "00a1", resp.Users[0].UserIDSuffix)
+	require.Equal(t, "#AB12CD", resp.Users[0].ProfileColor)
+	require.Equal(t, "https://cdn.example.com/alex-banner.jpg", resp.Users[0].ProfileBackgroundURL)
+	require.Equal(t, []UserProfileBadge{{Key: "admin", Label: "Admin"}}, resp.Users[0].Badges)
 	require.Equal(t, "next-page-token", resp.NextToken)
 }
 
