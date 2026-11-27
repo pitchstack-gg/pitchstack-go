@@ -29,6 +29,7 @@ const (
 	VisibilityLevelPrivate     VisibilityLevel = "VISIBILITY_LEVEL_PRIVATE"
 	VisibilityLevelShared      VisibilityLevel = "VISIBILITY_LEVEL_SHARED"
 	VisibilityLevelPublic      VisibilityLevel = "VISIBILITY_LEVEL_PUBLIC"
+	VisibilityLevelUnlisted    VisibilityLevel = "VISIBILITY_LEVEL_UNLISTED"
 )
 
 // CollectionType matches the API's v1CollectionType enum.
