@@ -54,17 +54,34 @@ const (
 
 // Collection mirrors v1Collection from the API definition.
 type Collection struct {
-	ID                    string          `json:"id,omitempty"`
-	Name                  string          `json:"name,omitempty"`
-	Description           string          `json:"description,omitempty"`
-	OwnerID               string          `json:"ownerId,omitempty"`
-	CollectionType        CollectionType  `json:"collectionType,omitempty"`
-	Visibility            VisibilityLevel `json:"visibility,omitempty"`
-	CreatedAt             *time.Time      `json:"createdAt,omitempty"`
-	UpdatedAt             *time.Time      `json:"updatedAt,omitempty"`
-	SelectedArtPrintingID string          `json:"selectedArtPrintingId,omitempty"`
-	ArtPrintingID         string          `json:"artPrintingId,omitempty"`
+	ID                    string            `json:"id,omitempty"`
+	Name                  string            `json:"name,omitempty"`
+	Description           string            `json:"description,omitempty"`
+	OwnerID               string            `json:"ownerId,omitempty"`
+	CollectionType        CollectionType    `json:"collectionType,omitempty"`
+	Visibility            VisibilityLevel   `json:"visibility,omitempty"`
+	CreatedAt             *time.Time        `json:"createdAt,omitempty"`
+	UpdatedAt             *time.Time        `json:"updatedAt,omitempty"`
+	SelectedArtPrintingID string            `json:"selectedArtPrintingId,omitempty"`
+	ArtPrintingID         string            `json:"artPrintingId,omitempty"`
+	Counts                *CollectionCounts `json:"counts,omitempty"`
 }
+
+// CollectionCounts summarizes item totals for a collection.
+type CollectionCounts struct {
+	UniqueProducts *int64 `json:"uniqueProducts,omitempty,string"`
+	TotalQuantity  *int64 `json:"totalQuantity,omitempty,string"`
+}
+
+// CollectionValuationPriceType selects the unit price used for a valuation.
+type CollectionValuationPriceType string
+
+const (
+	CollectionValuationPriceTypeMarket CollectionValuationPriceType = "market"
+	CollectionValuationPriceTypeLow    CollectionValuationPriceType = "low"
+	CollectionValuationPriceTypeMid    CollectionValuationPriceType = "mid"
+	CollectionValuationPriceTypeHigh   CollectionValuationPriceType = "high"
+)
 
 // CollectionStats captures aggregate metrics for a collection.
 type CollectionStats struct {
@@ -177,15 +194,18 @@ func (r *CreateCollectionResponse) setMetadata(metadata ResponseMetadata) {
 }
 
 // GetCollectionRequest identifies the collection to fetch.
+// ExcludeWithheld asks the server to omit content withheld by moderation.
 type GetCollectionRequest struct {
-	CollectionID string `json:"-"`
+	CollectionID    string `json:"-"`
+	ExcludeWithheld bool
 }
 
 // GetCollectionResponse returns a single collection.
 type GetCollectionResponse struct {
-	Collection *Collection      `json:"collection,omitempty"`
-	Stats      *CollectionStats `json:"stats,omitempty"`
-	Metadata   ResponseMetadata `json:"-"`
+	Collection         *Collection      `json:"collection,omitempty"`
+	Stats              *CollectionStats `json:"stats,omitempty"`
+	WithholdingChecked *bool            `json:"withholdingChecked,omitempty"`
+	Metadata           ResponseMetadata `json:"-"`
 }
 
 func (r *GetCollectionResponse) setMetadata(metadata ResponseMetadata) {
@@ -428,9 +448,11 @@ func (r *ListCollectionAccessGrantsResponse) setMetadata(metadata ResponseMetada
 }
 
 // GetCollectionValuationRequest identifies a collection valuation lookup.
+// PriceType selects the unit price; empty uses the server default (market).
 type GetCollectionValuationRequest struct {
 	CollectionID string `json:"-"`
 	Source       string
+	PriceType    CollectionValuationPriceType
 }
 
 // GetCollectionValuationResponse describes valuation metrics.
@@ -466,9 +488,10 @@ type ListTradeItemsRequest struct {
 
 // ListTradeItemsResponse returns paginated trade items.
 type ListTradeItemsResponse struct {
-	Items     []TradeItem      `json:"items,omitempty"`
-	NextToken string           `json:"nextToken,omitempty"`
-	Metadata  ResponseMetadata `json:"-"`
+	Items     []TradeItem       `json:"items,omitempty"`
+	NextToken string            `json:"nextToken,omitempty"`
+	Counts    *CollectionCounts `json:"counts,omitempty"`
+	Metadata  ResponseMetadata  `json:"-"`
 }
 
 func (r *ListTradeItemsResponse) setMetadata(metadata ResponseMetadata) {
@@ -554,6 +577,11 @@ func (c *Client) GetCollection(ctx context.Context, request *GetCollectionReques
 	req, err := c.newRequest(ctx, http.MethodGet, path, nil)
 	if err != nil {
 		return nil, err
+	}
+	if request.ExcludeWithheld {
+		query := req.URL.Query()
+		query.Set("excludeWithheld", "true")
+		req.URL.RawQuery = query.Encode()
 	}
 
 	response := &GetCollectionResponse{}
@@ -829,6 +857,7 @@ func (c *Client) GetCollectionValuation(ctx context.Context, request *GetCollect
 	if source := strings.TrimSpace(request.Source); source != "" {
 		query.Set("source", source)
 	}
+	setQueryString(query, "priceType", string(request.PriceType))
 	req.URL.RawQuery = query.Encode()
 
 	response := &GetCollectionValuationResponse{}
