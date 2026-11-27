@@ -746,3 +746,50 @@ func (c *Client) SetArticleOverride(ctx context.Context, request *SetArticleOver
 
 	return response, nil
 }
+
+// HomeHighlightStatus represents news.v1.HomeHighlightStatus.
+type HomeHighlightStatus string
+
+const (
+	HomeHighlightStatusUnspecified HomeHighlightStatus = "HOME_HIGHLIGHT_STATUS_UNSPECIFIED"
+	HomeHighlightStatusDraft       HomeHighlightStatus = "HOME_HIGHLIGHT_STATUS_DRAFT"
+	HomeHighlightStatusPublished   HomeHighlightStatus = "HOME_HIGHLIGHT_STATUS_PUBLISHED"
+	HomeHighlightStatusArchived    HomeHighlightStatus = "HOME_HIGHLIGHT_STATUS_ARCHIVED"
+)
+
+// HomeHighlight represents news.v1.HomeHighlight.
+type HomeHighlight struct {
+	HighlightID    string              `json:"highlightId,omitempty"`
+	Label          string              `json:"label,omitempty"`
+	DestinationURL string              `json:"destinationUrl,omitempty"`
+	StartsAt       *time.Time          `json:"startsAt,omitempty"`
+	EndsAt         *time.Time          `json:"endsAt,omitempty"`
+	Priority       int32               `json:"priority,omitempty"`
+	Status         HomeHighlightStatus `json:"status,omitempty"`
+	CreatedAt      *time.Time          `json:"createdAt,omitempty"`
+	UpdatedAt      *time.Time          `json:"updatedAt,omitempty"`
+}
+
+// ListHomeHighlightsResponse returns the currently active home highlights.
+type ListHomeHighlightsResponse struct {
+	Highlights []HomeHighlight  `json:"highlights,omitempty"`
+	Metadata   ResponseMetadata `json:"-"`
+}
+
+func (r *ListHomeHighlightsResponse) setMetadata(metadata ResponseMetadata) {
+	r.Metadata = metadata
+}
+
+// ListHomeHighlights lists the currently active home page highlights.
+func (c *Client) ListHomeHighlights(ctx context.Context, opts ...RequestOpt) (*ListHomeHighlightsResponse, error) {
+	req, err := c.newRequest(ctx, http.MethodGet, "/v1/news/home-highlights", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListHomeHighlightsResponse{}
+	if err := c.do(req, response, opts...); err != nil {
+		return nil, err
+	}
+	return response, nil
+}
