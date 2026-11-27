@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 )
@@ -92,6 +93,24 @@ func TestClientSearchCards(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, resp.Summaries, 1)
 		require.Equal(t, "next-token", resp.NextToken)
+	})
+
+	t.Run("when first seen filter provided, then RFC3339 query sent and new summary fields decoded", func(t *testing.T) {
+		after := time.Date(2026, 9, 1, 0, 0, 0, 0, time.UTC)
+		client := newStubAPIClient(t, func(t *testing.T, r *http.Request) {
+			require.Equal(t, "/v1/cards", r.URL.Path)
+			require.Equal(t, "2026-09-01T00:00:00Z", r.URL.Query().Get("firstSeenAfter"))
+			require.Equal(t, "first_seen", r.URL.Query().Get("sortBy"))
+		}, `{"summaries":[{"identity":{"cardId":"card-1"},"selectedCore":{"colorIdentity":"COLOR_IDENTITY_PURPLE"},"firstSeenAt":"2026-09-15T00:00:00Z","relationships":{"youngHeroId":"hero-young","adultHeroId":"hero-adult"}}]}`)
+
+		resp, err := client.SearchCards(context.Background(), &SearchCardsRequest{FirstSeenAfter: &after, SortBy: "first_seen"})
+		require.NoError(t, err)
+		require.Len(t, resp.Summaries, 1)
+		summary := resp.Summaries[0]
+		require.Equal(t, ColorIdentityPurple, summary.SelectedCore.ColorIdentity)
+		require.NotNil(t, summary.FirstSeenAt)
+		require.Equal(t, "hero-young", summary.Relationships.YoungHeroID)
+		require.Equal(t, "hero-adult", summary.Relationships.AdultHeroID)
 	})
 
 	t.Run("when request is nil, then defaults applied and response decoded", func(t *testing.T) {

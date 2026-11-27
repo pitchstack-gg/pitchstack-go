@@ -20,6 +20,7 @@ const (
 	ColorIdentityYellow      ColorIdentity = "COLOR_IDENTITY_YELLOW"
 	ColorIdentityBlue        ColorIdentity = "COLOR_IDENTITY_BLUE"
 	ColorIdentityNone        ColorIdentity = "COLOR_IDENTITY_NONE"
+	ColorIdentityPurple      ColorIdentity = "COLOR_IDENTITY_PURPLE"
 )
 
 // LegalityStatus represents v1LegalityStatus.
@@ -108,6 +109,7 @@ type CardSummary struct {
 	Layout            *CardLayoutSummary            `json:"layout,omitempty"`
 	Relationships     *CardRelationshipSummary      `json:"relationships,omitempty"`
 	LegalitySummary   *CardLegalitySummary          `json:"legalitySummary,omitempty"`
+	FirstSeenAt       *time.Time                    `json:"firstSeenAt,omitempty"`
 }
 
 // CardIdentitySummary mirrors v1CardIdentitySummary.
@@ -219,6 +221,8 @@ type CardRelationshipSummary struct {
 	PitchSiblingIDs   []string `json:"pitchSiblingIds,omitempty"`
 	ReferencedCards   []string `json:"referencedCards,omitempty"`
 	CardsReferencedBy []string `json:"cardsReferencedBy,omitempty"`
+	YoungHeroID       string   `json:"youngHeroId,omitempty"`
+	AdultHeroID       string   `json:"adultHeroId,omitempty"`
 }
 
 // TCGPlayerSummary mirrors v1TCGPlayerSummary.
@@ -367,6 +371,8 @@ type DataSnapshotManifest struct {
 }
 
 // SearchCardsRequest models query filters for card search.
+// SortBy accepts "name", "release_date", "set" or "first_seen"; anything else sorts by relevance.
+// FirstSeenAfter restricts results to cards first seen at or after the given instant.
 type SearchCardsRequest struct {
 	SearchTerm           string
 	Class                string
@@ -408,6 +414,7 @@ type SearchCardsRequest struct {
 	Artist               string
 	SortBy               string
 	SortOrder            string
+	FirstSeenAfter       *time.Time
 }
 
 // SearchCardsResponse mirrors v1SearchCardsResponse.
@@ -711,6 +718,7 @@ func (c *Client) SearchCards(ctx context.Context, request *SearchCardsRequest, o
 	setQueryString(query, "artist", request.Artist)
 	setQueryString(query, "sortBy", request.SortBy)
 	setQueryString(query, "sortOrder", request.SortOrder)
+	setQueryTime(query, "firstSeenAfter", request.FirstSeenAfter)
 	req.URL.RawQuery = query.Encode()
 
 	response := &SearchCardsResponse{}
