@@ -41,6 +41,18 @@ type UserProfileBadge struct {
 	Label string `json:"label,omitempty"`
 }
 
+// UserProfileSummary carries the minimal profile fields needed to render a
+// user card in a list.
+type UserProfileSummary struct {
+	Username             string             `json:"username,omitempty"`
+	Name                 string             `json:"name,omitempty"`
+	AvatarURL            string             `json:"avatarUrl,omitempty"`
+	UserIDSuffix         string             `json:"userIdSuffix,omitempty"`
+	ProfileColor         string             `json:"profileColor,omitempty"`
+	ProfileBackgroundURL string             `json:"profileBackgroundUrl,omitempty"`
+	Badges               []UserProfileBadge `json:"badges,omitempty"`
+}
+
 // UserSearchResult represents a compact search result for a user, carrying
 // enough profile detail to render a minimized profile card.
 type UserSearchResult struct {

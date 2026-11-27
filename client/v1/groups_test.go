@@ -336,3 +336,149 @@ func TestClientGroupAvatarUploadFlow(t *testing.T) {
 	require.True(t, sawBegin)
 	require.True(t, sawComplete)
 }
+
+func TestClientGroupTagsAndDiscovery(t *testing.T) {
+	t.Run("when creating with tags, then sends the tags", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			require.Equal(t, "/v1/groups", r.URL.Path)
+			var payload map[string]any
+			require.NoError(t, json.NewDecoder(r.Body).Decode(&payload))
+			require.Equal(t, []any{"draft", "cube"}, payload["tags"])
+			_, _ = w.Write([]byte(`{"group":{"groupId":"group-1","tags":["draft","cube"]}}`))
+		}))
+		t.Cleanup(server.Close)
+
+		client := newTestClient(t, WithBaseURL(server.URL), WithHTTPClient(server.Client()))
+		resp, err := client.CreateGroup(context.Background(), &CreateGroupRequest{Name: "G", Tags: []string{"draft", "cube"}})
+		require.NoError(t, err)
+		require.Equal(t, []string{"draft", "cube"}, resp.Group.Tags)
+	})
+
+	t.Run("when updating tags with a mask, then sends the tags and mask", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			require.Equal(t, http.MethodPatch, r.Method)
+			var payload map[string]any
+			require.NoError(t, json.NewDecoder(r.Body).Decode(&payload))
+			require.Equal(t, []any{"cube"}, payload["tags"])
+			require.Equal(t, "tags", payload["updateMask"])
+			_, _ = w.Write([]byte(`{}`))
+		}))
+		t.Cleanup(server.Close)
+
+		client := newTestClient(t, WithBaseURL(server.URL), WithHTTPClient(server.Client()))
+		_, err := client.UpdateGroup(context.Background(), &UpdateGroupRequest{GroupID: "group-1", Tags: []string{"cube"}, UpdateMask: "tags"})
+		require.NoError(t, err)
+	})
+
+	t.Run("when listing with sort and tag, then sends them as query parameters", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			require.Equal(t, "/v1/groups", r.URL.Path)
+			require.Equal(t, "GROUP_SORT_ORDER_MOST_MEMBERS", r.URL.Query().Get("sort"))
+			require.Equal(t, "draft", r.URL.Query().Get("tag"))
+			_, _ = w.Write([]byte(`{}`))
+		}))
+		t.Cleanup(server.Close)
+
+		client := newTestClient(t, WithBaseURL(server.URL), WithHTTPClient(server.Client()))
+		_, err := client.ListGroups(context.Background(), &ListGroupsRequest{Sort: GroupSortOrderMostMembers, Tag: " draft "})
+		require.NoError(t, err)
+	})
+
+	t.Run("when searching with a tag, then sends the tag", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			require.Equal(t, "/v1/groups/search", r.URL.Path)
+			require.Equal(t, "draft", r.URL.Query().Get("tag"))
+			_, _ = w.Write([]byte(`{}`))
+		}))
+		t.Cleanup(server.Close)
+
+		client := newTestClient(t, WithBaseURL(server.URL), WithHTTPClient(server.Client()))
+		_, err := client.SearchGroups(context.Background(), &SearchGroupsRequest{Tag: "draft"})
+		require.NoError(t, err)
+	})
+}
+
+func TestClientListGroupMembersFilters(t *testing.T) {
+	t.Run("when given roles, query and sort, then sends them and decodes member profiles", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			require.Equal(t, "/v1/groups/group-1/members", r.URL.Path)
+			query := r.URL.Query()
+			require.Equal(t, []string{"GROUP_ROLE_ADMIN", "GROUP_ROLE_OWNER"}, query["roles"])
+			require.Equal(t, "ali", query.Get("query"))
+			require.Equal(t, "GROUP_MEMBER_SORT_ROLE", query.Get("sort"))
+			_, _ = w.Write([]byte(`{"members":[{"userId":"user-1","roleValue":"GROUP_ROLE_ADMIN","profile":{"username":"alice","userIdSuffix":"1234","badges":[{"key":"staff","label":"Staff"}]}}]}`))
+		}))
+		t.Cleanup(server.Close)
+
+		client := newTestClient(t, WithBaseURL(server.URL), WithHTTPClient(server.Client()))
+		resp, err := client.ListGroupMembers(context.Background(), &ListGroupMembersRequest{
+			GroupID: "group-1",
+			Roles:   []GroupRole{GroupRoleAdmin, GroupRoleOwner},
+			Query:   "ali",
+			Sort:    GroupMemberSortRole,
+		})
+		require.NoError(t, err)
+		require.Equal(t, "alice", resp.Members[0].Profile.Username)
+		require.Equal(t, "staff", resp.Members[0].Profile.Badges[0].Key)
+	})
+}
+
+func TestClientListMyGroupsMemberships(t *testing.T) {
+	t.Run("when the server returns memberships, then decodes role and group", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			require.Equal(t, "/v1/groups:mine", r.URL.Path)
+			_, _ = w.Write([]byte(`{"memberships":[{"group":{"groupId":"group-1"},"role":"GROUP_ROLE_OWNER","joinedAt":"2026-01-02T03:04:05Z"}]}`))
+		}))
+		t.Cleanup(server.Close)
+
+		client := newTestClient(t, WithBaseURL(server.URL), WithHTTPClient(server.Client()))
+		resp, err := client.ListMyGroups(context.Background(), nil)
+		require.NoError(t, err)
+		require.Equal(t, GroupRoleOwner, resp.Memberships[0].Role)
+		require.Equal(t, "group-1", resp.Memberships[0].Group.GroupID)
+		require.NotNil(t, resp.Memberships[0].JoinedAt)
+	})
+}
+
+func TestClientGroupRoleValue(t *testing.T) {
+	t.Run("when creating an invite with only a role value, then sends roleValue", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			require.Equal(t, "/v1/groups/group-1/invites", r.URL.Path)
+			var payload map[string]any
+			require.NoError(t, json.NewDecoder(r.Body).Decode(&payload))
+			require.Equal(t, "GROUP_ROLE_ADMIN", payload["roleValue"])
+			require.NotContains(t, payload, "role")
+			_, _ = w.Write([]byte(`{}`))
+		}))
+		t.Cleanup(server.Close)
+
+		client := newTestClient(t, WithBaseURL(server.URL), WithHTTPClient(server.Client()))
+		role := GroupRoleAdmin
+		_, err := client.CreateGroupInvite(context.Background(), &CreateGroupInviteRequest{GroupID: "group-1", InvitedUserID: "user-1", RoleValue: &role})
+		require.NoError(t, err)
+	})
+
+	t.Run("when updating a member with only a role value, then sends roleValue", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			require.Equal(t, http.MethodPatch, r.Method)
+			var payload map[string]any
+			require.NoError(t, json.NewDecoder(r.Body).Decode(&payload))
+			require.Equal(t, "GROUP_ROLE_MEMBER", payload["roleValue"])
+			_, _ = w.Write([]byte(`{}`))
+		}))
+		t.Cleanup(server.Close)
+
+		client := newTestClient(t, WithBaseURL(server.URL), WithHTTPClient(server.Client()))
+		role := GroupRoleMember
+		_, err := client.UpdateGroupMemberRole(context.Background(), &UpdateGroupMemberRoleRequest{GroupID: "group-1", UserID: "user-1", RoleValue: &role})
+		require.NoError(t, err)
+	})
+
+	t.Run("when neither role nor role value is set, then returns an error", func(t *testing.T) {
+		client := newTestClient(t)
+		_, err := client.CreateGroupInvite(context.Background(), &CreateGroupInviteRequest{GroupID: "group-1", InvitedUserID: "user-1"})
+		require.Error(t, err)
+		_, err = client.UpdateGroupMemberRole(context.Background(), &UpdateGroupMemberRoleRequest{GroupID: "group-1", UserID: "user-1"})
+		require.Error(t, err)
+	})
+}

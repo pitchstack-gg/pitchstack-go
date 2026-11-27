@@ -114,6 +114,23 @@ func (r *ChangePasswordResponse) setMetadata(metadata ResponseMetadata) {
 	r.Metadata = metadata
 }
 
+// SetPasswordRequest adds a first password to an account that has none.
+type SetPasswordRequest struct {
+	UserID      string `json:"userId,omitempty"`
+	NewPassword string `json:"newPassword,omitempty"`
+	// ReauthenticationAccessToken is an access token from a recent sign-in.
+	ReauthenticationAccessToken string `json:"reauthenticationAccessToken,omitempty"`
+}
+
+// SetPasswordResponse captures metadata for set-password operations.
+type SetPasswordResponse struct {
+	Metadata ResponseMetadata `json:"-"`
+}
+
+func (r *SetPasswordResponse) setMetadata(metadata ResponseMetadata) {
+	r.Metadata = metadata
+}
+
 // RequestPasswordResetRequest starts a password reset flow.
 type RequestPasswordResetRequest struct {
 	Email string `json:"email,omitempty"`
@@ -279,12 +296,13 @@ type RegisterRequest struct {
 
 // RegisterResponse returns credentials created during registration.
 type RegisterResponse struct {
-	UserID               string           `json:"userId,omitempty"`
-	AccessToken          string           `json:"accessToken,omitempty"`
-	RefreshToken         string           `json:"refreshToken,omitempty"`
-	AccessTokenExpiresAt *time.Time       `json:"accessTokenExpiresAt,omitempty"`
-	Roles                []string         `json:"roles,omitempty"`
-	Metadata             ResponseMetadata `json:"-"`
+	UserID                    string                    `json:"userId,omitempty"`
+	AccessToken               string                    `json:"accessToken,omitempty"`
+	RefreshToken              string                    `json:"refreshToken,omitempty"`
+	AccessTokenExpiresAt      *time.Time                `json:"accessTokenExpiresAt,omitempty"`
+	Roles                     []string                  `json:"roles,omitempty"`
+	IndependentRecoveryStatus IndependentRecoveryStatus `json:"independentRecoveryStatus,omitempty"`
+	Metadata                  ResponseMetadata          `json:"-"`
 }
 
 func (r *RegisterResponse) setMetadata(metadata ResponseMetadata) {
@@ -339,6 +357,9 @@ func (r *LinkOAuthProviderResponse) setMetadata(metadata ResponseMetadata) {
 type UnlinkOAuthProviderRequest struct {
 	Provider string `json:"-"`
 	UserID   string `json:"userId,omitempty"`
+	// ReauthenticationAccessToken is an access token from a recent sign-in.
+	// It is required when unlinking Apple and ignored for other providers.
+	ReauthenticationAccessToken string `json:"reauthenticationAccessToken,omitempty"`
 }
 
 // UnlinkOAuthProviderResponse captures metadata for unlink operations.
@@ -376,8 +397,9 @@ type ListAuthMethodsRequest struct {
 
 // ListAuthMethodsResponse lists auth methods for a user.
 type ListAuthMethodsResponse struct {
-	Methods  []AuthMethod     `json:"methods,omitempty"`
-	Metadata ResponseMetadata `json:"-"`
+	Methods                   []AuthMethod              `json:"methods,omitempty"`
+	IndependentRecoveryStatus IndependentRecoveryStatus `json:"independentRecoveryStatus,omitempty"`
+	Metadata                  ResponseMetadata          `json:"-"`
 }
 
 func (r *ListAuthMethodsResponse) setMetadata(metadata ResponseMetadata) {
@@ -549,6 +571,49 @@ func (c *Client) ChangePassword(ctx context.Context, request *ChangePasswordRequ
 	req.Header.Set("Content-Type", "application/json")
 
 	response := &ChangePasswordResponse{}
+	if err := c.do(req, response, opts...); err != nil {
+		return nil, err
+	}
+	return response, nil
+}
+
+// SetPassword adds a first password to an account that signs in only with a
+// passkey or a linked provider. It requires an access token from a recent
+// sign-in as proof of reauthentication.
+func (c *Client) SetPassword(ctx context.Context, request *SetPasswordRequest, opts ...RequestOpt) (*SetPasswordResponse, error) {
+	if request == nil {
+		return nil, errors.New("request must not be nil")
+	}
+	if strings.TrimSpace(request.UserID) == "" {
+		return nil, errors.New("userID must not be empty")
+	}
+	if strings.TrimSpace(request.NewPassword) == "" {
+		return nil, errors.New("newPassword must not be empty")
+	}
+	if strings.TrimSpace(request.ReauthenticationAccessToken) == "" {
+		return nil, errors.New("reauthenticationAccessToken must not be empty")
+	}
+
+	body, err := jsonBody(struct {
+		UserID                      string `json:"userId,omitempty"`
+		NewPassword                 string `json:"newPassword,omitempty"`
+		ReauthenticationAccessToken string `json:"reauthenticationAccessToken,omitempty"`
+	}{
+		UserID:                      strings.TrimSpace(request.UserID),
+		NewPassword:                 request.NewPassword,
+		ReauthenticationAccessToken: strings.TrimSpace(request.ReauthenticationAccessToken),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("encode body: %w", err)
+	}
+
+	req, err := c.newRequest(ctx, http.MethodPost, "/v1/auth/set-password", body)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	response := &SetPasswordResponse{}
 	if err := c.do(req, response, opts...); err != nil {
 		return nil, err
 	}
@@ -969,9 +1034,11 @@ func (c *Client) UnlinkOAuthProvider(ctx context.Context, request *UnlinkOAuthPr
 	}
 
 	body, err := jsonBody(struct {
-		UserID string `json:"userId,omitempty"`
+		UserID                      string `json:"userId,omitempty"`
+		ReauthenticationAccessToken string `json:"reauthenticationAccessToken,omitempty"`
 	}{
-		UserID: strings.TrimSpace(request.UserID),
+		UserID:                      strings.TrimSpace(request.UserID),
+		ReauthenticationAccessToken: strings.TrimSpace(request.ReauthenticationAccessToken),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("encode body: %w", err)

@@ -210,3 +210,35 @@ func TestClientListActivityFeed(t *testing.T) {
 		require.Nil(t, resp)
 	})
 }
+
+func TestClientListFollowEntries(t *testing.T) {
+	t.Run("when the server returns follower entries, then decodes profiles", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			require.Equal(t, http.MethodGet, r.Method)
+			require.Equal(t, "/v1/users/user-1/followers", r.URL.Path)
+			_, _ = w.Write([]byte(`{"userIds":["user-2"],"followers":[{"userId":"user-2","followedAt":"2026-01-02T03:04:05Z","profile":{"username":"bob","avatarUrl":"https://cdn/b.png"}}]}`))
+		}))
+		t.Cleanup(server.Close)
+
+		client := newTestClient(t, WithBaseURL(server.URL), WithHTTPClient(server.Client()))
+		resp, err := client.ListFollowers(context.Background(), &ListFollowersRequest{UserID: "user-1"})
+		require.NoError(t, err)
+		require.Equal(t, []string{"user-2"}, resp.UserIDs)
+		require.Equal(t, "bob", resp.Followers[0].Profile.Username)
+		require.NotNil(t, resp.Followers[0].FollowedAt)
+	})
+
+	t.Run("when the server returns following entries, then decodes them", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			require.Equal(t, "/v1/users/user-1/following", r.URL.Path)
+			_, _ = w.Write([]byte(`{"following":[{"userId":"user-3"}]}`))
+		}))
+		t.Cleanup(server.Close)
+
+		client := newTestClient(t, WithBaseURL(server.URL), WithHTTPClient(server.Client()))
+		resp, err := client.ListFollowing(context.Background(), &ListFollowingRequest{UserID: "user-1"})
+		require.NoError(t, err)
+		require.Equal(t, "user-3", resp.Following[0].UserID)
+		require.Nil(t, resp.Following[0].Profile)
+	})
+}

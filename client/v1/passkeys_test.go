@@ -136,3 +136,20 @@ func TestClientPasskeysFlow(t *testing.T) {
 	require.True(t, sawUpdate)
 	require.True(t, sawDelete)
 }
+
+func TestClientCompletePasskeySignup(t *testing.T) {
+	t.Run("when signup completes, then decodes the recovery status", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			require.Equal(t, http.MethodPost, r.Method)
+			require.Equal(t, "/v1/auth/webauthn/signup/complete", r.URL.Path)
+			_, _ = w.Write([]byte(`{"userId":"user-1","credentialId":"cred-1","independentRecoveryStatus":"INDEPENDENT_RECOVERY_STATUS_NOT_REQUIRED"}`))
+		}))
+		t.Cleanup(server.Close)
+
+		client := newTestClient(t, WithBaseURL(server.URL), WithHTTPClient(server.Client()))
+		resp, err := client.CompletePasskeySignup(context.Background(), &CompletePasskeySignupRequest{SessionID: "s", ClientDataJSON: "c", AttestationObject: "a"})
+		require.NoError(t, err)
+		require.Equal(t, "cred-1", resp.CredentialID)
+		require.Equal(t, IndependentRecoveryStatusNotRequired, resp.IndependentRecoveryStatus)
+	})
+}
