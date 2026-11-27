@@ -386,3 +386,81 @@ func TestClientAuthMethodManagement(t *testing.T) {
 	require.True(t, sawRemove)
 	require.True(t, sawPreferred)
 }
+
+func TestClientSetPassword(t *testing.T) {
+	t.Run("when given a password and proof, then posts them", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			require.Equal(t, http.MethodPost, r.Method)
+			require.Equal(t, "/v1/auth/set-password", r.URL.Path)
+			require.Equal(t, "application/json", r.Header.Get("Content-Type"))
+			var payload SetPasswordRequest
+			require.NoError(t, json.NewDecoder(r.Body).Decode(&payload))
+			require.Equal(t, "user-1", payload.UserID)
+			require.Equal(t, "new-pw", payload.NewPassword)
+			require.Equal(t, "recent-access", payload.ReauthenticationAccessToken)
+			w.Header().Set("X-Request-Id", "req-set")
+			_, _ = w.Write([]byte(`{}`))
+		}))
+		t.Cleanup(server.Close)
+
+		client := newTestClient(t, WithBaseURL(server.URL), WithHTTPClient(server.Client()))
+		resp, err := client.SetPassword(context.Background(), &SetPasswordRequest{UserID: "user-1", NewPassword: "new-pw", ReauthenticationAccessToken: "recent-access"})
+		require.NoError(t, err)
+		require.Equal(t, "req-set", resp.Metadata.RequestID)
+	})
+
+	t.Run("when a required field is missing, then returns an error", func(t *testing.T) {
+		client := newTestClient(t)
+		_, err := client.SetPassword(context.Background(), &SetPasswordRequest{UserID: "user-1", NewPassword: "pw"})
+		require.Error(t, err)
+		_, err = client.SetPassword(context.Background(), &SetPasswordRequest{UserID: "user-1", ReauthenticationAccessToken: "t"})
+		require.Error(t, err)
+		_, err = client.SetPassword(context.Background(), &SetPasswordRequest{NewPassword: "pw", ReauthenticationAccessToken: "t"})
+		require.Error(t, err)
+		_, err = client.SetPassword(context.Background(), nil)
+		require.Error(t, err)
+	})
+}
+
+func TestClientUnlinkOAuthProviderReauthentication(t *testing.T) {
+	t.Run("when given a reauthentication token, then sends it in the body", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			require.Equal(t, http.MethodPost, r.Method)
+			require.Equal(t, "/v1/auth/oauth/apple/unlink", r.URL.Path)
+			var payload map[string]any
+			require.NoError(t, json.NewDecoder(r.Body).Decode(&payload))
+			require.Equal(t, "user-1", payload["userId"])
+			require.Equal(t, "recent-access", payload["reauthenticationAccessToken"])
+			_, _ = w.Write([]byte(`{}`))
+		}))
+		t.Cleanup(server.Close)
+
+		client := newTestClient(t, WithBaseURL(server.URL), WithHTTPClient(server.Client()))
+		_, err := client.UnlinkOAuthProvider(context.Background(), &UnlinkOAuthProviderRequest{Provider: "apple", UserID: "user-1", ReauthenticationAccessToken: "recent-access"})
+		require.NoError(t, err)
+	})
+}
+
+func TestClientAuthExtraRecoveryStatus(t *testing.T) {
+	t.Run("when register and list-methods report recovery status, then decodes it", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			switch r.URL.Path {
+			case "/v1/auth/register":
+				_, _ = w.Write([]byte(`{"userId":"user-1","independentRecoveryStatus":"INDEPENDENT_RECOVERY_STATUS_NOT_REQUIRED"}`))
+			case "/v1/auth/users/user-1/methods":
+				_, _ = w.Write([]byte(`{"methods":[{"methodType":"AUTH_METHOD_TYPE_OAUTH_APPLE"}],"independentRecoveryStatus":"INDEPENDENT_RECOVERY_STATUS_READY"}`))
+			default:
+				t.Fatalf("unexpected path: %s", r.URL.Path)
+			}
+		}))
+		t.Cleanup(server.Close)
+
+		client := newTestClient(t, WithBaseURL(server.URL), WithHTTPClient(server.Client()))
+		reg, err := client.Register(context.Background(), &RegisterRequest{Email: "a@b.c", Password: "pw"})
+		require.NoError(t, err)
+		require.Equal(t, IndependentRecoveryStatusNotRequired, reg.IndependentRecoveryStatus)
+		methods, err := client.ListAuthMethods(context.Background(), &ListAuthMethodsRequest{UserID: "user-1"})
+		require.NoError(t, err)
+		require.Equal(t, IndependentRecoveryStatusReady, methods.IndependentRecoveryStatus)
+	})
+}

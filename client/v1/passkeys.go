@@ -71,13 +71,14 @@ type CompletePasskeySignupRequest struct {
 
 // CompletePasskeySignupResponse returns credentials for a new passkey account.
 type CompletePasskeySignupResponse struct {
-	UserID               string           `json:"userId,omitempty"`
-	AccessToken          string           `json:"accessToken,omitempty"`
-	RefreshToken         string           `json:"refreshToken,omitempty"`
-	AccessTokenExpiresAt *time.Time       `json:"accessTokenExpiresAt,omitempty"`
-	Roles                []string         `json:"roles,omitempty"`
-	CredentialID         string           `json:"credentialId,omitempty"`
-	Metadata             ResponseMetadata `json:"-"`
+	UserID                    string                    `json:"userId,omitempty"`
+	AccessToken               string                    `json:"accessToken,omitempty"`
+	RefreshToken              string                    `json:"refreshToken,omitempty"`
+	AccessTokenExpiresAt      *time.Time                `json:"accessTokenExpiresAt,omitempty"`
+	Roles                     []string                  `json:"roles,omitempty"`
+	CredentialID              string                    `json:"credentialId,omitempty"`
+	IndependentRecoveryStatus IndependentRecoveryStatus `json:"independentRecoveryStatus,omitempty"`
+	Metadata                  ResponseMetadata          `json:"-"`
 }
 
 func (r *CompletePasskeySignupResponse) setMetadata(metadata ResponseMetadata) {
