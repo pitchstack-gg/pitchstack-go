@@ -15,11 +15,12 @@ import (
 type Condition string
 
 const (
-	ConditionUnspecified   Condition = "CONDITION_UNSPECIFIED"
-	ConditionNearMint      Condition = "NEAR_MINT"
-	ConditionLightlyPlayed Condition = "LIGHTLY_PLAYED"
-	ConditionHeavilyPlayed Condition = "HEAVILY_PLAYED"
-	ConditionDamaged       Condition = "DAMAGED"
+	ConditionUnspecified      Condition = "CONDITION_UNSPECIFIED"
+	ConditionNearMint         Condition = "NEAR_MINT"
+	ConditionLightlyPlayed    Condition = "LIGHTLY_PLAYED"
+	ConditionModeratelyPlayed Condition = "MODERATELY_PLAYED"
+	ConditionHeavilyPlayed    Condition = "HEAVILY_PLAYED"
+	ConditionDamaged          Condition = "DAMAGED"
 )
 
 // CollectionItem mirrors v1CollectionItem.
@@ -108,6 +109,8 @@ type AdjustCollectionItemQuantityRequest struct {
 	QuantityDelta    int32     `json:"quantityDelta,omitempty"`
 	ItemID           string    `json:"itemId,omitempty"`
 	ClientMutationID string    `json:"clientMutationId,omitempty"`
+	// Value is the acquired value, recorded only when the adjustment creates the item.
+	Value *float64 `json:"value,omitempty"`
 }
 
 // AdjustCollectionItemQuantityResponse returns the adjusted item.
@@ -131,6 +134,8 @@ type UpdateCollectionItemRequest struct {
 	ClientMutationID  string     `json:"clientMutationId,omitempty"`
 	TradeQuantity     *int32     `json:"tradeQuantity,omitempty"`
 	Notes             *string    `json:"notes,omitempty"`
+	// ValueMustBeUnset makes a value update succeed only while the stored value is unset.
+	ValueMustBeUnset *bool `json:"valueMustBeUnset,omitempty"`
 }
 
 // UpdateCollectionItemResponse returns the updated item.
@@ -386,6 +391,7 @@ func (c *Client) UpdateCollectionItem(ctx context.Context, request *UpdateCollec
 		ClientMutationID  string     `json:"clientMutationId,omitempty"`
 		TradeQuantity     *int32     `json:"tradeQuantity,omitempty"`
 		Notes             *string    `json:"notes,omitempty"`
+		ValueMustBeUnset  *bool      `json:"valueMustBeUnset,omitempty"`
 	}{
 		Quantity:          request.Quantity,
 		Condition:         request.Condition,
@@ -395,6 +401,7 @@ func (c *Client) UpdateCollectionItem(ctx context.Context, request *UpdateCollec
 		ClientMutationID:  strings.TrimSpace(request.ClientMutationID),
 		TradeQuantity:     request.TradeQuantity,
 		Notes:             request.Notes,
+		ValueMustBeUnset:  request.ValueMustBeUnset,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("encode body: %w", err)
@@ -528,10 +535,11 @@ func (c *Client) BatchUpdateCollectionItems(ctx context.Context, request *BatchU
 		ClientMutationID  string     `json:"clientMutationId,omitempty"`
 		TradeQuantity     *int32     `json:"tradeQuantity,omitempty"`
 		Notes             *string    `json:"notes,omitempty"`
+		ValueMustBeUnset  *bool      `json:"valueMustBeUnset,omitempty"`
 	}
 	wires := make([]updateWire, len(request.Requests))
 	for index, item := range request.Requests {
-		wires[index] = updateWire{ItemID: strings.TrimSpace(item.ItemID), Quantity: item.Quantity, Condition: item.Condition, Value: item.Value, Pinned: item.Pinned, ExpectedUpdatedAt: item.ExpectedUpdatedAt, ClientMutationID: strings.TrimSpace(item.ClientMutationID), TradeQuantity: item.TradeQuantity, Notes: item.Notes}
+		wires[index] = updateWire{ItemID: strings.TrimSpace(item.ItemID), Quantity: item.Quantity, Condition: item.Condition, Value: item.Value, Pinned: item.Pinned, ExpectedUpdatedAt: item.ExpectedUpdatedAt, ClientMutationID: strings.TrimSpace(item.ClientMutationID), TradeQuantity: item.TradeQuantity, Notes: item.Notes, ValueMustBeUnset: item.ValueMustBeUnset}
 	}
 	body, err := jsonBody(struct {
 		CollectionID string       `json:"collectionId"`
@@ -603,6 +611,77 @@ func (c *Client) BatchTransferCollectionItems(ctx context.Context, request *Batc
 	}
 	req.Header.Set("Content-Type", "application/json")
 	response := &BatchTransferCollectionItemsResponse{}
+	if err := c.do(req, response, opts...); err != nil {
+		return nil, err
+	}
+	return response, nil
+}
+
+// SplitCollectionItemRequest moves part of an item's quantity into a new item.
+// ExpectedUpdatedAt and ClientMutationID are required; NewItemID optionally
+// supplies the identifier for the new item.
+type SplitCollectionItemRequest struct {
+	ItemID            string     `json:"-"`
+	SplitQuantity     int32      `json:"splitQuantity"`
+	ExpectedUpdatedAt *time.Time `json:"expectedUpdatedAt,omitempty"`
+	ClientMutationID  string     `json:"clientMutationId,omitempty"`
+	NewItemID         string     `json:"newItemId,omitempty"`
+}
+
+// SplitCollectionItemResponse returns the reduced source item and the new item.
+type SplitCollectionItemResponse struct {
+	SourceItem *CollectionItem  `json:"sourceItem,omitempty"`
+	SplitItem  *CollectionItem  `json:"splitItem,omitempty"`
+	Metadata   ResponseMetadata `json:"-"`
+}
+
+func (r *SplitCollectionItemResponse) setMetadata(metadata ResponseMetadata) {
+	r.Metadata = metadata
+}
+
+// SplitCollectionItem splits part of a collection item's quantity into a new item.
+func (c *Client) SplitCollectionItem(ctx context.Context, request *SplitCollectionItemRequest, opts ...RequestOpt) (*SplitCollectionItemResponse, error) {
+	if request == nil {
+		return nil, errors.New("request must not be nil")
+	}
+	itemID := strings.TrimSpace(request.ItemID)
+	if itemID == "" {
+		return nil, errors.New("itemID must not be empty")
+	}
+	if request.SplitQuantity <= 0 {
+		return nil, errors.New("splitQuantity must be greater than zero")
+	}
+	if request.ExpectedUpdatedAt == nil {
+		return nil, errors.New("expectedUpdatedAt must not be nil")
+	}
+	clientMutationID := strings.TrimSpace(request.ClientMutationID)
+	if clientMutationID == "" {
+		return nil, errors.New("clientMutationID must not be empty")
+	}
+
+	body, err := jsonBody(struct {
+		SplitQuantity     int32      `json:"splitQuantity"`
+		ExpectedUpdatedAt *time.Time `json:"expectedUpdatedAt"`
+		ClientMutationID  string     `json:"clientMutationId"`
+		NewItemID         string     `json:"newItemId,omitempty"`
+	}{
+		SplitQuantity:     request.SplitQuantity,
+		ExpectedUpdatedAt: request.ExpectedUpdatedAt,
+		ClientMutationID:  clientMutationID,
+		NewItemID:         strings.TrimSpace(request.NewItemID),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("encode body: %w", err)
+	}
+
+	path := fmt.Sprintf("/v1/collection_items/%s:split", url.PathEscape(itemID))
+	req, err := c.newRequest(ctx, http.MethodPost, path, body)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	response := &SplitCollectionItemResponse{}
 	if err := c.do(req, response, opts...); err != nil {
 		return nil, err
 	}

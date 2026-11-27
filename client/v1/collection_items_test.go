@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 )
@@ -398,4 +399,87 @@ func TestClientBatchTransferCollectionItems(t *testing.T) {
 	resp, err := client.BatchTransferCollectionItems(context.Background(), &BatchTransferCollectionItemsRequest{SourceCollectionID: "c-source", DestinationCollectionID: "c-destination", ItemIDs: []string{"ci-1"}})
 	require.NoError(t, err)
 	require.Equal(t, "c-destination", resp.Items[0].CollectionID)
+}
+
+func TestClientCollectionItemsContractUpdates(t *testing.T) {
+	t.Run("when condition is moderately played, then it round-trips", func(t *testing.T) {
+		client := newStubAPIClient(t, nil, `{"item":{"id":"item-1","condition":"MODERATELY_PLAYED"}}`)
+		resp, err := client.GetCollectionItem(context.Background(), &GetCollectionItemRequest{ItemID: "item-1"})
+		require.NoError(t, err)
+		require.Equal(t, ConditionModeratelyPlayed, resp.Item.Condition)
+		require.Equal(t, "MODERATELY_PLAYED", string(ConditionModeratelyPlayed))
+	})
+
+	t.Run("when value provided, then adjust quantity body includes it", func(t *testing.T) {
+		value := 0.0
+		client := newStubAPIClient(t, func(t *testing.T, r *http.Request) {
+			var payload map[string]any
+			require.NoError(t, json.NewDecoder(r.Body).Decode(&payload))
+			require.Contains(t, payload, "value")
+			require.Equal(t, float64(0), payload["value"])
+		}, `{"item":{"id":"item-1"}}`)
+		_, err := client.AdjustCollectionItemQuantity(context.Background(), &AdjustCollectionItemQuantityRequest{CollectionID: "col-1", ProductID: "prod-1", QuantityDelta: 1, Value: &value})
+		require.NoError(t, err)
+	})
+
+	t.Run("when value must be unset, then update and batch update bodies include it", func(t *testing.T) {
+		mustBeUnset := true
+		value := 3.5
+		client := newStubAPIClient(t, func(t *testing.T, r *http.Request) {
+			var payload map[string]any
+			require.NoError(t, json.NewDecoder(r.Body).Decode(&payload))
+			if r.URL.Path == "/v1/collection_items:batchUpdate" {
+				payload = payload["requests"].([]any)[0].(map[string]any)
+			}
+			require.Equal(t, true, payload["valueMustBeUnset"])
+		}, `{"item":{"id":"item-1"}}`)
+		_, err := client.UpdateCollectionItem(context.Background(), &UpdateCollectionItemRequest{ItemID: "item-1", Value: &value, ValueMustBeUnset: &mustBeUnset})
+		require.NoError(t, err)
+		_, err = client.BatchUpdateCollectionItems(context.Background(), &BatchUpdateCollectionItemsRequest{CollectionID: "col-1", Requests: []UpdateCollectionItemRequest{{ItemID: "item-1", Value: &value, ValueMustBeUnset: &mustBeUnset}}})
+		require.NoError(t, err)
+	})
+}
+
+func TestClientSplitCollectionItem(t *testing.T) {
+	expected := time.Date(2026, 11, 1, 0, 0, 0, 0, time.UTC)
+
+	t.Run("when request valid, then POST body sent and both items decoded", func(t *testing.T) {
+		client := newStubAPIClient(t, func(t *testing.T, r *http.Request) {
+			require.Equal(t, http.MethodPost, r.Method)
+			require.Equal(t, "/v1/collection_items/item-1:split", r.URL.Path)
+			require.Equal(t, "application/json", r.Header.Get("Content-Type"))
+			var payload map[string]any
+			require.NoError(t, json.NewDecoder(r.Body).Decode(&payload))
+			require.Equal(t, float64(2), payload["splitQuantity"])
+			require.Equal(t, "2026-11-01T00:00:00Z", payload["expectedUpdatedAt"])
+			require.Equal(t, "mut-1", payload["clientMutationId"])
+			require.Equal(t, "item-2", payload["newItemId"])
+		}, `{"sourceItem":{"id":"item-1","quantity":3},"splitItem":{"id":"item-2","quantity":2}}`)
+
+		resp, err := client.SplitCollectionItem(context.Background(), &SplitCollectionItemRequest{
+			ItemID:            "item-1",
+			SplitQuantity:     2,
+			ExpectedUpdatedAt: &expected,
+			ClientMutationID:  "mut-1",
+			NewItemID:         "item-2",
+		})
+		require.NoError(t, err)
+		require.Equal(t, "item-1", resp.SourceItem.ID)
+		require.Equal(t, "item-2", resp.SplitItem.ID)
+	})
+
+	t.Run("when required fields missing, then returns error", func(t *testing.T) {
+		client := newTestClient(t)
+		cases := []*SplitCollectionItemRequest{
+			nil,
+			{SplitQuantity: 1, ExpectedUpdatedAt: &expected, ClientMutationID: "m"},
+			{ItemID: "item-1", ExpectedUpdatedAt: &expected, ClientMutationID: "m"},
+			{ItemID: "item-1", SplitQuantity: 1, ClientMutationID: "m"},
+			{ItemID: "item-1", SplitQuantity: 1, ExpectedUpdatedAt: &expected},
+		}
+		for _, request := range cases {
+			_, err := client.SplitCollectionItem(context.Background(), request)
+			require.Error(t, err)
+		}
+	})
 }
