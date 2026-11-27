@@ -210,3 +210,45 @@ func TestClientEngagement(t *testing.T) {
 		require.True(t, viewerResp.Likes[0].Liked)
 	})
 }
+
+func TestClientListLikedResources(t *testing.T) {
+	t.Run("when filters provided, then POST body sent and likes decoded", func(t *testing.T) {
+		client := newStubAPIClient(t, func(t *testing.T, r *http.Request) {
+			require.Equal(t, http.MethodPost, r.Method)
+			require.Equal(t, "/v1/engagement/likes:list", r.URL.Path)
+			require.Equal(t, "application/json", r.Header.Get("Content-Type"))
+			var payload map[string]any
+			require.NoError(t, json.NewDecoder(r.Body).Decode(&payload))
+			require.Equal(t, "LIKEABLE_RESOURCE_TYPE_DECK", payload["resourceType"])
+			require.Equal(t, float64(50), payload["pageSize"])
+			require.Equal(t, "tok", payload["nextPageToken"])
+		}, `{"resources":[{"resource":{"resourceType":"LIKEABLE_RESOURCE_TYPE_DECK","resourceId":"deck-1"},"likedAt":"2026-11-01T00:00:00Z"}],"nextPageToken":"next"}`)
+
+		resp, err := client.ListLikedResources(context.Background(), &ListLikedResourcesRequest{
+			ResourceType:  LikeableResourceTypeDeck,
+			PageSize:      50,
+			NextPageToken: "tok",
+		})
+		require.NoError(t, err)
+		require.Len(t, resp.Resources, 1)
+		require.Equal(t, "deck-1", resp.Resources[0].Resource.ResourceID)
+		require.NotNil(t, resp.Resources[0].LikedAt)
+		require.Equal(t, "next", resp.NextPageToken)
+	})
+
+	t.Run("when request is nil, then empty body sent", func(t *testing.T) {
+		client := newStubAPIClient(t, func(t *testing.T, r *http.Request) {
+			var payload map[string]any
+			require.NoError(t, json.NewDecoder(r.Body).Decode(&payload))
+			require.Empty(t, payload)
+		}, `{}`)
+		_, err := client.ListLikedResources(context.Background(), nil)
+		require.NoError(t, err)
+	})
+
+	t.Run("when page size negative, then returns error", func(t *testing.T) {
+		client := newTestClient(t)
+		_, err := client.ListLikedResources(context.Background(), &ListLikedResourcesRequest{PageSize: -1})
+		require.Error(t, err)
+	})
+}

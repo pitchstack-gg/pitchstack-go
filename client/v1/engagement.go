@@ -622,3 +622,61 @@ func parseFlexibleInt64(raw json.RawMessage) (int64, error) {
 
 	return 0, fmt.Errorf("expected int64 or string-encoded int64, got %s", string(raw))
 }
+
+// ListLikedResourcesRequest lists the authenticated caller's likes.
+// An unspecified ResourceType lists all likeable kinds; PageSize zero uses the server default.
+type ListLikedResourcesRequest struct {
+	ResourceType  LikeableResourceType `json:"resourceType,omitempty"`
+	PageSize      int32                `json:"pageSize,omitempty"`
+	NextPageToken string               `json:"nextPageToken,omitempty"`
+}
+
+// LikedResource mirrors engagement.v1.LikedResource.
+type LikedResource struct {
+	Resource *LikeableResourceRef `json:"resource,omitempty"`
+	LikedAt  *time.Time           `json:"likedAt,omitempty"`
+}
+
+// ListLikedResourcesResponse returns liked resources, most recent first.
+type ListLikedResourcesResponse struct {
+	Resources     []LikedResource  `json:"resources,omitempty"`
+	NextPageToken string           `json:"nextPageToken,omitempty"`
+	Metadata      ResponseMetadata `json:"-"`
+}
+
+func (r *ListLikedResourcesResponse) setMetadata(metadata ResponseMetadata) {
+	r.Metadata = metadata
+}
+
+// ListLikedResources lists resources the authenticated caller has liked.
+func (c *Client) ListLikedResources(ctx context.Context, request *ListLikedResourcesRequest, opts ...RequestOpt) (*ListLikedResourcesResponse, error) {
+	if request == nil {
+		request = &ListLikedResourcesRequest{}
+	}
+	if request.PageSize < 0 {
+		return nil, errors.New("pageSize must not be negative")
+	}
+
+	payload := *request
+	if payload.ResourceType == LikeableResourceTypeUnspecified {
+		payload.ResourceType = ""
+	}
+	payload.NextPageToken = strings.TrimSpace(payload.NextPageToken)
+
+	body, err := jsonBody(payload)
+	if err != nil {
+		return nil, fmt.Errorf("encode body: %w", err)
+	}
+
+	req, err := c.newRequest(ctx, http.MethodPost, "/v1/engagement/likes:list", body)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	response := &ListLikedResourcesResponse{}
+	if err := c.do(req, response, opts...); err != nil {
+		return nil, err
+	}
+	return response, nil
+}
