@@ -355,3 +355,22 @@ func TestClientGetProductPriceWatchDigest(t *testing.T) {
 	require.Error(t, err)
 	require.Nil(t, resp)
 }
+
+func TestClientPriceEntryNamedPrices(t *testing.T) {
+	t.Run("when named prices reported, then pointers distinguish zero from absent", func(t *testing.T) {
+		client := newStubAPIClient(t, func(t *testing.T, r *http.Request) {
+			require.Equal(t, "/v1/prices/prod-1", r.URL.Path)
+		}, `{"entry":{"productId":"prod-1","price":2.5,"price2":0,"midPrice":2.5,"lowPrice":0,"marketPrice":2.75}}`)
+
+		resp, err := client.GetProductPrice(context.Background(), &GetProductPriceRequest{ProductID: "prod-1"})
+		require.NoError(t, err)
+		entry := resp.Entry
+		require.NotNil(t, entry.MarketPrice)
+		require.InDelta(t, 2.75, *entry.MarketPrice, 0.0001)
+		require.NotNil(t, entry.MidPrice)
+		require.InDelta(t, 2.5, *entry.MidPrice, 0.0001)
+		require.NotNil(t, entry.LowPrice)
+		require.Zero(t, *entry.LowPrice)
+		require.Nil(t, entry.HighPrice)
+	})
+}
