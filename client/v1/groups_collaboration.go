@@ -28,6 +28,25 @@ const (
 	GroupJoinPolicyInviteOnly GroupJoinPolicy = "GROUP_JOIN_POLICY_INVITE_ONLY"
 )
 
+// GroupSortOrder orders public group discovery results.
+type GroupSortOrder string
+
+const (
+	GroupSortOrderUnspecified    GroupSortOrder = "GROUP_SORT_ORDER_UNSPECIFIED"
+	GroupSortOrderNewest         GroupSortOrder = "GROUP_SORT_ORDER_NEWEST"
+	GroupSortOrderMostMembers    GroupSortOrder = "GROUP_SORT_ORDER_MOST_MEMBERS"
+	GroupSortOrderRecentlyActive GroupSortOrder = "GROUP_SORT_ORDER_RECENTLY_ACTIVE"
+)
+
+// GroupMemberSort orders a group member directory.
+type GroupMemberSort string
+
+const (
+	GroupMemberSortUnspecified GroupMemberSort = "GROUP_MEMBER_SORT_UNSPECIFIED"
+	GroupMemberSortJoined      GroupMemberSort = "GROUP_MEMBER_SORT_JOINED"
+	GroupMemberSortRole        GroupMemberSort = "GROUP_MEMBER_SORT_ROLE"
+)
+
 type GroupMemberDirectoryVisibility string
 
 const (
@@ -58,6 +77,8 @@ type GroupResourceType string
 const (
 	GroupResourceTypeDeck       GroupResourceType = "GROUP_RESOURCE_TYPE_DECK"
 	GroupResourceTypeCollection GroupResourceType = "GROUP_RESOURCE_TYPE_COLLECTION"
+	// GroupResourceTypeEvent is a public event; it can be pinned but not shared.
+	GroupResourceTypeEvent GroupResourceType = "GROUP_RESOURCE_TYPE_EVENT"
 )
 
 type GroupReportReason string
@@ -98,6 +119,8 @@ type GroupJoinRequest struct {
 	CreatedAt        *time.Time             `json:"createdAt,omitempty"`
 	UpdatedAt        *time.Time             `json:"updatedAt,omitempty"`
 	ReviewedByUserID string                 `json:"reviewedByUserId,omitempty"`
+	// DeclineReason is the reviewer's optional explanation on a declined request.
+	DeclineReason string `json:"declineReason,omitempty"`
 }
 type GroupInviteLink struct {
 	InviteLinkID string     `json:"inviteLinkId,omitempty"`
@@ -129,6 +152,7 @@ type GroupReport struct {
 	ResolutionNotes  string            `json:"resolutionNotes,omitempty"`
 	CreatedAt        *time.Time        `json:"createdAt,omitempty"`
 	UpdatedAt        *time.Time        `json:"updatedAt,omitempty"`
+	Version          int64             `json:"version,omitempty,string"`
 }
 
 type GroupActionResponse = DeleteGroupResponse
@@ -325,6 +349,13 @@ func (c *Client) ListGroupJoinRequests(ctx context.Context, groupID string, page
 	return response, err
 }
 func (c *Client) ReviewGroupJoinRequest(ctx context.Context, groupID, requestID string, decision GroupJoinRequestStatus, opts ...RequestOpt) (*GroupJoinRequestResponse, error) {
+	return c.ReviewGroupJoinRequestWithReason(ctx, groupID, requestID, decision, "", opts...)
+}
+
+// ReviewGroupJoinRequestWithReason approves or declines a join request. The
+// optional declineReason is shown to the applicant and is only accepted with a
+// declined decision.
+func (c *Client) ReviewGroupJoinRequestWithReason(ctx context.Context, groupID, requestID string, decision GroupJoinRequestStatus, declineReason string, opts ...RequestOpt) (*GroupJoinRequestResponse, error) {
 	group, err := required(groupID, "groupID")
 	if err != nil {
 		return nil, err
@@ -333,8 +364,12 @@ func (c *Client) ReviewGroupJoinRequest(ctx context.Context, groupID, requestID 
 	if err != nil {
 		return nil, err
 	}
+	payload := map[string]any{"decision": decision}
+	if reason := strings.TrimSpace(declineReason); reason != "" {
+		payload["declineReason"] = reason
+	}
 	response := &GroupJoinRequestResponse{}
-	err = c.doGroupJSON(ctx, http.MethodPost, "/v1/groups/"+url.PathEscape(group)+"/join-requests/"+url.PathEscape(requestValue)+":review", map[string]any{"decision": decision}, response, opts...)
+	err = c.doGroupJSON(ctx, http.MethodPost, "/v1/groups/"+url.PathEscape(group)+"/join-requests/"+url.PathEscape(requestValue)+":review", payload, response, opts...)
 	return response, err
 }
 func (c *Client) ListGroupInvites(ctx context.Context, groupID string, pageSize *int32, nextToken string, opts ...RequestOpt) (*ListGroupInvitesResponse, error) {

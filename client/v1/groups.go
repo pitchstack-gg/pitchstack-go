@@ -20,6 +20,7 @@ type CreateGroupRequest struct {
 	JoinPolicy                GroupJoinPolicy                `json:"joinPolicy,omitempty"`
 	MemberDirectoryVisibility GroupMemberDirectoryVisibility `json:"memberDirectoryVisibility,omitempty"`
 	BackgroundColor           string                         `json:"backgroundColor,omitempty"`
+	Tags                      []string                       `json:"tags,omitempty"`
 }
 
 // CreateGroupResponse includes the created group.
@@ -41,7 +42,10 @@ type UpdateGroupRequest struct {
 	JoinPolicy                *GroupJoinPolicy                `json:"joinPolicy,omitempty"`
 	MemberDirectoryVisibility *GroupMemberDirectoryVisibility `json:"memberDirectoryVisibility,omitempty"`
 	BackgroundColor           *string                         `json:"backgroundColor,omitempty"`
-	UpdateMask                string                          `json:"updateMask,omitempty"`
+	// Tags replaces the group's tags. To clear them, send an empty list with
+	// "tags" in UpdateMask.
+	Tags       []string `json:"tags,omitempty"`
+	UpdateMask string   `json:"updateMask,omitempty"`
 }
 
 // UpdateGroupResponse contains the updated group.
@@ -72,6 +76,10 @@ func (r *DeleteGroupResponse) setMetadata(metadata ResponseMetadata) {
 type ListGroupsRequest struct {
 	PageSize  *int32
 	NextToken string
+	// Sort orders the results; empty uses the server default (newest first).
+	Sort GroupSortOrder
+	// Tag limits results to groups carrying this tag (case-insensitive).
+	Tag string
 }
 
 // ListGroupsResponse lists groups visible to the caller.
@@ -90,6 +98,7 @@ type AddGroupMemberRequest struct {
 	GroupID   string     `json:"-"`
 	UserID    string     `json:"userId,omitempty"`
 	Role      string     `json:"role,omitempty"`
+	RoleValue *GroupRole `json:"roleValue,omitempty"`
 	ExpiresAt *time.Time `json:"expiresAt,omitempty"`
 }
 
@@ -124,6 +133,12 @@ type ListGroupMembersRequest struct {
 	GroupID   string
 	PageSize  *int32
 	NextToken string
+	// Roles limits results to members holding one of these roles; empty means all.
+	Roles []GroupRole
+	// Query matches members whose username or display name contains this text.
+	Query string
+	// Sort orders the directory; empty uses the server default (join order).
+	Sort GroupMemberSort
 }
 
 // ListGroupMembersResponse returns group membership.
@@ -157,6 +172,7 @@ type UserGroup struct {
 	BackgroundColor           string                         `json:"backgroundColor,omitempty"`
 	BackgroundURL             string                         `json:"backgroundUrl,omitempty"`
 	MemberCount               int32                          `json:"memberCount,omitempty"`
+	Tags                      []string                       `json:"tags,omitempty"`
 }
 
 // GroupLink represents v1GroupLink.
@@ -175,6 +191,8 @@ type GroupMember struct {
 	Role      string     `json:"role,omitempty"`
 	JoinedAt  *time.Time `json:"joinedAt,omitempty"`
 	RoleValue GroupRole  `json:"roleValue,omitempty"`
+	// Profile is a profile card for the member; absent when none is available.
+	Profile *UserProfileSummary `json:"profile,omitempty"`
 }
 
 // GetGroupRequest identifies the group to retrieve.
@@ -199,6 +217,8 @@ type SearchGroupsRequest struct {
 	SearchTerm string
 	PageSize   *int32
 	NextToken  string
+	// Tag limits results to groups carrying this tag (case-insensitive).
+	Tag string
 }
 
 // SearchGroupsResponse lists groups matching the query.
@@ -218,11 +238,19 @@ type ListMyGroupsRequest struct {
 	NextToken string
 }
 
+// GroupMembership pairs a group with the caller's role in it.
+type GroupMembership struct {
+	Group    *UserGroup `json:"group,omitempty"`
+	Role     GroupRole  `json:"role,omitempty"`
+	JoinedAt *time.Time `json:"joinedAt,omitempty"`
+}
+
 // ListMyGroupsResponse lists groups the authenticated user belongs to.
 type ListMyGroupsResponse struct {
-	Groups    []UserGroup      `json:"groups,omitempty"`
-	NextToken string           `json:"nextToken,omitempty"`
-	Metadata  ResponseMetadata `json:"-"`
+	Groups      []UserGroup       `json:"groups,omitempty"`
+	NextToken   string            `json:"nextToken,omitempty"`
+	Memberships []GroupMembership `json:"memberships,omitempty"`
+	Metadata    ResponseMetadata  `json:"-"`
 }
 
 func (r *ListMyGroupsResponse) setMetadata(metadata ResponseMetadata) {
@@ -242,10 +270,12 @@ type GroupInvite struct {
 
 // CreateGroupInviteRequest creates a group invite.
 type CreateGroupInviteRequest struct {
-	GroupID       string     `json:"-"`
-	InvitedUserID string     `json:"invitedUserId,omitempty"`
-	Role          string     `json:"role,omitempty"`
-	ExpiresAt     *time.Time `json:"expiresAt,omitempty"`
+	GroupID       string `json:"-"`
+	InvitedUserID string `json:"invitedUserId,omitempty"`
+	// Role is the legacy string role; prefer RoleValue. At least one is required.
+	Role      string     `json:"role,omitempty"`
+	RoleValue *GroupRole `json:"roleValue,omitempty"`
+	ExpiresAt *time.Time `json:"expiresAt,omitempty"`
 }
 
 // CreateGroupInviteResponse returns the created invite and token (once).
@@ -293,7 +323,9 @@ func (r *AcceptGroupInviteResponse) setMetadata(metadata ResponseMetadata) {
 type UpdateGroupMemberRoleRequest struct {
 	GroupID string `json:"-"`
 	UserID  string `json:"-"`
-	Role    string `json:"role,omitempty"`
+	// Role is the legacy string role; prefer RoleValue. At least one is required.
+	Role      string     `json:"role,omitempty"`
+	RoleValue *GroupRole `json:"roleValue,omitempty"`
 }
 
 // UpdateGroupMemberRoleResponse captures metadata for role updates.
@@ -373,6 +405,7 @@ func (c *Client) UpdateGroup(ctx context.Context, request *UpdateGroupRequest, o
 		JoinPolicy                *GroupJoinPolicy                `json:"joinPolicy,omitempty"`
 		MemberDirectoryVisibility *GroupMemberDirectoryVisibility `json:"memberDirectoryVisibility,omitempty"`
 		BackgroundColor           *string                         `json:"backgroundColor,omitempty"`
+		Tags                      []string                        `json:"tags,omitempty"`
 		UpdateMask                string                          `json:"updateMask,omitempty"`
 	}{
 		Name:                      request.Name,
@@ -381,6 +414,7 @@ func (c *Client) UpdateGroup(ctx context.Context, request *UpdateGroupRequest, o
 		JoinPolicy:                request.JoinPolicy,
 		MemberDirectoryVisibility: request.MemberDirectoryVisibility,
 		BackgroundColor:           request.BackgroundColor,
+		Tags:                      request.Tags,
 		UpdateMask:                request.UpdateMask,
 	})
 	if err != nil {
@@ -445,6 +479,12 @@ func (c *Client) ListGroups(ctx context.Context, request *ListGroupsRequest, opt
 	if token := strings.TrimSpace(request.NextToken); token != "" {
 		query.Set("nextToken", token)
 	}
+	if request.Sort != "" {
+		query.Set("sort", string(request.Sort))
+	}
+	if tag := strings.TrimSpace(request.Tag); tag != "" {
+		query.Set("tag", tag)
+	}
 	req.URL.RawQuery = query.Encode()
 	response := &ListGroupsResponse{}
 	if err := c.do(req, response, opts...); err != nil {
@@ -463,6 +503,7 @@ func (c *Client) AddGroupMember(ctx context.Context, request *AddGroupMemberRequ
 		GroupID:       request.GroupID,
 		InvitedUserID: request.UserID,
 		Role:          request.Role,
+		RoleValue:     request.RoleValue,
 		ExpiresAt:     request.ExpiresAt,
 	}, opts...)
 	if err != nil {
@@ -529,6 +570,17 @@ func (c *Client) ListGroupMembers(ctx context.Context, request *ListGroupMembers
 	if token := strings.TrimSpace(request.NextToken); token != "" {
 		query.Set("nextToken", token)
 	}
+	for _, role := range request.Roles {
+		if role != "" {
+			query.Add("roles", string(role))
+		}
+	}
+	if q := strings.TrimSpace(request.Query); q != "" {
+		query.Set("query", q)
+	}
+	if request.Sort != "" {
+		query.Set("sort", string(request.Sort))
+	}
 	req.URL.RawQuery = query.Encode()
 
 	response := &ListGroupMembersResponse{}
@@ -576,6 +628,9 @@ func (c *Client) SearchGroups(ctx context.Context, request *SearchGroupsRequest,
 	query := req.URL.Query()
 	if term := strings.TrimSpace(request.SearchTerm); term != "" {
 		query.Set("searchTerm", term)
+	}
+	if tag := strings.TrimSpace(request.Tag); tag != "" {
+		query.Set("tag", tag)
 	}
 	if request.PageSize != nil && *request.PageSize > 0 {
 		query.Set("pageSize", strconv.Itoa(int(*request.PageSize)))
@@ -637,17 +692,19 @@ func (c *Client) CreateGroupInvite(ctx context.Context, request *CreateGroupInvi
 		return nil, errors.New("invitedUserID must not be empty")
 	}
 	role := strings.TrimSpace(request.Role)
-	if role == "" {
+	if role == "" && request.RoleValue == nil {
 		return nil, errors.New("role must not be empty")
 	}
 
 	body, err := jsonBody(struct {
 		InvitedUserID string     `json:"invitedUserId,omitempty"`
 		Role          string     `json:"role,omitempty"`
+		RoleValue     *GroupRole `json:"roleValue,omitempty"`
 		ExpiresAt     *time.Time `json:"expiresAt,omitempty"`
 	}{
 		InvitedUserID: invitedUserID,
 		Role:          role,
+		RoleValue:     request.RoleValue,
 		ExpiresAt:     request.ExpiresAt,
 	})
 	if err != nil {
@@ -739,13 +796,14 @@ func (c *Client) UpdateGroupMemberRole(ctx context.Context, request *UpdateGroup
 		return nil, errors.New("userID must not be empty")
 	}
 	role := strings.TrimSpace(request.Role)
-	if role == "" {
+	if role == "" && request.RoleValue == nil {
 		return nil, errors.New("role must not be empty")
 	}
 
 	body, err := jsonBody(struct {
-		Role string `json:"role,omitempty"`
-	}{Role: role})
+		Role      string     `json:"role,omitempty"`
+		RoleValue *GroupRole `json:"roleValue,omitempty"`
+	}{Role: role, RoleValue: request.RoleValue})
 	if err != nil {
 		return nil, fmt.Errorf("encode body: %w", err)
 	}
