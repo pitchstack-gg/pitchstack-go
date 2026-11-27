@@ -358,3 +358,22 @@ func TestClientUploadCrud(t *testing.T) {
 		require.Nil(t, resp)
 	})
 }
+
+func TestClientUploadCrudErrorDetails(t *testing.T) {
+	t.Run("when a result failed, then decodes error code and reason", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			require.Equal(t, "/v1/sync/powersync/crud:upload", r.URL.Path)
+			_, _ = w.Write([]byte(`{"results":[{"opId":"1","errorMessage":"bad","errorCode":"invalid_argument","errorReason":"QUOTA_EXCEEDED"}]}`))
+		}))
+		t.Cleanup(server.Close)
+
+		client := newTestClient(t, WithBaseURL(server.URL), WithHTTPClient(server.Client()))
+		resp, err := client.UploadCrud(context.Background(), &UploadCrudRequest{
+			DeviceID: "device-1",
+			Entries:  []CrudEntry{{OpID: 1, Op: "PUT", Type: "collections", ID: "col-1"}},
+		})
+		require.NoError(t, err)
+		require.Equal(t, "invalid_argument", resp.Results[0].ErrorCode)
+		require.Equal(t, "QUOTA_EXCEEDED", resp.Results[0].ErrorReason)
+	})
+}
