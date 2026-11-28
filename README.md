@@ -44,18 +44,42 @@ func main() {
 	ctx := context.Background()
 	pageSize := int32(10)
 
-	resp, err := c.ListCards(ctx, &client.ListCardsRequest{
-		PageSize: &pageSize,
+	resp, err := c.SearchCards(ctx, &client.SearchCardsRequest{
+		SearchTerm: "Dorinthea",
+		PageSize:   &pageSize,
 	})
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	for _, card := range resp.Cards {
-		fmt.Println(card.Name)
+	for _, card := range resp.Summaries {
+		fmt.Println(card.Identity.Name)
 	}
 }
 ```
+
+Public read endpoints cover cards, printings, products and sets, prices,
+public decks, events, tour stops, Living Legend standings, and meta
+analytics. For example, to list the hero leaderboard for paper play:
+
+```go
+leaderboard, err := c.ListHeroLeaderboard(ctx, &client.ListHeroLeaderboardRequest{
+	PlayEnvironment: client.PlayEnvironmentPaper,
+	Ruleset:         "cc",
+	StartDate:       "2026-10-01",
+	EndDate:         "2026-10-31",
+})
+if err != nil {
+	log.Fatal(err)
+}
+for _, hero := range leaderboard.Heroes {
+	fmt.Printf("%s: %.1f%% over %d games\n", hero.HeroID, hero.WinRate*100, hero.Games)
+}
+```
+
+Large counters that the API encodes as JSON strings (64-bit integers) are
+decoded into `int64`/`uint64` fields. Optional scalar response fields whose zero
+value is meaningful are pointers, so `nil` means the server did not report a value.
 
 For non-production environments, override the API endpoint:
 
@@ -91,7 +115,7 @@ c, err := client.NewClient(
 Non-2xx API responses are returned as `*client.APIError`. The error includes HTTP response metadata and the structured API status payload when available.
 
 ```go
-resp, err := c.GetCard(ctx, &client.GetCardRequest{Identifier: "missing-card"})
+resp, err := c.GetCard(ctx, &client.GetCardRequest{CardID: "missing-card"})
 if err != nil {
 	var apiErr *client.APIError
 	if errors.As(err, &apiErr) {

@@ -944,3 +944,142 @@ func TestClientListStarredDecks(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, int32(1), resp.Total)
 }
+
+func TestClientSearchDecksByEvent(t *testing.T) {
+	t.Run("when event id provided, then eventId query sent and deck event fields decoded", func(t *testing.T) {
+		client := newStubAPIClient(t, func(t *testing.T, r *http.Request) {
+			require.Equal(t, "/v1/decks/search", r.URL.Path)
+			require.Equal(t, "evt-1", r.URL.Query().Get("eventId"))
+		}, `{"decks":[{"id":"deck-1","eventId":"evt-1","sourceFormat":"Classic Constructed","selectedHeroArtPrintingId":"pr-1","visibility":"VISIBILITY_LEVEL_UNLISTED"}]}`)
+
+		resp, err := client.SearchDecks(context.Background(), &SearchDecksRequest{EventID: "evt-1"})
+		require.NoError(t, err)
+		require.Len(t, resp.Decks, 1)
+		require.Equal(t, "evt-1", resp.Decks[0].EventID)
+		require.Equal(t, "Classic Constructed", resp.Decks[0].SourceFormat)
+		require.Equal(t, "pr-1", resp.Decks[0].SelectedHeroArtPrintingID)
+		require.Equal(t, VisibilityLevelUnlisted, resp.Decks[0].Visibility)
+	})
+}
+
+func TestClientGetDeckWithheldAndProducts(t *testing.T) {
+	t.Run("when exclude withheld set, then query sent and product links decoded", func(t *testing.T) {
+		client := newStubAPIClient(t, func(t *testing.T, r *http.Request) {
+			require.Equal(t, "/v1/decks/deck-1", r.URL.Path)
+			require.Equal(t, "true", r.URL.Query().Get("excludeWithheld"))
+		}, `{"deck":{"id":"deck-1"},"canonicalProductId":"prod-1","relatedProducts":[{"productId":"prod-2","ownerProductId":"prod-1","quantity":1,"relation":"PRODUCT_DECK_RELATION_EDITION","deckId":"deck-1"}],"withholdingChecked":true}`)
+
+		resp, err := client.GetDeck(context.Background(), &GetDeckRequest{DeckID: "deck-1", ExcludeWithheld: true})
+		require.NoError(t, err)
+		require.Equal(t, "prod-1", resp.CanonicalProductID)
+		require.Len(t, resp.RelatedProducts, 1)
+		require.Equal(t, ProductDeckRelationEdition, resp.RelatedProducts[0].Relation)
+		require.NotNil(t, resp.WithholdingChecked)
+		require.True(t, *resp.WithholdingChecked)
+	})
+
+	t.Run("when exclude withheld unset, then no query sent", func(t *testing.T) {
+		client := newStubAPIClient(t, func(t *testing.T, r *http.Request) {
+			require.Empty(t, r.URL.RawQuery)
+		}, `{"deck":{"id":"deck-1"}}`)
+
+		resp, err := client.GetDeck(context.Background(), &GetDeckRequest{DeckID: "deck-1"})
+		require.NoError(t, err)
+		require.Nil(t, resp.WithholdingChecked)
+	})
+}
+
+func TestClientImportDeckHeroArt(t *testing.T) {
+	t.Run("when hero art selected, then body includes it and deckCreated decoded", func(t *testing.T) {
+		client := newStubAPIClient(t, func(t *testing.T, r *http.Request) {
+			var payload map[string]any
+			require.NoError(t, json.NewDecoder(r.Body).Decode(&payload))
+			require.Equal(t, "pr-1", payload["selectedHeroArtPrintingId"])
+		}, `{"deck":{"id":"deck-1"},"importedVersions":1,"deckCreated":true}`)
+
+		resp, err := client.ImportDeck(context.Background(), &ImportDeckRequest{Name: "Imported", SelectedHeroArtPrintingID: "pr-1"})
+		require.NoError(t, err)
+		require.True(t, resp.DeckCreated)
+	})
+}
+
+func TestClientListProductDecks(t *testing.T) {
+	t.Run("when product id provided, then links decoded", func(t *testing.T) {
+		client := newStubAPIClient(t, func(t *testing.T, r *http.Request) {
+			require.Equal(t, http.MethodGet, r.Method)
+			require.Equal(t, "/v1/products/prod-1/decks", r.URL.Path)
+		}, `{"links":[{"productId":"prod-1","ownerProductId":"prod-1","unitProductId":"prod-1","quantity":2,"relation":"PRODUCT_DECK_RELATION_OWNER","deckId":"deck-1"}]}`)
+
+		resp, err := client.ListProductDecks(context.Background(), &ListProductDecksRequest{ProductID: "prod-1"})
+		require.NoError(t, err)
+		require.Len(t, resp.Links, 1)
+		require.Equal(t, int32(2), resp.Links[0].Quantity)
+		require.Equal(t, ProductDeckRelationOwner, resp.Links[0].Relation)
+		require.Equal(t, "deck-1", resp.Links[0].DeckID)
+	})
+
+	t.Run("when product id missing, then returns error", func(t *testing.T) {
+		client := newTestClient(t)
+		resp, err := client.ListProductDecks(context.Background(), &ListProductDecksRequest{})
+		require.Error(t, err)
+		require.Nil(t, resp)
+	})
+}
+
+func TestClientUpdateDeckHeroArt(t *testing.T) {
+	t.Run("when art selected, then PUT body sent and deck decoded", func(t *testing.T) {
+		client := newStubAPIClient(t, func(t *testing.T, r *http.Request) {
+			require.Equal(t, http.MethodPut, r.Method)
+			require.Equal(t, "/v1/decks/deck-1/hero/art", r.URL.Path)
+			require.Equal(t, "application/json", r.Header.Get("Content-Type"))
+			var payload map[string]any
+			require.NoError(t, json.NewDecoder(r.Body).Decode(&payload))
+			require.Equal(t, "pr-9", payload["selectedArtPrintingId"])
+			require.NotContains(t, payload, "clearSelectedArt")
+		}, `{"deck":{"id":"deck-1","selectedHeroArtPrintingId":"pr-9"}}`)
+
+		resp, err := client.UpdateDeckHeroArt(context.Background(), &UpdateDeckHeroArtRequest{DeckID: "deck-1", SelectedArtPrintingID: "pr-9"})
+		require.NoError(t, err)
+		require.Equal(t, "pr-9", resp.Deck.SelectedHeroArtPrintingID)
+	})
+
+	t.Run("when clearing art, then clearSelectedArt sent", func(t *testing.T) {
+		client := newStubAPIClient(t, func(t *testing.T, r *http.Request) {
+			var payload map[string]any
+			require.NoError(t, json.NewDecoder(r.Body).Decode(&payload))
+			require.Equal(t, true, payload["clearSelectedArt"])
+		}, `{"deck":{"id":"deck-1"}}`)
+
+		_, err := client.UpdateDeckHeroArt(context.Background(), &UpdateDeckHeroArtRequest{DeckID: "deck-1", ClearSelectedArt: true})
+		require.NoError(t, err)
+	})
+
+	t.Run("when deck id missing, then returns error", func(t *testing.T) {
+		client := newTestClient(t)
+		_, err := client.UpdateDeckHeroArt(context.Background(), &UpdateDeckHeroArtRequest{})
+		require.Error(t, err)
+	})
+}
+
+func TestClientUpdateDeckVersionCardArt(t *testing.T) {
+	t.Run("when ids provided, then PUT body sent and selection decoded", func(t *testing.T) {
+		client := newStubAPIClient(t, func(t *testing.T, r *http.Request) {
+			require.Equal(t, http.MethodPut, r.Method)
+			require.Equal(t, "/v1/deck_versions/dv-1/cards/card-1/art", r.URL.Path)
+			var payload map[string]any
+			require.NoError(t, json.NewDecoder(r.Body).Decode(&payload))
+			require.Equal(t, "pr-2", payload["selectedArtPrintingId"])
+		}, `{"cardId":"card-1","selectedArtPrintingId":"pr-2"}`)
+
+		resp, err := client.UpdateDeckVersionCardArt(context.Background(), &UpdateDeckVersionCardArtRequest{DeckVersionID: "dv-1", CardID: "card-1", SelectedArtPrintingID: "pr-2"})
+		require.NoError(t, err)
+		require.Equal(t, "card-1", resp.CardID)
+		require.Equal(t, "pr-2", resp.SelectedArtPrintingID)
+	})
+
+	t.Run("when card id missing, then returns error", func(t *testing.T) {
+		client := newTestClient(t)
+		_, err := client.UpdateDeckVersionCardArt(context.Background(), &UpdateDeckVersionCardArtRequest{DeckVersionID: "dv-1"})
+		require.Error(t, err)
+	})
+}

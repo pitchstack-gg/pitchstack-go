@@ -46,10 +46,20 @@ type ListFollowersRequest struct {
 	NextToken string
 }
 
-// ListFollowersResponse returns follower user IDs.
+// FollowEntry is one edge of a follower or following list.
+type FollowEntry struct {
+	UserID     string     `json:"userId,omitempty"`
+	FollowedAt *time.Time `json:"followedAt,omitempty"`
+	// Profile is absent when the user has no visible profile.
+	Profile *UserProfileSummary `json:"profile,omitempty"`
+}
+
+// ListFollowersResponse returns followers of a user.
 type ListFollowersResponse struct {
+	// UserIDs is superseded by Followers and kept for compatibility.
 	UserIDs   []string         `json:"userIds,omitempty"`
 	NextToken string           `json:"nextToken,omitempty"`
+	Followers []FollowEntry    `json:"followers,omitempty"`
 	Metadata  ResponseMetadata `json:"-"`
 }
 
@@ -64,10 +74,12 @@ type ListFollowingRequest struct {
 	NextToken string
 }
 
-// ListFollowingResponse returns user IDs being followed.
+// ListFollowingResponse returns users being followed.
 type ListFollowingResponse struct {
+	// UserIDs is superseded by Following and kept for compatibility.
 	UserIDs   []string         `json:"userIds,omitempty"`
 	NextToken string           `json:"nextToken,omitempty"`
+	Following []FollowEntry    `json:"following,omitempty"`
 	Metadata  ResponseMetadata `json:"-"`
 }
 

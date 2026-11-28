@@ -177,3 +177,19 @@ func TestClientNews(t *testing.T) {
 		require.NoError(t, err)
 	})
 }
+
+func TestClientListHomeHighlights(t *testing.T) {
+	t.Run("when highlights exist, then they are decoded", func(t *testing.T) {
+		client := newStubAPIClient(t, func(t *testing.T, r *http.Request) {
+			require.Equal(t, http.MethodGet, r.Method)
+			require.Equal(t, "/v1/news/home-highlights", r.URL.Path)
+		}, `{"highlights":[{"highlightId":"hl-1","label":"Spoilers","destinationUrl":"https://example.com","priority":2,"status":"HOME_HIGHLIGHT_STATUS_PUBLISHED","startsAt":"2026-11-01T00:00:00Z"}]}`)
+
+		resp, err := client.ListHomeHighlights(context.Background())
+		require.NoError(t, err)
+		require.Len(t, resp.Highlights, 1)
+		require.Equal(t, HomeHighlightStatusPublished, resp.Highlights[0].Status)
+		require.Equal(t, int32(2), resp.Highlights[0].Priority)
+		require.NotNil(t, resp.Highlights[0].StartsAt)
+	})
+}

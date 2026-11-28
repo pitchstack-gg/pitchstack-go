@@ -53,6 +53,11 @@ type UploadCrudResult struct {
 	OpID         string     `json:"opId,omitempty"`
 	Status       SyncStatus `json:"status,omitempty"`
 	ErrorMessage string     `json:"errorMessage,omitempty"`
+	// ErrorCode is the lowercase gRPC code for a failed operation.
+	ErrorCode string `json:"errorCode,omitempty"`
+	// ErrorReason is a stable machine-readable classification of a failure;
+	// prefer it over parsing ErrorMessage.
+	ErrorReason string `json:"errorReason,omitempty"`
 }
 
 // UploadCrudResponse is returned from SyncService.UploadCrud.

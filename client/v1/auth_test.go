@@ -356,3 +356,85 @@ func TestClientDeleteUser(t *testing.T) {
 	require.Nil(t, resp)
 	require.Error(t, err)
 }
+
+func TestClientHeartbeat(t *testing.T) {
+	t.Run("when called without a request, then posts an empty body and decodes the cadence", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			require.Equal(t, http.MethodPost, r.Method)
+			require.Equal(t, "/v1/auth/heartbeat", r.URL.Path)
+			require.Equal(t, "application/json", r.Header.Get("Content-Type"))
+			var payload map[string]any
+			require.NoError(t, json.NewDecoder(r.Body).Decode(&payload))
+			require.Empty(t, payload)
+			_, _ = w.Write([]byte(`{"serverTime":"2026-01-02T03:04:05Z","nextHeartbeatSeconds":60}`))
+		}))
+		t.Cleanup(server.Close)
+
+		client := newTestClient(t, WithBaseURL(server.URL), WithHTTPClient(server.Client()))
+		resp, err := client.Heartbeat(context.Background(), nil)
+		require.NoError(t, err)
+		require.Equal(t, int32(60), resp.NextHeartbeatSeconds)
+		require.NotNil(t, resp.ServerTime)
+	})
+}
+
+func TestClientAuthRecoveryStatus(t *testing.T) {
+	t.Run("when login reports account creation and recovery status, then decodes them", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			require.Equal(t, "/v1/auth/login", r.URL.Path)
+			_, _ = w.Write([]byte(`{"userId":"user-1","accountCreated":true,"independentRecoveryStatus":"INDEPENDENT_RECOVERY_STATUS_READY"}`))
+		}))
+		t.Cleanup(server.Close)
+
+		client := newTestClient(t, WithBaseURL(server.URL), WithHTTPClient(server.Client()))
+		resp, err := client.Login(context.Background(), &LoginRequest{Email: "a@b.c", Password: "pw"})
+		require.NoError(t, err)
+		require.True(t, resp.AccountCreated)
+		require.Equal(t, IndependentRecoveryStatusReady, resp.IndependentRecoveryStatus)
+	})
+
+	t.Run("when refresh reports recovery status, then decodes it", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			require.Equal(t, "/v1/auth/token/refresh", r.URL.Path)
+			_, _ = w.Write([]byte(`{"accessToken":"a","independentRecoveryStatus":"INDEPENDENT_RECOVERY_STATUS_NOT_REQUIRED"}`))
+		}))
+		t.Cleanup(server.Close)
+
+		client := newTestClient(t, WithBaseURL(server.URL), WithHTTPClient(server.Client()))
+		resp, err := client.RefreshToken(context.Background(), &RefreshTokenRequest{RefreshToken: "r"})
+		require.NoError(t, err)
+		require.Equal(t, IndependentRecoveryStatusNotRequired, resp.IndependentRecoveryStatus)
+	})
+}
+
+func TestClientLogoutPushDevice(t *testing.T) {
+	t.Run("when given a push device id, then sends it with the refresh token", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			require.Equal(t, "/v1/auth/logout", r.URL.Path)
+			var payload map[string]any
+			require.NoError(t, json.NewDecoder(r.Body).Decode(&payload))
+			require.Equal(t, "refresh", payload["refreshToken"])
+			require.Equal(t, "device-1", payload["pushDeviceId"])
+			_, _ = w.Write([]byte(`{}`))
+		}))
+		t.Cleanup(server.Close)
+
+		client := newTestClient(t, WithBaseURL(server.URL), WithHTTPClient(server.Client()))
+		_, err := client.Logout(context.Background(), &LogoutRequest{RefreshToken: "refresh", PushDeviceID: "device-1"})
+		require.NoError(t, err)
+	})
+
+	t.Run("when no push device id is given, then omits it", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			var payload map[string]any
+			require.NoError(t, json.NewDecoder(r.Body).Decode(&payload))
+			require.NotContains(t, payload, "pushDeviceId")
+			_, _ = w.Write([]byte(`{}`))
+		}))
+		t.Cleanup(server.Close)
+
+		client := newTestClient(t, WithBaseURL(server.URL), WithHTTPClient(server.Client()))
+		_, err := client.Logout(context.Background(), &LogoutRequest{RefreshToken: "refresh"})
+		require.NoError(t, err)
+	})
+}

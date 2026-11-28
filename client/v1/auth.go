@@ -18,14 +18,29 @@ type LoginRequest struct {
 	DeviceInfo string `json:"deviceInfo,omitempty"`
 }
 
+// IndependentRecoveryStatus reports whether an account holds a recovery
+// method independent of Sign in with Apple.
+type IndependentRecoveryStatus string
+
+const (
+	IndependentRecoveryStatusUnspecified IndependentRecoveryStatus = "INDEPENDENT_RECOVERY_STATUS_UNSPECIFIED"
+	IndependentRecoveryStatusNotRequired IndependentRecoveryStatus = "INDEPENDENT_RECOVERY_STATUS_NOT_REQUIRED"
+	// IndependentRecoveryStatusRequired is reserved for compatibility and is no longer returned.
+	IndependentRecoveryStatusRequired IndependentRecoveryStatus = "INDEPENDENT_RECOVERY_STATUS_REQUIRED"
+	IndependentRecoveryStatusReady    IndependentRecoveryStatus = "INDEPENDENT_RECOVERY_STATUS_READY"
+)
+
 // LoginResponse contains tokens issued during authentication.
 type LoginResponse struct {
-	UserID               string           `json:"userId,omitempty"`
-	AccessToken          string           `json:"accessToken,omitempty"`
-	RefreshToken         string           `json:"refreshToken,omitempty"`
-	AccessTokenExpiresAt *time.Time       `json:"accessTokenExpiresAt,omitempty"`
-	Roles                []string         `json:"roles,omitempty"`
-	Metadata             ResponseMetadata `json:"-"`
+	UserID                    string                    `json:"userId,omitempty"`
+	AccessToken               string                    `json:"accessToken,omitempty"`
+	RefreshToken              string                    `json:"refreshToken,omitempty"`
+	AccessTokenExpiresAt      *time.Time                `json:"accessTokenExpiresAt,omitempty"`
+	Roles                     []string                  `json:"roles,omitempty"`
+	IndependentRecoveryStatus IndependentRecoveryStatus `json:"independentRecoveryStatus,omitempty"`
+	// AccountCreated is true only on the sign-in that created the account.
+	AccountCreated bool             `json:"accountCreated,omitempty"`
+	Metadata       ResponseMetadata `json:"-"`
 }
 
 func (r *LoginResponse) setMetadata(metadata ResponseMetadata) {
@@ -120,10 +135,11 @@ type RefreshTokenRequest struct {
 
 // RefreshTokenResponse returns renewed access and refresh tokens.
 type RefreshTokenResponse struct {
-	AccessToken          string           `json:"accessToken,omitempty"`
-	RefreshToken         string           `json:"refreshToken,omitempty"`
-	AccessTokenExpiresAt *time.Time       `json:"accessTokenExpiresAt,omitempty"`
-	Metadata             ResponseMetadata `json:"-"`
+	AccessToken               string                    `json:"accessToken,omitempty"`
+	RefreshToken              string                    `json:"refreshToken,omitempty"`
+	AccessTokenExpiresAt      *time.Time                `json:"accessTokenExpiresAt,omitempty"`
+	IndependentRecoveryStatus IndependentRecoveryStatus `json:"independentRecoveryStatus,omitempty"`
+	Metadata                  ResponseMetadata          `json:"-"`
 }
 
 func (r *RefreshTokenResponse) setMetadata(metadata ResponseMetadata) {
@@ -133,6 +149,9 @@ func (r *RefreshTokenResponse) setMetadata(metadata ResponseMetadata) {
 // LogoutRequest revokes authentication state.
 type LogoutRequest struct {
 	RefreshToken string `json:"refreshToken,omitempty"`
+	// PushDeviceID optionally retires this installation's push registration as
+	// part of the logout. It must match the ID sent to RegisterPushDevice.
+	PushDeviceID string `json:"pushDeviceId,omitempty"`
 }
 
 // LogoutResponse captures metadata from a logout operation.
@@ -141,6 +160,20 @@ type LogoutResponse struct {
 }
 
 func (r *LogoutResponse) setMetadata(metadata ResponseMetadata) {
+	r.Metadata = metadata
+}
+
+// HeartbeatRequest reports that an authenticated client is still open.
+type HeartbeatRequest struct{}
+
+// HeartbeatResponse tells the client when to send the next heartbeat.
+type HeartbeatResponse struct {
+	ServerTime           *time.Time       `json:"serverTime,omitempty"`
+	NextHeartbeatSeconds int32            `json:"nextHeartbeatSeconds,omitempty"`
+	Metadata             ResponseMetadata `json:"-"`
+}
+
+func (r *HeartbeatResponse) setMetadata(metadata ResponseMetadata) {
 	r.Metadata = metadata
 }
 
@@ -499,6 +532,32 @@ func (c *Client) Logout(ctx context.Context, request *LogoutRequest, opts ...Req
 	}
 
 	response := &LogoutResponse{}
+	if err := c.do(req, response, opts...); err != nil {
+		return nil, err
+	}
+
+	return response, nil
+}
+
+// Heartbeat reports that the client is still open so the user's presence does
+// not depend on request traffic.
+func (c *Client) Heartbeat(ctx context.Context, request *HeartbeatRequest, opts ...RequestOpt) (*HeartbeatResponse, error) {
+	if request == nil {
+		request = &HeartbeatRequest{}
+	}
+
+	body, err := jsonBody(request)
+	if err != nil {
+		return nil, fmt.Errorf("encode body: %w", err)
+	}
+
+	req, err := c.newRequest(ctx, http.MethodPost, "/v1/auth/heartbeat", body)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	response := &HeartbeatResponse{}
 	if err := c.do(req, response, opts...); err != nil {
 		return nil, err
 	}

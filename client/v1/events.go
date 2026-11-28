@@ -18,6 +18,7 @@ const (
 	EventSourceUnspecified EventSource = "EVENT_SOURCE_UNSPECIFIED"
 	EventSourceOfficialGem EventSource = "EVENT_SOURCE_OFFICIAL_GEM"
 	EventSourceCommunity   EventSource = "EVENT_SOURCE_COMMUNITY"
+	EventSourceTournament  EventSource = "EVENT_SOURCE_TOURNAMENT"
 )
 
 // EventStatus represents events.v1.EventStatus.
@@ -28,6 +29,35 @@ const (
 	EventStatusPublished   EventStatus = "EVENT_STATUS_PUBLISHED"
 	EventStatusCancelled   EventStatus = "EVENT_STATUS_CANCELLED"
 	EventStatusHidden      EventStatus = "EVENT_STATUS_HIDDEN"
+	EventStatusCompleted   EventStatus = "EVENT_STATUS_COMPLETED"
+)
+
+// ListEventsOrder represents events.v1.ListEventsOrder.
+type ListEventsOrder string
+
+const (
+	ListEventsOrderUnspecified  ListEventsOrder = "LIST_EVENTS_ORDER_UNSPECIFIED"
+	ListEventsOrderStartsAtAsc  ListEventsOrder = "LIST_EVENTS_ORDER_STARTS_AT_ASC"
+	ListEventsOrderStartsAtDesc ListEventsOrder = "LIST_EVENTS_ORDER_STARTS_AT_DESC"
+	ListEventsOrderDistanceAsc  ListEventsOrder = "LIST_EVENTS_ORDER_DISTANCE_ASC"
+)
+
+// ListStoresOrder represents events.v1.ListStoresOrder.
+type ListStoresOrder string
+
+const (
+	ListStoresOrderUnspecified ListStoresOrder = "LIST_STORES_ORDER_UNSPECIFIED"
+	ListStoresOrderNameAsc     ListStoresOrder = "LIST_STORES_ORDER_NAME_ASC"
+	ListStoresOrderDistanceAsc ListStoresOrder = "LIST_STORES_ORDER_DISTANCE_ASC"
+)
+
+// EventImageKind represents events.v1.EventImageKind.
+type EventImageKind string
+
+const (
+	EventImageKindUnspecified EventImageKind = "EVENT_IMAGE_KIND_UNSPECIFIED"
+	EventImageKindLocation    EventImageKind = "EVENT_IMAGE_KIND_LOCATION"
+	EventImageKindProductSet  EventImageKind = "EVENT_IMAGE_KIND_PRODUCT_SET"
 )
 
 // StoreSource represents events.v1.StoreSource.
@@ -37,6 +67,82 @@ const (
 	StoreSourceUnspecified StoreSource = "STORE_SOURCE_UNSPECIFIED"
 	StoreSourceGem         StoreSource = "STORE_SOURCE_GEM"
 )
+
+// EventImageAttribution represents events.v1.EventImageAttribution.
+type EventImageAttribution struct {
+	Title       string `json:"title,omitempty"`
+	Creator     string `json:"creator,omitempty"`
+	Credit      string `json:"credit,omitempty"`
+	SourceURL   string `json:"sourceUrl,omitempty"`
+	LicenseName string `json:"licenseName,omitempty"`
+	LicenseURL  string `json:"licenseUrl,omitempty"`
+	ShareAlike  bool   `json:"shareAlike,omitempty"`
+}
+
+// EventImage represents events.v1.EventImage.
+type EventImage struct {
+	AssetKey     string                 `json:"assetKey,omitempty"`
+	URL          string                 `json:"url,omitempty"`
+	ThumbnailURL string                 `json:"thumbnailUrl,omitempty"`
+	AltText      string                 `json:"altText,omitempty"`
+	Kind         EventImageKind         `json:"kind,omitempty"`
+	Attribution  *EventImageAttribution `json:"attribution,omitempty"`
+}
+
+// EventMoney represents events.v1.EventMoney.
+type EventMoney struct {
+	Amount   float64 `json:"amount,omitempty"`
+	Currency string  `json:"currency,omitempty"`
+}
+
+// TournamentDay represents events.v1.TournamentDay.
+type TournamentDay struct {
+	Date                  string `json:"date,omitempty"`
+	StartTimeLocal        string `json:"startTimeLocal,omitempty"`
+	RulesEnforcementLevel string `json:"rulesEnforcementLevel,omitempty"`
+}
+
+// TournamentAttendance represents events.v1.TournamentAttendance.
+type TournamentAttendance struct {
+	Count int32  `json:"count,omitempty"`
+	Unit  string `json:"unit,omitempty"`
+	Scope string `json:"scope,omitempty"`
+}
+
+// TournamentPrize represents events.v1.TournamentPrize.
+type TournamentPrize struct {
+	Place              string      `json:"place,omitempty"`
+	Cash               *EventMoney `json:"cash,omitempty"`
+	Items              []string    `json:"items,omitempty"`
+	RecipientEntrantID string      `json:"recipientEntrantId,omitempty"`
+	WorldTourPoints    *int32      `json:"worldTourPoints,omitempty"`
+}
+
+// EventBanner represents events.v1.EventBanner.
+type EventBanner struct {
+	SourceURL   string `json:"sourceUrl,omitempty"`
+	AccentColor string `json:"accentColor,omitempty"`
+}
+
+// TournamentDetails represents events.v1.TournamentDetails.
+// StartsOn and EndsOn are YYYY-MM-DD dates.
+type TournamentDetails struct {
+	CatalogEventID string                `json:"catalogEventId,omitempty"`
+	CatalogStopID  string                `json:"catalogStopId,omitempty"`
+	StartsOn       string                `json:"startsOn,omitempty"`
+	EndsOn         string                `json:"endsOn,omitempty"`
+	TournamentType string                `json:"tournamentType,omitempty"`
+	Circuit        string                `json:"circuit,omitempty"`
+	Formats        []string              `json:"formats,omitempty"`
+	Days           []TournamentDay       `json:"days,omitempty"`
+	EntryFee       *EventMoney           `json:"entryFee,omitempty"`
+	Attendance     *TournamentAttendance `json:"attendance,omitempty"`
+	Prizes         []TournamentPrize     `json:"prizes,omitempty"`
+	PrizePool      *EventMoney           `json:"prizePool,omitempty"`
+	Eligibility    string                `json:"eligibility,omitempty"`
+	LivestreamURL  string                `json:"livestreamUrl,omitempty"`
+	Banner         *EventBanner          `json:"banner,omitempty"`
+}
 
 // EventCoordinates represents events.v1.Coordinates.
 type EventCoordinates struct {
@@ -86,34 +192,42 @@ type EventStore struct {
 	CreatedAt    *time.Time    `json:"createdAt,omitempty"`
 	UpdatedAt    *time.Time    `json:"updatedAt,omitempty"`
 	LastSeenAt   *time.Time    `json:"lastSeenAt,omitempty"`
+	DistanceKM   *float64      `json:"distanceKm,omitempty"`
 }
 
 // Event represents events.v1.Event.
 type Event struct {
-	EventID            string            `json:"eventId,omitempty"`
-	Source             EventSource       `json:"source,omitempty"`
-	Status             EventStatus       `json:"status,omitempty"`
-	GemEventID         int64             `json:"gemEventId,omitempty,string"`
-	StoreID            string            `json:"storeId,omitempty"`
-	OrganizerStoreSlug string            `json:"organizerStoreSlug,omitempty"`
-	OrganizerName      string            `json:"organizerName,omitempty"`
-	Title              string            `json:"title,omitempty"`
-	EventType          string            `json:"eventType,omitempty"`
-	Format             string            `json:"format,omitempty"`
-	StartsAt           *time.Time        `json:"startsAt,omitempty"`
-	EndsAt             *time.Time        `json:"endsAt,omitempty"`
-	VenueName          string            `json:"venueName,omitempty"`
-	Address            string            `json:"address,omitempty"`
-	Country            string            `json:"country,omitempty"`
-	Coordinates        *EventCoordinates `json:"coordinates,omitempty"`
-	ExternalLink       string            `json:"externalLink,omitempty"`
-	Description        string            `json:"description,omitempty"`
-	DescriptionHTML    string            `json:"descriptionHtml,omitempty"`
-	PlayerCap          int32             `json:"playerCap,omitempty"`
-	OwnerUserID        string            `json:"ownerUserId,omitempty"`
-	CreatedAt          *time.Time        `json:"createdAt,omitempty"`
-	UpdatedAt          *time.Time        `json:"updatedAt,omitempty"`
-	LastSeenAt         *time.Time        `json:"lastSeenAt,omitempty"`
+	EventID            string             `json:"eventId,omitempty"`
+	Source             EventSource        `json:"source,omitempty"`
+	Status             EventStatus        `json:"status,omitempty"`
+	GemEventID         int64              `json:"gemEventId,omitempty,string"`
+	StoreID            string             `json:"storeId,omitempty"`
+	OrganizerStoreSlug string             `json:"organizerStoreSlug,omitempty"`
+	OrganizerName      string             `json:"organizerName,omitempty"`
+	Title              string             `json:"title,omitempty"`
+	EventType          string             `json:"eventType,omitempty"`
+	Format             string             `json:"format,omitempty"`
+	StartsAt           *time.Time         `json:"startsAt,omitempty"`
+	EndsAt             *time.Time         `json:"endsAt,omitempty"`
+	VenueName          string             `json:"venueName,omitempty"`
+	Address            string             `json:"address,omitempty"`
+	Country            string             `json:"country,omitempty"`
+	Coordinates        *EventCoordinates  `json:"coordinates,omitempty"`
+	ExternalLink       string             `json:"externalLink,omitempty"`
+	Description        string             `json:"description,omitempty"`
+	DescriptionHTML    string             `json:"descriptionHtml,omitempty"`
+	PlayerCap          int32              `json:"playerCap,omitempty"`
+	OwnerUserID        string             `json:"ownerUserId,omitempty"`
+	CreatedAt          *time.Time         `json:"createdAt,omitempty"`
+	UpdatedAt          *time.Time         `json:"updatedAt,omitempty"`
+	LastSeenAt         *time.Time         `json:"lastSeenAt,omitempty"`
+	TourStopID         string             `json:"tourStopId,omitempty"`
+	RegistrationURL    string             `json:"registrationUrl,omitempty"`
+	CanonicalEventID   string             `json:"canonicalEventId,omitempty"`
+	Image              *EventImage        `json:"image,omitempty"`
+	Timezone           string             `json:"timezone,omitempty"`
+	DistanceKM         *float64           `json:"distanceKm,omitempty"`
+	Tournament         *TournamentDetails `json:"tournament,omitempty"`
 }
 
 // EventFilterValue represents events.v1.EventFilterValue.
@@ -155,6 +269,7 @@ type ListEventsRequest struct {
 	Latitude     *float64
 	Longitude    *float64
 	RadiusKM     *float64
+	OrderBy      ListEventsOrder
 }
 
 // ListEventsResponse returns events.
@@ -197,6 +312,7 @@ type CreateCommunityEventRequest struct {
 	ExternalLink string            `json:"externalLink,omitempty"`
 	Description  string            `json:"description,omitempty"`
 	PlayerCap    *int32            `json:"playerCap,omitempty"`
+	Timezone     string            `json:"timezone,omitempty"`
 }
 
 // CreateCommunityEventResponse returns the created event.
@@ -210,6 +326,7 @@ func (r *CreateCommunityEventResponse) setMetadata(metadata ResponseMetadata) {
 }
 
 // UpdateCommunityEventRequest updates a community event.
+// UpdateMask optionally lists the comma-separated camelCase fields to update.
 type UpdateCommunityEventRequest struct {
 	EventID      string            `json:"-"`
 	Title        *string           `json:"title,omitempty"`
@@ -224,6 +341,8 @@ type UpdateCommunityEventRequest struct {
 	ExternalLink *string           `json:"externalLink,omitempty"`
 	Description  *string           `json:"description,omitempty"`
 	PlayerCap    *int32            `json:"playerCap,omitempty"`
+	Timezone     *string           `json:"timezone,omitempty"`
+	UpdateMask   string            `json:"updateMask,omitempty"`
 }
 
 // UpdateCommunityEventResponse returns the updated event.
@@ -262,6 +381,7 @@ type ListStoresRequest struct {
 	Latitude    *float64
 	Longitude   *float64
 	RadiusKM    *float64
+	OrderBy     ListStoresOrder
 }
 
 // ListStoresResponse returns stores.
@@ -374,6 +494,7 @@ func (c *Client) ListEvents(ctx context.Context, request *ListEventsRequest, opt
 	setQueryFloat64(query, "latitude", request.Latitude)
 	setQueryFloat64(query, "longitude", request.Longitude)
 	setQueryFloat64(query, "radiusKm", request.RadiusKM)
+	setQueryEnum(query, "orderBy", string(request.OrderBy), string(ListEventsOrderUnspecified))
 	req.URL.RawQuery = query.Encode()
 
 	response := &ListEventsResponse{}
@@ -515,6 +636,7 @@ func (c *Client) ListStores(ctx context.Context, request *ListStoresRequest, opt
 	setQueryFloat64(query, "latitude", request.Latitude)
 	setQueryFloat64(query, "longitude", request.Longitude)
 	setQueryFloat64(query, "radiusKm", request.RadiusKM)
+	setQueryEnum(query, "orderBy", string(request.OrderBy), string(ListStoresOrderUnspecified))
 	req.URL.RawQuery = query.Encode()
 
 	response := &ListStoresResponse{}

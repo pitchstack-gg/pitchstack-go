@@ -727,3 +727,48 @@ func TestClientImportCollection(t *testing.T) {
 		require.Nil(t, resp)
 	})
 }
+
+func TestClientCollectionsContractUpdates(t *testing.T) {
+	t.Run("when exclude withheld set, then query sent and counts decoded", func(t *testing.T) {
+		client := newStubAPIClient(t, func(t *testing.T, r *http.Request) {
+			require.Equal(t, "/v1/collections/col-1", r.URL.Path)
+			require.Equal(t, "true", r.URL.Query().Get("excludeWithheld"))
+		}, `{"collection":{"id":"col-1","visibility":"VISIBILITY_LEVEL_UNLISTED","counts":{"uniqueProducts":"12","totalQuantity":"0"}},"withholdingChecked":false}`)
+
+		resp, err := client.GetCollection(context.Background(), &GetCollectionRequest{CollectionID: "col-1", ExcludeWithheld: true})
+		require.NoError(t, err)
+		require.Equal(t, VisibilityLevelUnlisted, resp.Collection.Visibility)
+		require.Equal(t, int64(12), *resp.Collection.Counts.UniqueProducts)
+		require.Zero(t, *resp.Collection.Counts.TotalQuantity)
+		require.NotNil(t, resp.WithholdingChecked)
+		require.False(t, *resp.WithholdingChecked)
+	})
+
+	t.Run("when exclude withheld unset, then no query sent", func(t *testing.T) {
+		client := newStubAPIClient(t, func(t *testing.T, r *http.Request) {
+			require.Empty(t, r.URL.RawQuery)
+		}, `{"collection":{"id":"col-1"}}`)
+		resp, err := client.GetCollection(context.Background(), &GetCollectionRequest{CollectionID: "col-1"})
+		require.NoError(t, err)
+		require.Nil(t, resp.Collection.Counts)
+	})
+
+	t.Run("when price type set, then valuation query includes it", func(t *testing.T) {
+		client := newStubAPIClient(t, func(t *testing.T, r *http.Request) {
+			require.Equal(t, "/v1/collections/col-1/valuation", r.URL.Path)
+			require.Equal(t, "low", r.URL.Query().Get("priceType"))
+			require.Equal(t, "TCGPlayer", r.URL.Query().Get("source"))
+		}, `{"collectionId":"col-1"}`)
+		_, err := client.GetCollectionValuation(context.Background(), &GetCollectionValuationRequest{CollectionID: "col-1", Source: "TCGPlayer", PriceType: CollectionValuationPriceTypeLow})
+		require.NoError(t, err)
+	})
+
+	t.Run("when trade items listed, then counts decoded", func(t *testing.T) {
+		client := newStubAPIClient(t, func(t *testing.T, r *http.Request) {
+			require.Equal(t, "/v1/trade_items", r.URL.Path)
+		}, `{"items":[],"counts":{"uniqueProducts":"3","totalQuantity":"7"}}`)
+		resp, err := client.ListTradeItems(context.Background(), &ListTradeItemsRequest{})
+		require.NoError(t, err)
+		require.Equal(t, int64(7), *resp.Counts.TotalQuantity)
+	})
+}

@@ -22,6 +22,12 @@ type PriceEntry struct {
 	RecordAt  *time.Time `json:"recordAt,omitempty"`
 	Source    string     `json:"source,omitempty"`
 	SourceURL string     `json:"sourceUrl,omitempty"`
+	// MarketPrice, LowPrice, MidPrice and HighPrice are read-only named amounts.
+	// Prefer them over Price, Price2 and Price3; nil means the amount was not reported.
+	MarketPrice *float64 `json:"marketPrice,omitempty"`
+	LowPrice    *float64 `json:"lowPrice,omitempty"`
+	MidPrice    *float64 `json:"midPrice,omitempty"`
+	HighPrice   *float64 `json:"highPrice,omitempty"`
 }
 
 // GetProductPriceRequest identifies which product price to fetch.

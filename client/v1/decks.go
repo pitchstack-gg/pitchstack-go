@@ -94,21 +94,44 @@ const (
 
 // Deck models v1Deck.
 type Deck struct {
-	ID                  string               `json:"id,omitempty"`
-	UserID              string               `json:"userId,omitempty"`
-	Name                string               `json:"name,omitempty"`
-	Author              string               `json:"author,omitempty"`
-	HeroID              string               `json:"heroId,omitempty"`
-	Format              string               `json:"format,omitempty"`
-	Visibility          VisibilityLevel      `json:"visibility,omitempty"`
-	DeckVersions        []DeckVersionSummary `json:"deckVersions,omitempty"`
-	ActiveDeckVersionID string               `json:"activeDeckVersionId,omitempty"`
-	DeckKind            DeckKind             `json:"deckKind,omitempty"`
-	SourceKind          DeckSourceKind       `json:"sourceKind,omitempty"`
-	SourceReference     string               `json:"sourceReference,omitempty"`
-	TournamentType      string               `json:"tournamentType,omitempty"`
-	CreatedAt           *time.Time           `json:"createdAt,omitempty"`
-	UpdatedAt           *time.Time           `json:"updatedAt,omitempty"`
+	ID                        string               `json:"id,omitempty"`
+	UserID                    string               `json:"userId,omitempty"`
+	Name                      string               `json:"name,omitempty"`
+	Author                    string               `json:"author,omitempty"`
+	HeroID                    string               `json:"heroId,omitempty"`
+	Format                    string               `json:"format,omitempty"`
+	Visibility                VisibilityLevel      `json:"visibility,omitempty"`
+	DeckVersions              []DeckVersionSummary `json:"deckVersions,omitempty"`
+	ActiveDeckVersionID       string               `json:"activeDeckVersionId,omitempty"`
+	DeckKind                  DeckKind             `json:"deckKind,omitempty"`
+	SourceKind                DeckSourceKind       `json:"sourceKind,omitempty"`
+	SourceReference           string               `json:"sourceReference,omitempty"`
+	TournamentType            string               `json:"tournamentType,omitempty"`
+	CreatedAt                 *time.Time           `json:"createdAt,omitempty"`
+	UpdatedAt                 *time.Time           `json:"updatedAt,omitempty"`
+	SelectedHeroArtPrintingID string               `json:"selectedHeroArtPrintingId,omitempty"`
+	EventID                   string               `json:"eventId,omitempty"`
+	SourceFormat              string               `json:"sourceFormat,omitempty"`
+}
+
+// ProductDeckRelation represents decks.v1.ProductDeckRelation.
+type ProductDeckRelation string
+
+const (
+	ProductDeckRelationUnspecified ProductDeckRelation = "PRODUCT_DECK_RELATION_UNSPECIFIED"
+	ProductDeckRelationOwner       ProductDeckRelation = "PRODUCT_DECK_RELATION_OWNER"
+	ProductDeckRelationEdition     ProductDeckRelation = "PRODUCT_DECK_RELATION_EDITION"
+	ProductDeckRelationPackage     ProductDeckRelation = "PRODUCT_DECK_RELATION_PACKAGE"
+)
+
+// ProductDeckLink represents decks.v1.ProductDeckLink, linking a product to a deck.
+type ProductDeckLink struct {
+	ProductID      string              `json:"productId,omitempty"`
+	OwnerProductID string              `json:"ownerProductId,omitempty"`
+	UnitProductID  string              `json:"unitProductId,omitempty"`
+	Quantity       int32               `json:"quantity,omitempty"`
+	Relation       ProductDeckRelation `json:"relation,omitempty"`
+	DeckID         string              `json:"deckId,omitempty"`
 }
 
 // DeckVersionSummary represents v1DeckVersionSummary.
@@ -176,8 +199,9 @@ type DeckVersionCardChange struct {
 
 // DeckCard mirrors v1Card used within deck operations.
 type DeckCard struct {
-	CardID   string `json:"cardId,omitempty"`
-	Quantity int32  `json:"quantity,omitempty"`
+	CardID                string `json:"cardId,omitempty"`
+	Quantity              int32  `json:"quantity,omitempty"`
+	SelectedArtPrintingID string `json:"selectedArtPrintingId,omitempty"`
 }
 
 // ListDecksRequest configures filters for ListDecks.
@@ -265,6 +289,7 @@ type SearchDecksRequest struct {
 	SourceReference string
 	TournamentType  string
 	OrderBy         SearchDecksOrder
+	EventID         string
 }
 
 // SearchDecksResponse returns decks matching the search query.
@@ -279,14 +304,19 @@ func (r *SearchDecksResponse) setMetadata(metadata ResponseMetadata) {
 }
 
 // GetDeckRequest identifies the deck to retrieve.
+// ExcludeWithheld asks the server to omit content withheld by moderation.
 type GetDeckRequest struct {
-	DeckID string `json:"-"`
+	DeckID          string `json:"-"`
+	ExcludeWithheld bool
 }
 
 // GetDeckResponse wraps the retrieved deck.
 type GetDeckResponse struct {
-	Deck     *Deck            `json:"deck,omitempty"`
-	Metadata ResponseMetadata `json:"-"`
+	Deck               *Deck             `json:"deck,omitempty"`
+	CanonicalProductID string            `json:"canonicalProductId,omitempty"`
+	RelatedProducts    []ProductDeckLink `json:"relatedProducts,omitempty"`
+	WithholdingChecked *bool             `json:"withholdingChecked,omitempty"`
+	Metadata           ResponseMetadata  `json:"-"`
 }
 
 func (r *GetDeckResponse) setMetadata(metadata ResponseMetadata) {
@@ -735,21 +765,23 @@ type ImportDeckVersion struct {
 
 // ImportDeckRequest imports a deck snapshot.
 type ImportDeckRequest struct {
-	DeckID              string              `json:"deckId,omitempty"`
-	Name                string              `json:"name,omitempty"`
-	HeroID              string              `json:"heroId,omitempty"`
-	Format              string              `json:"format,omitempty"`
-	Author              string              `json:"author,omitempty"`
-	Visibility          *VisibilityLevel    `json:"visibility,omitempty"`
-	CreatedAt           *time.Time          `json:"createdAt,omitempty"`
-	Versions            []ImportDeckVersion `json:"versions,omitempty"`
-	ActiveDeckVersionID string              `json:"activeDeckVersionId,omitempty"`
+	DeckID                    string              `json:"deckId,omitempty"`
+	Name                      string              `json:"name,omitempty"`
+	HeroID                    string              `json:"heroId,omitempty"`
+	Format                    string              `json:"format,omitempty"`
+	Author                    string              `json:"author,omitempty"`
+	Visibility                *VisibilityLevel    `json:"visibility,omitempty"`
+	CreatedAt                 *time.Time          `json:"createdAt,omitempty"`
+	Versions                  []ImportDeckVersion `json:"versions,omitempty"`
+	ActiveDeckVersionID       string              `json:"activeDeckVersionId,omitempty"`
+	SelectedHeroArtPrintingID string              `json:"selectedHeroArtPrintingId,omitempty"`
 }
 
 // ImportDeckResponse returns the imported deck details.
 type ImportDeckResponse struct {
 	Deck             *Deck            `json:"deck,omitempty"`
 	ImportedVersions int32            `json:"importedVersions,omitempty"`
+	DeckCreated      bool             `json:"deckCreated,omitempty"`
 	Metadata         ResponseMetadata `json:"-"`
 }
 
@@ -931,6 +963,7 @@ func (c *Client) SearchDecks(ctx context.Context, request *SearchDecksRequest, o
 	if orderBy := strings.TrimSpace(string(request.OrderBy)); orderBy != "" && orderBy != string(SearchDecksOrderUnspecified) {
 		query.Set("orderBy", orderBy)
 	}
+	setQueryString(query, "eventId", request.EventID)
 	req.URL.RawQuery = query.Encode()
 
 	response := &SearchDecksResponse{}
@@ -956,6 +989,11 @@ func (c *Client) GetDeck(ctx context.Context, request *GetDeckRequest, opts ...R
 	req, err := c.newRequest(ctx, http.MethodGet, path, nil)
 	if err != nil {
 		return nil, err
+	}
+	if request.ExcludeWithheld {
+		query := req.URL.Query()
+		query.Set("excludeWithheld", "true")
+		req.URL.RawQuery = query.Encode()
 	}
 
 	response := &GetDeckResponse{}
@@ -1801,25 +1839,27 @@ func (c *Client) ImportDeck(ctx context.Context, request *ImportDeckRequest, opt
 	}
 
 	body, err := jsonBody(struct {
-		DeckID              string              `json:"deckId,omitempty"`
-		Name                string              `json:"name,omitempty"`
-		HeroID              string              `json:"heroId,omitempty"`
-		Format              string              `json:"format,omitempty"`
-		Author              string              `json:"author,omitempty"`
-		Visibility          *VisibilityLevel    `json:"visibility,omitempty"`
-		CreatedAt           *time.Time          `json:"createdAt,omitempty"`
-		Versions            []ImportDeckVersion `json:"versions,omitempty"`
-		ActiveDeckVersionID string              `json:"activeDeckVersionId,omitempty"`
+		DeckID                    string              `json:"deckId,omitempty"`
+		Name                      string              `json:"name,omitempty"`
+		HeroID                    string              `json:"heroId,omitempty"`
+		Format                    string              `json:"format,omitempty"`
+		Author                    string              `json:"author,omitempty"`
+		Visibility                *VisibilityLevel    `json:"visibility,omitempty"`
+		CreatedAt                 *time.Time          `json:"createdAt,omitempty"`
+		Versions                  []ImportDeckVersion `json:"versions,omitempty"`
+		ActiveDeckVersionID       string              `json:"activeDeckVersionId,omitempty"`
+		SelectedHeroArtPrintingID string              `json:"selectedHeroArtPrintingId,omitempty"`
 	}{
-		DeckID:              strings.TrimSpace(request.DeckID),
-		Name:                strings.TrimSpace(request.Name),
-		HeroID:              strings.TrimSpace(request.HeroID),
-		Format:              strings.TrimSpace(request.Format),
-		Author:              strings.TrimSpace(request.Author),
-		Visibility:          request.Visibility,
-		CreatedAt:           request.CreatedAt,
-		Versions:            request.Versions,
-		ActiveDeckVersionID: strings.TrimSpace(request.ActiveDeckVersionID),
+		DeckID:                    strings.TrimSpace(request.DeckID),
+		Name:                      strings.TrimSpace(request.Name),
+		HeroID:                    strings.TrimSpace(request.HeroID),
+		Format:                    strings.TrimSpace(request.Format),
+		Author:                    strings.TrimSpace(request.Author),
+		Visibility:                request.Visibility,
+		CreatedAt:                 request.CreatedAt,
+		Versions:                  request.Versions,
+		ActiveDeckVersionID:       strings.TrimSpace(request.ActiveDeckVersionID),
+		SelectedHeroArtPrintingID: strings.TrimSpace(request.SelectedHeroArtPrintingID),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("encode body: %w", err)
@@ -1868,6 +1908,157 @@ func (c *Client) ListStarredDecks(ctx context.Context, request *ListStarredDecks
 	req.URL.RawQuery = query.Encode()
 
 	response := &ListStarredDecksResponse{}
+	if err := c.do(req, response, opts...); err != nil {
+		return nil, err
+	}
+
+	return response, nil
+}
+
+// ListProductDecksRequest identifies a product whose decks should be listed.
+type ListProductDecksRequest struct {
+	ProductID string `json:"-"`
+}
+
+// ListProductDecksResponse returns the decks linked to a product.
+type ListProductDecksResponse struct {
+	Links    []ProductDeckLink `json:"links,omitempty"`
+	Metadata ResponseMetadata  `json:"-"`
+}
+
+func (r *ListProductDecksResponse) setMetadata(metadata ResponseMetadata) {
+	r.Metadata = metadata
+}
+
+// UpdateDeckHeroArtRequest selects or clears the hero artwork for a deck.
+type UpdateDeckHeroArtRequest struct {
+	DeckID                string `json:"-"`
+	SelectedArtPrintingID string `json:"selectedArtPrintingId,omitempty"`
+	ClearSelectedArt      bool   `json:"clearSelectedArt,omitempty"`
+}
+
+// UpdateDeckHeroArtResponse returns the updated deck.
+type UpdateDeckHeroArtResponse struct {
+	Deck     *Deck            `json:"deck,omitempty"`
+	Metadata ResponseMetadata `json:"-"`
+}
+
+func (r *UpdateDeckHeroArtResponse) setMetadata(metadata ResponseMetadata) {
+	r.Metadata = metadata
+}
+
+// UpdateDeckVersionCardArtRequest selects or clears the artwork for a card in a deck version.
+type UpdateDeckVersionCardArtRequest struct {
+	DeckVersionID         string `json:"-"`
+	CardID                string `json:"-"`
+	SelectedArtPrintingID string `json:"selectedArtPrintingId,omitempty"`
+	ClearSelectedArt      bool   `json:"clearSelectedArt,omitempty"`
+}
+
+// UpdateDeckVersionCardArtResponse returns the card's resulting artwork selection.
+type UpdateDeckVersionCardArtResponse struct {
+	CardID                string           `json:"cardId,omitempty"`
+	SelectedArtPrintingID string           `json:"selectedArtPrintingId,omitempty"`
+	Metadata              ResponseMetadata `json:"-"`
+}
+
+func (r *UpdateDeckVersionCardArtResponse) setMetadata(metadata ResponseMetadata) {
+	r.Metadata = metadata
+}
+
+// ListProductDecks lists the decks linked to a product, such as a preconstructed deck.
+func (c *Client) ListProductDecks(ctx context.Context, request *ListProductDecksRequest, opts ...RequestOpt) (*ListProductDecksResponse, error) {
+	if request == nil {
+		return nil, errors.New("request must not be nil")
+	}
+	productID := strings.TrimSpace(request.ProductID)
+	if productID == "" {
+		return nil, errors.New("productID must not be empty")
+	}
+
+	path := fmt.Sprintf("/v1/products/%s/decks", url.PathEscape(productID))
+	req, err := c.newRequest(ctx, http.MethodGet, path, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListProductDecksResponse{}
+	if err := c.do(req, response, opts...); err != nil {
+		return nil, err
+	}
+
+	return response, nil
+}
+
+// UpdateDeckHeroArt selects or clears the hero artwork for a deck.
+func (c *Client) UpdateDeckHeroArt(ctx context.Context, request *UpdateDeckHeroArtRequest, opts ...RequestOpt) (*UpdateDeckHeroArtResponse, error) {
+	if request == nil {
+		return nil, errors.New("request must not be nil")
+	}
+	deckID := strings.TrimSpace(request.DeckID)
+	if deckID == "" {
+		return nil, errors.New("deckID must not be empty")
+	}
+
+	body, err := jsonBody(struct {
+		SelectedArtPrintingID string `json:"selectedArtPrintingId,omitempty"`
+		ClearSelectedArt      bool   `json:"clearSelectedArt,omitempty"`
+	}{
+		SelectedArtPrintingID: strings.TrimSpace(request.SelectedArtPrintingID),
+		ClearSelectedArt:      request.ClearSelectedArt,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("encode body: %w", err)
+	}
+
+	path := fmt.Sprintf("/v1/decks/%s/hero/art", url.PathEscape(deckID))
+	req, err := c.newRequest(ctx, http.MethodPut, path, body)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	response := &UpdateDeckHeroArtResponse{}
+	if err := c.do(req, response, opts...); err != nil {
+		return nil, err
+	}
+
+	return response, nil
+}
+
+// UpdateDeckVersionCardArt selects or clears the artwork for one card in a deck version.
+func (c *Client) UpdateDeckVersionCardArt(ctx context.Context, request *UpdateDeckVersionCardArtRequest, opts ...RequestOpt) (*UpdateDeckVersionCardArtResponse, error) {
+	if request == nil {
+		return nil, errors.New("request must not be nil")
+	}
+	deckVersionID := strings.TrimSpace(request.DeckVersionID)
+	if deckVersionID == "" {
+		return nil, errors.New("deckVersionID must not be empty")
+	}
+	cardID := strings.TrimSpace(request.CardID)
+	if cardID == "" {
+		return nil, errors.New("cardID must not be empty")
+	}
+
+	body, err := jsonBody(struct {
+		SelectedArtPrintingID string `json:"selectedArtPrintingId,omitempty"`
+		ClearSelectedArt      bool   `json:"clearSelectedArt,omitempty"`
+	}{
+		SelectedArtPrintingID: strings.TrimSpace(request.SelectedArtPrintingID),
+		ClearSelectedArt:      request.ClearSelectedArt,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("encode body: %w", err)
+	}
+
+	path := fmt.Sprintf("/v1/deck_versions/%s/cards/%s/art", url.PathEscape(deckVersionID), url.PathEscape(cardID))
+	req, err := c.newRequest(ctx, http.MethodPut, path, body)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	response := &UpdateDeckVersionCardArtResponse{}
 	if err := c.do(req, response, opts...); err != nil {
 		return nil, err
 	}

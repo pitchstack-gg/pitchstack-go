@@ -134,3 +134,65 @@ func TestClientEventStoresAndAdmin(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, EventStatusPublished, unhideResp.Event.Status)
 }
+
+func TestClientEventsContractUpdates(t *testing.T) {
+	t.Run("when order set, then list events sends orderBy and decodes tournament fields", func(t *testing.T) {
+		client := newStubAPIClient(t, func(t *testing.T, r *http.Request) {
+			require.Equal(t, "/v1/events", r.URL.Path)
+			require.Equal(t, "LIST_EVENTS_ORDER_DISTANCE_ASC", r.URL.Query().Get("orderBy"))
+			require.Equal(t, "EVENT_SOURCE_TOURNAMENT", r.URL.Query().Get("source"))
+		}, `{"events":[{"eventId":"evt-1","status":"EVENT_STATUS_COMPLETED","tourStopId":"ts-1","registrationUrl":"https://reg.example","canonicalEventId":"evt-0","timezone":"America/Chicago","distanceKm":12.5,"image":{"url":"https://cdn.example/e.jpg","kind":"EVENT_IMAGE_KIND_PRODUCT_SET"},"tournament":{"catalogEventId":"cat-1","days":[{"date":"2026-05-01","startTimeLocal":"09:00"}],"attendance":{"count":300,"unit":"players"},"prizePool":{"amount":10000,"currency":"USD"},"banner":{"accentColor":"#fff"}}}]}`)
+
+		resp, err := client.ListEvents(context.Background(), &ListEventsRequest{Source: EventSourceTournament, OrderBy: ListEventsOrderDistanceAsc})
+		require.NoError(t, err)
+		require.Len(t, resp.Events, 1)
+		event := resp.Events[0]
+		require.Equal(t, EventStatusCompleted, event.Status)
+		require.Equal(t, "ts-1", event.TourStopID)
+		require.Equal(t, "America/Chicago", event.Timezone)
+		require.InDelta(t, 12.5, *event.DistanceKM, 0.0001)
+		require.Equal(t, EventImageKindProductSet, event.Image.Kind)
+		require.Equal(t, int32(300), event.Tournament.Attendance.Count)
+		require.Equal(t, "09:00", event.Tournament.Days[0].StartTimeLocal)
+		require.Equal(t, "USD", event.Tournament.PrizePool.Currency)
+	})
+
+	t.Run("when order unspecified, then orderBy omitted", func(t *testing.T) {
+		client := newStubAPIClient(t, func(t *testing.T, r *http.Request) {
+			require.False(t, r.URL.Query().Has("orderBy"))
+		}, `{}`)
+		_, err := client.ListEvents(context.Background(), &ListEventsRequest{OrderBy: ListEventsOrderUnspecified})
+		require.NoError(t, err)
+	})
+
+	t.Run("when store order set, then list stores sends orderBy and decodes distance", func(t *testing.T) {
+		client := newStubAPIClient(t, func(t *testing.T, r *http.Request) {
+			require.Equal(t, "/v1/event-stores", r.URL.Path)
+			require.Equal(t, "LIST_STORES_ORDER_NAME_ASC", r.URL.Query().Get("orderBy"))
+		}, `{"stores":[{"storeId":"store-1","distanceKm":3.2}]}`)
+
+		resp, err := client.ListStores(context.Background(), &ListStoresRequest{OrderBy: ListStoresOrderNameAsc})
+		require.NoError(t, err)
+		require.InDelta(t, 3.2, *resp.Stores[0].DistanceKM, 0.0001)
+	})
+
+	t.Run("when timezone and update mask set, then body includes them", func(t *testing.T) {
+		start := time.Date(2026, 5, 1, 18, 0, 0, 0, time.UTC)
+		client := newStubAPIClient(t, func(t *testing.T, r *http.Request) {
+			var payload map[string]any
+			require.NoError(t, json.NewDecoder(r.Body).Decode(&payload))
+			require.Equal(t, "Europe/London", payload["timezone"])
+			if r.Method == http.MethodPatch {
+				require.Equal(t, "title,timezone", payload["updateMask"])
+			}
+		}, `{"event":{"eventId":"evt-2"}}`)
+
+		_, err := client.CreateCommunityEvent(context.Background(), &CreateCommunityEventRequest{Title: "Armory", StartsAt: &start, Timezone: "Europe/London"})
+		require.NoError(t, err)
+
+		title := "Armory"
+		tz := "Europe/London"
+		_, err = client.UpdateCommunityEvent(context.Background(), &UpdateCommunityEventRequest{EventID: "evt-2", Title: &title, Timezone: &tz, UpdateMask: "title,timezone"})
+		require.NoError(t, err)
+	})
+}
